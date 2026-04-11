@@ -1,14 +1,134 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello World</title>
+  <title>CabinVoice Pro · 기내방송 훈련 시스템</title>
   <link href='/style.css' rel='stylesheet'>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <h1>Hello, world!</h1>
-  <button onclick="console.log('hello');">Press me</button>
+
+  <!-- ===== SCREEN 1: HOME ===== -->
+  <div id="screen-home" class="screen active">
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo-mark">✈</div>
+        <div>
+          <div class="logo-text">CabinVoice Pro</div>
+          <div class="logo-sub">기내방송 훈련 시스템</div>
+        </div>
+      </div>
+      <div class="header-badge">OPIc 방식</div>
+    </header>
+    <main class="home-main">
+      <div class="home-intro">
+        <h2>방송 유형을 선택하세요</h2>
+        <p>방송문안 숙지 → 녹음 → AI 자동 채점 · 피드백</p>
+      </div>
+      <div class="script-grid" id="script-grid"></div>
+    </main>
+  </div>
+
+  <!-- ===== SCREEN 2: PREP ===== -->
+  <div id="screen-prep" class="screen">
+    <div class="prep-topbar">
+      <button class="btn-icon" id="btn-back-prep">← 뒤로</button>
+      <div class="prep-timer-box">
+        <span class="prep-timer-label">준비 시간</span>
+        <span class="prep-countdown" id="prep-countdown">30</span>
+        <span class="prep-timer-label">초</span>
+      </div>
+      <button class="btn-primary sm" id="btn-start-record">🎤 녹음 시작</button>
+    </div>
+    <div class="prep-body">
+      <div class="prep-meta">
+        <span class="tag" id="prep-category-tag"></span>
+        <span class="tag outline" id="prep-difficulty-tag"></span>
+        <span class="tag outline" id="prep-duration-tag"></span>
+      </div>
+      <h2 class="prep-title" id="prep-title"></h2>
+      <div class="script-card" id="prep-text"></div>
+      <div class="checkpoints-box">
+        <div class="checkpoints-label">✅ 핵심 체크포인트</div>
+        <div class="checkpoints-list" id="prep-checkpoints"></div>
+      </div>
+      <div class="tips-box" id="tips-box"></div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 3: RECORDING ===== -->
+  <div id="screen-record" class="screen">
+    <div class="record-topbar">
+      <div class="rec-badge"><span class="rec-dot"></span> REC</div>
+      <div class="record-title" id="record-title"></div>
+      <div class="record-timer" id="record-timer">00:00</div>
+    </div>
+    <div class="waveform-wrap">
+      <canvas id="waveform-canvas" width="800" height="140"></canvas>
+    </div>
+    <div class="live-transcript-box">
+      <div class="live-label">🎙 실시간 인식</div>
+      <div class="live-text" id="live-text">말씀해 주세요...</div>
+    </div>
+    <div class="script-peek">
+      <button class="script-peek-btn" id="btn-peek">📄 방송문 보기/숨기기</button>
+      <div class="script-peek-text hidden" id="script-peek-text"></div>
+    </div>
+    <div class="record-actions">
+      <button class="btn-stop" id="btn-stop-record">■ 녹음 제출</button>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 4: RESULTS ===== -->
+  <div id="screen-result" class="screen">
+    <div class="result-topbar">
+      <button class="btn-icon" id="btn-home">🏠 처음으로</button>
+      <div class="result-topbar-title">분석 결과</div>
+      <button class="btn-primary sm" id="btn-retry">↺ 다시 연습</button>
+    </div>
+    <div class="result-body">
+      <div class="result-overview">
+        <div class="total-score-box">
+          <div class="total-score-value" id="total-score-value">—</div>
+          <div class="total-score-label">종합 점수</div>
+          <div class="total-grade" id="total-grade"></div>
+        </div>
+        <div class="radar-wrap">
+          <canvas id="radar-chart"></canvas>
+        </div>
+      </div>
+
+      <div class="score-bars" id="score-bars"></div>
+
+      <div class="feedback-section">
+        <div class="section-heading">📋 상세 피드백 및 개선사항</div>
+        <div class="feedback-cards" id="feedback-cards"></div>
+      </div>
+
+      <div class="transcript-section">
+        <div class="section-heading">📝 인식된 발화 내용</div>
+        <div class="transcript-compare" id="transcript-compare"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== LOADING ===== -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-box">
+      <div class="loading-plane">✈</div>
+      <div class="loading-title">음성 분석 중...</div>
+      <div class="loading-bars">
+        <div class="loading-bar" style="animation-delay:0s"></div>
+        <div class="loading-bar" style="animation-delay:.15s"></div>
+        <div class="loading-bar" style="animation-delay:.3s"></div>
+        <div class="loading-bar" style="animation-delay:.45s"></div>
+        <div class="loading-bar" style="animation-delay:.6s"></div>
+      </div>
+      <div class="loading-sub">발음 · 억양 · 유창성 · 다정함 · 완성도 평가 중</div>
+    </div>
+  </div>
+
   <script defer type="text/javascript" src="/main.js"></script>
 </body>
 </html>
