@@ -6,6 +6,7 @@
   <title>CabinVoice Pro · 기내방송 훈련 시스템</title>
   <link href='/style.css' rel='stylesheet'>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -32,6 +33,12 @@
 
   <!-- ===== SCREEN 2: PREP ===== -->
   <div id="screen-prep" class="screen">
+    <div class="lang-tabs" id="lang-tabs">
+      <button class="lang-tab active" data-lang="ko">🇰🇷 한국어</button>
+      <button class="lang-tab" data-lang="en">🇺🇸 English</button>
+      <button class="lang-tab" data-lang="ja">🇯🇵 日本語</button>
+      <button class="lang-tab" data-lang="zh">🇨🇳 中文</button>
+    </div>
     <div class="prep-topbar">
       <button class="btn-icon" id="btn-back-prep">← 뒤로</button>
       <div class="prep-timer-box">
@@ -54,6 +61,9 @@
         <div class="checkpoints-list" id="prep-checkpoints"></div>
       </div>
       <div class="tips-box" id="tips-box"></div>
+      <div class="model-voice-bar hidden" id="model-voice-bar">
+        <button class="btn-model-voice" id="btn-model-voice">🎙 모델 음성 듣기</button>
+      </div>
     </div>
   </div>
 
@@ -102,13 +112,181 @@
       <div class="score-bars" id="score-bars"></div>
 
       <div class="feedback-section">
-        <div class="section-heading">📋 상세 피드백 및 개선사항</div>
+        <div class="section-heading">📊 카테고리별 피드백 & 개선 포인트</div>
         <div class="feedback-cards" id="feedback-cards"></div>
       </div>
 
       <div class="transcript-section">
         <div class="section-heading">📝 인식된 발화 내용</div>
         <div class="transcript-compare" id="transcript-compare"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CUSTOM SCRIPT MODAL ===== -->
+  <div id="custom-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-title-text">✏️ 나만의 방송문 추가</div>
+        <button class="modal-close" id="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field-row">
+          <div class="modal-field">
+            <label>방송 제목 <span class="required">*</span></label>
+            <input type="text" id="custom-title" placeholder="예: 탑승 환영 방송 (실제)" maxlength="40">
+          </div>
+          <div class="modal-field">
+            <label>아이콘 <span class="optional">(이모지)</span></label>
+            <input type="text" id="custom-icon" placeholder="✈️" maxlength="2" value="📋">
+          </div>
+        </div>
+        <div class="modal-field">
+          <label>난이도</label>
+          <select id="custom-difficulty">
+            <option value="기본">기본</option>
+            <option value="중급">중급</option>
+            <option value="고급">고급</option>
+          </select>
+        </div>
+        <div class="modal-lang-tabs" id="modal-lang-tabs">
+          <button class="modal-lang-tab active" data-lang="ko">🇰🇷 한국어</button>
+          <button class="modal-lang-tab" data-lang="en">🇺🇸 English</button>
+          <button class="modal-lang-tab" data-lang="ja">🇯🇵 日本語</button>
+          <button class="modal-lang-tab" data-lang="zh">🇨🇳 中文</button>
+        </div>
+        <div id="modal-lang-ko" class="modal-lang-panel active">
+          <div class="modal-field">
+            <label>방송 원문 (한국어) <span class="required">*</span></label>
+            <textarea id="custom-text-ko" rows="7" placeholder="실제 방송문을 여기에 붙여넣으세요..."></textarea>
+            <div class="table-toolbar">
+              <button type="button" class="btn-table-toggle" id="btn-table-toggle">📊 표 삽입</button>
+              <div class="table-builder hidden" id="table-builder">
+                <label class="tb-label">열</label>
+                <select id="tb-cols">
+                  <option value="2">2</option>
+                  <option value="3" selected>3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+                <label class="tb-label">× 행</label>
+                <select id="tb-rows">
+                  <option value="1">1</option>
+                  <option value="2" selected>2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+                <button type="button" class="btn-primary sm" id="tb-insert-btn">삽입</button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-field">
+            <label>체크포인트 <span class="optional">(쉼표로 구분, 선택사항)</span></label>
+            <input type="text" id="custom-checkpoints-ko" placeholder="예: 환영 인사, 항공사명, 편명, 기장 소개, 비행 시간">
+          </div>
+        </div>
+        <div id="modal-lang-en" class="modal-lang-panel">
+          <div class="modal-field">
+            <label>Script (English) <span class="optional">(optional)</span></label>
+            <textarea id="custom-text-en" rows="7" placeholder="Paste the English version of your announcement here..."></textarea>
+          </div>
+        </div>
+        <div id="modal-lang-ja" class="modal-lang-panel">
+          <div class="modal-field">
+            <label>放送原稿（日本語）<span class="optional">（任意）</span></label>
+            <textarea id="custom-text-ja" rows="7" placeholder="日本語の放送原稿をここに貼り付けてください..."></textarea>
+          </div>
+        </div>
+        <div id="modal-lang-zh" class="modal-lang-panel">
+          <div class="modal-field">
+            <label>广播原文（中文）<span class="optional">（可选）</span></label>
+            <textarea id="custom-text-zh" rows="7" placeholder="请在此处粘贴中文广播原稿..."></textarea>
+          </div>
+        </div>
+
+        <!-- 모델 음성 섹션 -->
+        <div class="model-voice-section" id="model-voice-section">
+          <div class="mv-section-title">🎙 모델 음성</div>
+          <div class="mv-current hidden" id="mv-current">
+            <span class="mv-icon">🎵</span>
+            <span class="mv-name" id="mv-name">모델 음성 등록됨</span>
+            <button type="button" class="btn-icon sm" id="mv-play">▶ 재생</button>
+            <button type="button" class="btn-icon sm mv-del-btn" id="mv-del">✕ 삭제</button>
+          </div>
+          <label class="mv-upload-btn">
+            📁 음성 파일 업로드 (MP3 / WAV)
+            <input type="file" id="mv-file-input" accept="audio/mp3,audio/wav,audio/mpeg,audio/*" style="display:none">
+          </label>
+          <div class="mv-hint">훈련생이 연습 준비 화면에서 모델 음성을 들을 수 있습니다</div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-icon btn-restore hidden" id="modal-restore">↺ 원본 복원</button>
+        <div style="flex:1"></div>
+        <button class="btn-icon" id="modal-cancel">취소</button>
+        <button class="btn-primary" id="modal-save">저장하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PDF IMPORT MODAL ===== -->
+  <div id="pdf-modal" class="modal-overlay hidden">
+    <div class="modal-box pdf-modal-box">
+      <div class="modal-header">
+        <div class="modal-title">📄 방송교범 PDF 가져오기</div>
+        <button class="modal-close" id="pdf-modal-close">✕</button>
+      </div>
+      <div class="modal-body" id="pdf-modal-body">
+
+        <!-- Step 1: 파일 선택 -->
+        <div id="pdf-step-upload" class="pdf-step">
+          <div class="pdf-drop-zone" id="pdf-drop-zone">
+            <div class="pdf-drop-icon">📄</div>
+            <div class="pdf-drop-title">PDF 파일을 여기에 드래그하거나</div>
+            <label class="btn-primary sm" style="cursor:pointer;display:inline-block;margin-top:6px">
+              파일 선택
+              <input type="file" id="pdf-file-input" accept=".pdf" style="display:none">
+            </label>
+            <div class="pdf-drop-sub">방송교범 PDF 파일을 선택하면<br>번호 · 제목 · 내용을 자동으로 인식합니다</div>
+          </div>
+        </div>
+
+        <!-- Step 2: 분석 중 -->
+        <div id="pdf-step-parsing" class="pdf-step hidden">
+          <div class="pdf-parsing-box">
+            <div class="loading-plane" style="font-size:36px">✈</div>
+            <div style="color:var(--gray-700);font-weight:600;margin-top:12px" id="pdf-parsing-msg">PDF 분석 중...</div>
+            <div style="color:var(--gray-400);font-size:13px;margin-top:6px" id="pdf-parsing-sub"></div>
+          </div>
+        </div>
+
+        <!-- Step 3: 미리보기 & 편집 -->
+        <div id="pdf-step-preview" class="pdf-step hidden">
+          <div class="pdf-preview-topbar">
+            <div class="pdf-preview-info" id="pdf-preview-info"></div>
+            <div class="pdf-preview-actions">
+              <button class="btn-icon sm" id="pdf-select-all">전체 선택</button>
+              <button class="btn-icon sm" id="pdf-deselect-all">전체 해제</button>
+            </div>
+          </div>
+          <div class="pdf-script-list" id="pdf-script-list"></div>
+        </div>
+
+        <!-- Step 4: 오류 -->
+        <div id="pdf-step-error" class="pdf-step hidden">
+          <div class="pdf-error-box">
+            <div style="font-size:40px">⚠️</div>
+            <div class="pdf-error-msg" id="pdf-error-msg"></div>
+            <button class="btn-icon" id="pdf-retry-btn" style="margin-top:14px">다시 시도</button>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-icon" id="pdf-modal-cancel">취소</button>
+        <button class="btn-primary hidden" id="pdf-import-btn">선택한 방송문 가져오기</button>
       </div>
     </div>
   </div>
@@ -126,6 +304,24 @@
         <div class="loading-bar" style="animation-delay:.6s"></div>
       </div>
       <div class="loading-sub">발음 · 억양 · 유창성 · 다정함 · 완성도 평가 중</div>
+    </div>
+  </div>
+
+  <!-- ===== AUTH MODAL ===== -->
+  <div id="auth-modal" class="modal-overlay hidden">
+    <div class="modal-box auth-modal-box">
+      <div class="modal-header">
+        <div class="modal-title">🔐 편집 권한 확인</div>
+      </div>
+      <div class="modal-body auth-modal-body">
+        <p class="auth-desc">편집 기능은 관리자만 사용할 수 있습니다.<br>비밀번호를 입력해 주세요.</p>
+        <input type="password" id="auth-pw-input" class="auth-pw-input" placeholder="비밀번호">
+        <div class="auth-error hidden" id="auth-error">비밀번호가 올바르지 않습니다.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-icon" id="auth-cancel">취소</button>
+        <button class="btn-primary" id="auth-confirm">확인</button>
+      </div>
     </div>
   </div>
 
