@@ -1918,19 +1918,32 @@ async function handlePdfFile(file) {
 
     $('pdf-parsing-msg').textContent = `Gemini AI로 ${totalPages}페이지 분석 중...`;
 
-    const pageResults = [];
-    for (let p = 1; p <= totalPages; p++) {
-      $('pdf-parsing-sub').textContent = `${p} / ${totalPages} 페이지 분석 중...`;
-      const page = await pdf.getPage(p);
-      const viewport = page.getViewport({ scale: 1.5 });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      const imageBase64 = canvas.toDataURL('image/png').split(',')[1];
+    const CHUNK_SIZE = 10;
+    const USER_PROMPT = `항공사 방송교범 PDF 페이지들입니다. 각 페이지를 순서대로 분석하여 JSON 배열로만 반환하세요.
 
-      const result = await callGeminiVision(imageBase64);
-      if (result) pageResults.push(result);
+규칙:
+- 언어 코드: ko(한국어), en(영어), ja(일본어), zh(중국어)
+- 일본어: 히라가나/가타카나 원문만 추출, 한글 발음 표기는 제외
+- 헤더(챕터명), 푸터(페이지번호, REV.XX) 제외
+- 조건부 문안(표 구조, General/수하물 과다 반입 등): variants 배열로 추출
+
+각 페이지에 대해:
+방송문 있음: {"lang":"ko","num":"2.1.1","title":"방송 제목","text":"방송 내용"}
+복수 문안: {"lang":"ko","num":"2.1.1","title":"방송 제목","variants":[{"label":"General","text":"..."}]}
+방송문 없는 페이지: {"skip":true}
+
+반환: JSON 배열만 (예: [{"skip":true},{"lang":"ko",...}]) — 설명 없이`;
+
+    const pageResults = [];
+    for (let start = 1; start <= totalPages; start += CHUNK_SIZE) {
+      const end = Math.min(start + CHUNK_SIZE - 1, totalPages);
+      $('pdf-parsing-sub').textContent = `${start} – ${end} / ${totalPages} 페이지 분석 중...`;
+
+      const images = await _renderPdfPages(pdf, start, end);
+      const results = await callGeminiVisionChunk(images, USER_PROMPT);
+      pageResults.push(...results);
+
+      if (end < totalPages) await new Promise(r => setTimeout(r, 2000));
     }
 
     const scripts = groupPagesByScript(pageResults);
@@ -1944,34 +1957,50 @@ async function handlePdfFile(file) {
   }
 }
 
-async function callGeminiVision(imageBase64) {
+// PDF 페이지 렌더링 헬퍼 — start~end 페이지를 JPEG base64 배열로 반환
+async function _renderPdfPages(pdf, start, end) {
+  const images = [];
+  for (let p = start; p <= end; p++) {
+    const page = await pdf.getPage(p);
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    images.push(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+  }
+  return images;
+}
+
+// 청크 단위 Gemini Vision 호출 — 이미지 배열 + 프롬프트 → 파싱 결과 배열 반환
+async function callGeminiVisionChunk(images, prompt) {
   const model = await getGeminiModel();
-  const prompt = `항공사 방송교범 PDF 페이지입니다. 이 페이지의 언어와 방송문을 분석하여 JSON으로만 반환하세요.
-
-규칙:
-- 언어 코드: ko(한국어), en(영어), ja(일본어), zh(중국어)
-- 일본어: 히라가나/가타카나 원문만 추출, 한글 발음 표기는 제외
-- 헤더(챕터명), 푸터(페이지번호, REV.XX) 제외
-- 조건부 문안(표 구조, General/수하물 과다 반입 등): variants 배열로 추출
-
-반환 형식 (JSON만, 설명 없이):
-단일 문안: {"lang":"ko","num":"2.1.1","title":"방송 제목","text":"방송 내용"}
-복수 문안: {"lang":"ko","num":"2.1.1","title":"방송 제목","variants":[{"label":"General","text":"..."},{"label":"수하물 과다 반입","text":"..."}]}
-방송문 없는 페이지: {"skip":true}
-
-이 페이지를 분석해서 JSON으로 추출해주세요.`;
-
-  const result = await model.generateContent([
-    prompt,
-    { inlineData: { data: imageBase64, mimeType: 'image/png' } }
-  ]);
+  const parts = [
+    ...images.map(b64 => ({ inlineData: { data: b64, mimeType: 'image/jpeg' } })),
+    { text: prompt }
+  ];
+  const result = await model.generateContent(parts);
   const raw = result.response.text().trim();
-  const match = raw.match(/\{[\s\S]*?\}/);
-  if (!match) return null;
-  try {
-    const parsed = JSON.parse(match[0]);
-    return parsed.skip ? null : parsed;
-  } catch { return null; }
+
+  // JSON 배열 우선, 없으면 개별 JSON 객체 여러 개 파싱
+  const arrMatch = raw.match(/\[[\s\S]*\]/);
+  if (arrMatch) {
+    try {
+      const arr = JSON.parse(arrMatch[0]);
+      return Array.isArray(arr) ? arr.filter(r => r && !r.skip) : [];
+    } catch {}
+  }
+  // 배열 파싱 실패 시 개별 {...} 객체들 추출
+  const results = [];
+  const objRe = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)?\}/g;
+  let m;
+  while ((m = objRe.exec(raw)) !== null) {
+    try {
+      const parsed = JSON.parse(m[0]);
+      if (parsed && !parsed.skip && parsed.num) results.push(parsed);
+    } catch {}
+  }
+  return results;
 }
 
 function groupPagesByScript(pageResults) {
@@ -2236,11 +2265,11 @@ async function handleAdminPdf(file) {
     const total = pdf.numPages;
     $('admin-parsing-msg').textContent = `Gemini AI로 ${total}페이지 분석 중...`;
 
-    const ADMIN_PROMPT = `항공사 기내방송 교범 PDF 페이지입니다.
-다음을 JSON으로만 반환하세요 (preamble 없이):
-{ "skip": true } — 방송문이 없는 페이지(표지·목차·빈 페이지)
-또는
-{ "lang":"ko", "num":"2.1.1", "title":"방송 제목", "text":"방송 본문" }
+    const ADMIN_PROMPT = `항공사 기내방송 교범 PDF 페이지들입니다. 각 페이지를 순서대로 분석하여 JSON 배열로만 반환하세요.
+
+각 페이지에 대해:
+방송문 없는 페이지(표지·목차·빈 페이지): {"skip":true}
+방송문 있음: {"lang":"ko","num":"2.1.1","title":"방송 제목","text":"방송 본문"}
 
 규칙:
 - 언어 코드: ko(한국어), en(영어), ja(일본어)
@@ -2249,31 +2278,19 @@ async function handleAdminPdf(file) {
 - [목적지] [편명] 같은 변수 그대로 유지
 - 조건부 문안(General/수하물 과다 반입 등 표 구조)은 본문에 포함
 
-이 페이지를 분석해서 JSON으로 추출해주세요.`;
+반환: JSON 배열만 (예: [{"skip":true},{"lang":"ko",...}]) — 설명 없이`;
 
-    const geminiModel = await getGeminiModel();
+    const CHUNK_SIZE = 10;
     const pageResults = [];
-    for (let p = 1; p <= total; p++) {
-      $('admin-parsing-sub').textContent = `${p} / ${total} 페이지...`;
-      const page = await pdf.getPage(p);
-      const viewport = page.getViewport({ scale: 1.5 });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width; canvas.height = viewport.height;
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      const b64 = canvas.toDataURL('image/png').split(',')[1];
+    for (let start = 1; start <= total; start += CHUNK_SIZE) {
+      const end = Math.min(start + CHUNK_SIZE - 1, total);
+      $('admin-parsing-sub').textContent = `${start} – ${end} / ${total} 페이지...`;
 
-      const res = await geminiModel.generateContent([
-        ADMIN_PROMPT,
-        { inlineData: { data: b64, mimeType: 'image/png' } }
-      ]);
-      const raw = res.response.text().trim();
-      const m = raw.match(/\{[\s\S]*?\}/);
-      if (m) {
-        try {
-          const parsed = JSON.parse(m[0]);
-          if (!parsed.skip) pageResults.push(parsed);
-        } catch {}
-      }
+      const images = await _renderPdfPages(pdf, start, end);
+      const results = await callGeminiVisionChunk(images, ADMIN_PROMPT);
+      pageResults.push(...results);
+
+      if (end < total) await new Promise(r => setTimeout(r, 2000));
     }
 
     // 페이지 결과를 방송문별로 묶기
