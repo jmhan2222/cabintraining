@@ -24,7 +24,7 @@ async function getGeminiModel() {
   }
   try {
     const { getAI, getGenerativeModel, GoogleAIBackend } = await import(
-      'https://www.gstatic.com/firebasejs/11.3.0/firebase-ai.js'
+      'https://www.gstatic.com/firebasejs/11.6.0/firebase-ai.js'
     );
     const ai = getAI(firebase.app(), { backend: new GoogleAIBackend() });
     _geminiModel = getGenerativeModel(ai, { model: 'gemini-2.0-flash' });

@@ -36,8 +36,8 @@
 </div>
 
 <!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/11.3.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 
 <script>
 const FIREBASE_CONFIG = {
@@ -88,7 +88,7 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
   show('res-ai', '⏳ Gemini 호출 중… (최초 로딩 시 5–10초 소요)', 'run');
   try {
     const { getAI, getGenerativeModel, GoogleAIBackend } = await import(
-      'https://www.gstatic.com/firebasejs/11.3.0/firebase-ai.js'
+      'https://www.gstatic.com/firebasejs/11.6.0/firebase-ai.js'
     );
     const ai = getAI(firebase.app(), { backend: new GoogleAIBackend() });
     const model = getGenerativeModel(ai, { model: 'gemini-2.0-flash' });
