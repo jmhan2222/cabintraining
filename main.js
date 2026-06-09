@@ -31,7 +31,7 @@ async function getGeminiModel() {
   try {
     const { GoogleGenerativeAI } = await import('https://esm.sh/@google/generative-ai@0.24.1');
     const genAI = new GoogleGenerativeAI(apiKey);
-    _geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    _geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
     return _geminiModel;
   } catch(e) {
     _geminiModel = null;

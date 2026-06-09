@@ -31,7 +31,7 @@
 
 <!-- Gemini 테스트 -->
 <div class="card">
-  <h3>2. Gemini Developer API (gemini-2.0-flash)</h3>
+  <h3>2. Gemini Developer API (gemini-1.5-flash-latest)</h3>
   <input type="password" id="test-gemini-key" placeholder="Gemini API 키 입력 (AIza...)" autocomplete="off">
   <button id="btn-ai">테스트 시작</button>
   <div id="res-ai" class="result" style="display:none"></div>
@@ -93,7 +93,7 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
   try {
     const { GoogleGenerativeAI } = await import('https://esm.sh/@google/generative-ai@0.24.1');
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
     const result = await model.generateContent('한 문장으로 "연결 성공"을 한국어로 알려줘.');
     const text = result.response.text();
     show('res-ai', `✅ Gemini Developer API 성공\n\n응답: ${text}`, 'ok');
