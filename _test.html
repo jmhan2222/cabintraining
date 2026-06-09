@@ -9,7 +9,6 @@
   h2 { color: #1e293b; }
   .card { background: #fff; border-radius: 12px; padding: 20px; margin: 16px 0; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
   .card h3 { margin: 0 0 12px; font-size: 15px; color: #334155; }
-  input[type=password], input[type=text] { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; font-size: 14px; width: 100%; box-sizing: border-box; margin-bottom: 8px; }
   button { background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-size: 14px; }
   button:disabled { background: #94a3b8; cursor: default; }
   .result { margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; line-height: 1.6; }
@@ -20,7 +19,7 @@
 </head>
 <body>
 <h2>🔧 CabinVoice 연결 테스트</h2>
-<p style="color:#64748b;font-size:13px">Firestore DB · Gemini Developer API 연결 상태를 확인합니다.</p>
+<p style="color:#64748b;font-size:13px">Firestore DB · Gemini 2.5 Flash (프록시) 연결 상태를 확인합니다.</p>
 
 <!-- Firestore 테스트 -->
 <div class="card">
@@ -29,10 +28,10 @@
   <div id="res-fs" class="result" style="display:none"></div>
 </div>
 
-<!-- Gemini 테스트 -->
+<!-- Gemini 프록시 테스트 -->
 <div class="card">
-  <h3>2. Gemini Developer API (gemini-1.5-flash-latest)</h3>
-  <input type="password" id="test-gemini-key" placeholder="Gemini API 키 입력 (AIza...)" autocomplete="off">
+  <h3>2. Gemini 2.5 Flash (/api/gemini 프록시)</h3>
+  <p style="font-size:12px;color:#64748b;margin:0 0 10px">Cloudflare Pages Function + GEMINI_API_KEY 환경변수 경유</p>
   <button id="btn-ai">테스트 시작</button>
   <div id="res-ai" class="result" style="display:none"></div>
 </div>
@@ -83,20 +82,24 @@ document.getElementById('btn-fs').addEventListener('click', async () => {
   btn.disabled = false;
 });
 
-// ── Gemini Developer API 테스트 ────────────────────
+// ── Gemini 프록시 테스트 ───────────────────────────
 document.getElementById('btn-ai').addEventListener('click', async () => {
   const btn = document.getElementById('btn-ai');
-  const apiKey = document.getElementById('test-gemini-key').value.trim();
-  if (!apiKey) { show('res-ai', '❌ API 키를 입력해주세요', 'err'); return; }
   btn.disabled = true;
-  show('res-ai', '⏳ Gemini 호출 중… (최초 로딩 시 5–10초 소요)', 'run');
+  show('res-ai', '⏳ /api/gemini 호출 중…', 'run');
   try {
-    const { GoogleGenerativeAI } = await import('https://esm.sh/@google/generative-ai@0.24.1');
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
-    const result = await model.generateContent('한 문장으로 "연결 성공"을 한국어로 알려줘.');
-    const text = result.response.text();
-    show('res-ai', `✅ Gemini Developer API 성공\n\n응답: ${text}`, 'ok');
+    const res = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gemini-2.5-flash',
+        contents: [{ parts: [{ text: '한 문장으로 "연결 성공"을 한국어로 알려줘.' }] }]
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '(응답 없음)';
+    show('res-ai', `✅ Gemini 프록시 성공\n\n응답: ${text}`, 'ok');
   } catch(e) {
     show('res-ai', `❌ 오류: ${e.message}`, 'err');
   }

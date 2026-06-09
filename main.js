@@ -16,27 +16,31 @@ function initFirebase() {
     return true;
   } catch { return false; }
 }
-// ===== GEMINI (Google AI Developer API) =====
-function getGeminiApiKey() {
-  return localStorage.getItem('cabinvoice_gemini_api_key') || '';
-}
-function saveGeminiApiKey(key) {
-  localStorage.setItem('cabinvoice_gemini_api_key', key);
-  _geminiModel = null; // 키 변경 시 캐시 초기화
-}
+// ===== GEMINI (Cloudflare Pages Function 프록시 경유) =====
 async function getGeminiModel() {
   if (_geminiModel) return _geminiModel;
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) throw new Error('Gemini API 키가 없습니다.\n관리자 패널 → Gemini API 키를 입력해주세요.');
-  try {
-    const { GoogleGenerativeAI } = await import('https://esm.sh/@google/generative-ai@0.24.1');
-    const genAI = new GoogleGenerativeAI(apiKey);
-    _geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
-    return _geminiModel;
-  } catch(e) {
-    _geminiModel = null;
-    throw new Error(`Gemini 초기화 실패: ${e.message}`);
-  }
+  _geminiModel = {
+    async generateContent(input) {
+      let contents;
+      if (typeof input === 'string') {
+        contents = [{ parts: [{ text: input }] }];
+      } else if (Array.isArray(input)) {
+        contents = [{ parts: input }];
+      } else {
+        contents = [input];
+      }
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'gemini-2.5-flash', contents })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Gemini 오류 (HTTP ${res.status})`);
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      return { response: { text: () => text } };
+    }
+  };
+  return _geminiModel;
 }
 
 async function firestoreLoadLatest() {
@@ -2112,12 +2116,6 @@ function openAdminScreen() {
     initFirebase();
     _refreshAdminVersion();
     _refreshAdminVersionList();
-    // 저장된 Gemini 키가 있으면 마스킹해서 표시
-    const savedKey = getGeminiApiKey();
-    if (savedKey && $('admin-gemini-key')) {
-      $('admin-gemini-key').placeholder = '저장됨: ' + savedKey.slice(0,6) + '…';
-      if ($('admin-gemini-status')) $('admin-gemini-status').textContent = '✅ 키 저장됨';
-    }
     showScreen('screen-admin');
   });
 }
@@ -2529,15 +2527,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = $('admin-firebase-status');
     if (el) el.textContent = ok ? '✅ Firebase 연결됨' : '❌ 연결 실패';
     if (ok) { _refreshAdminVersion(); _refreshAdminVersionList(); }
-  });
-  if ($('btn-save-gemini-key')) $('btn-save-gemini-key').addEventListener('click', () => {
-    const key = ($('admin-gemini-key').value || '').trim();
-    const statusEl = $('admin-gemini-status');
-    if (!key) { if (statusEl) statusEl.textContent = '❌ 키를 입력해주세요'; return; }
-    saveGeminiApiKey(key);
-    $('admin-gemini-key').value = '';
-    $('admin-gemini-key').placeholder = '저장됨: ' + key.slice(0,6) + '…';
-    if (statusEl) statusEl.textContent = '✅ 저장됨';
   });
   $('admin-pdf-input').addEventListener('change', e => { if (e.target.files[0]) handleAdminPdf(e.target.files[0]); });
   const adminDropZone = $('admin-pdf-drop-zone');
