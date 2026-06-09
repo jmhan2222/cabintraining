@@ -36,8 +36,8 @@
 </div>
 
 <!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
 
 <script>
 const FIREBASE_CONFIG = {
@@ -87,16 +87,18 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
   btn.disabled = true;
   show('res-ai', '⏳ Gemini 호출 중… (최초 로딩 시 5–10초 소요)', 'run');
   try {
-    const { getAI, getGenerativeModel, GoogleAIBackend } = await import(
-      'https://www.gstatic.com/firebasejs/11.6.0/firebase-ai.js'
-    );
-    const ai = getAI(firebase.app(), { backend: new GoogleAIBackend() });
+    const [{ initializeApp, getApps, getApp }, { getAI, getGenerativeModel, GoogleAIBackend }] = await Promise.all([
+      import('https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/11.10.0/firebase-ai.js')
+    ]);
+    const firebaseApp = getApps().length ? getApp() : initializeApp(FIREBASE_CONFIG);
+    const ai = getAI(firebaseApp, { backend: new GoogleAIBackend() });
     const model = getGenerativeModel(ai, { model: 'gemini-2.0-flash' });
     const result = await model.generateContent('한 문장으로 "연결 성공"을 한국어로 알려줘.');
     const text = result.response.text();
     show('res-ai', `✅ Gemini AI Logic 성공\n\n응답: ${text}`, 'ok');
   } catch(e) {
-    show('res-ai', `❌ 오류: ${e.message}\n\nFirebase 콘솔 → 빌드 → AI Logic 활성화 여부를 확인하세요.`, 'err');
+    show('res-ai', `❌ 오류: ${e.message}`, 'err');
   }
   btn.disabled = false;
 });

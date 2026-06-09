@@ -16,22 +16,21 @@ function initFirebase() {
     return true;
   } catch { return false; }
 }
-// Firebase AI Logic (Gemini 2.0 Flash) — 동적 import로 CDN 모듈 로드
+// Firebase AI Logic (Gemini 2.0 Flash)
 async function getGeminiModel() {
   if (_geminiModel) return _geminiModel;
-  if (!firebase.apps.length) {
-    throw new Error('Firebase가 초기화되지 않았습니다.');
-  }
   try {
-    const { getAI, getGenerativeModel, GoogleAIBackend } = await import(
-      'https://www.gstatic.com/firebasejs/11.6.0/firebase-ai.js'
-    );
-    const ai = getAI(firebase.app(), { backend: new GoogleAIBackend() });
+    const [{ initializeApp, getApps, getApp }, { getAI, getGenerativeModel, GoogleAIBackend }] = await Promise.all([
+      import('https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/11.10.0/firebase-ai.js')
+    ]);
+    const firebaseApp = getApps().length ? getApp() : initializeApp(FIREBASE_CONFIG);
+    const ai = getAI(firebaseApp, { backend: new GoogleAIBackend() });
     _geminiModel = getGenerativeModel(ai, { model: 'gemini-2.0-flash' });
     return _geminiModel;
   } catch(e) {
     _geminiModel = null;
-    throw new Error(`Gemini 초기화 실패: ${e.message}\nFirebase 콘솔에서 AI Logic이 활성화되어 있는지 확인해주세요.`);
+    throw new Error(`Gemini 초기화 실패: ${e.message}`);
   }
 }
 
