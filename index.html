@@ -20,41 +20,80 @@
           <div class="logo-sub">기내방송 훈련 시스템</div>
         </div>
       </div>
-      <div class="header-badge">OPIc 방식</div>
-    </header>
-    <main class="home-main">
-      <div class="home-intro">
-        <h2>방송 유형을 선택하세요</h2>
-        <p>방송문안 숙지 → 녹음 → AI 자동 채점 · 피드백</p>
+      <div class="header-right">
+        <div class="header-badge" id="rev-badge">OPIc 방식</div>
+        <button class="btn-admin-icon" id="btn-open-admin" title="관리자 패널">⚙</button>
       </div>
-      <div class="script-grid" id="script-grid"></div>
-    </main>
+    </header>
+
+    <!-- 모바일 사이드바 토글 -->
+    <div class="mobile-topbar">
+      <button class="btn-icon" id="btn-toggle-sidebar">☰ 목록</button>
+      <div class="mobile-topbar-title">방송문 선택</div>
+    </div>
+
+    <div class="home-layout">
+      <!-- 좌측 사이드바 -->
+      <aside class="nav-sidebar" id="nav-sidebar">
+        <div class="sidebar-top">
+          <input type="text" id="sidebar-search" class="sidebar-search" placeholder="🔍 방송문 검색...">
+          <div class="sidebar-actions">
+            <button class="btn-sidebar-action" id="btn-sidebar-add" title="직접 추가">＋ 추가</button>
+            <button class="btn-sidebar-action" id="btn-sidebar-pdf" title="PDF 가져오기">📄 PDF</button>
+          </div>
+        </div>
+        <div class="sidebar-tree" id="sidebar-tree"></div>
+      </aside>
+
+      <!-- 사이드바 모바일 오버레이 -->
+      <div class="sidebar-overlay hidden" id="sidebar-overlay"></div>
+
+      <!-- 우측 상세 패널 -->
+      <main class="detail-panel" id="detail-panel">
+        <div class="detail-empty" id="detail-empty">
+          <div class="detail-empty-icon">✈️</div>
+          <div class="detail-empty-title">방송문을 선택하세요</div>
+          <div class="detail-empty-sub">왼쪽 목록에서 연습할 방송문을 선택하면<br>내용 확인 후 바로 연습을 시작할 수 있습니다</div>
+        </div>
+        <div class="detail-content hidden" id="detail-content">
+          <div class="detail-topbar">
+            <span class="detail-chapter-badge" id="detail-chapter-badge"></span>
+            <span class="detail-section-num" id="detail-section-num"></span>
+            <button class="btn-icon sm detail-edit-btn hidden" id="detail-edit-btn">✏️ 편집</button>
+          </div>
+          <h2 class="detail-title" id="detail-title"></h2>
+          <div class="detail-lang-tabs" id="detail-lang-tabs">
+            <button class="detail-lang-tab active" data-lang="ko">🇰🇷 한국어</button>
+            <button class="detail-lang-tab" data-lang="en">🇺🇸 English</button>
+            <button class="detail-lang-tab" data-lang="ja">🇯🇵 日本語</button>
+            <button class="detail-lang-tab" data-lang="zh">🇨🇳 中文</button>
+          </div>
+          <div class="detail-script-box" id="detail-script-box"></div>
+          <div class="detail-checkpoints hidden" id="detail-checkpoints"></div>
+          <div class="detail-actions">
+            <button class="btn-model-voice detail-voice-btn hidden" id="detail-voice-btn">🎵 모델 음성 듣기</button>
+            <button class="btn-primary detail-start-btn" id="detail-start-btn">✈ 연습 시작 →</button>
+          </div>
+        </div>
+      </main>
+    </div>
   </div>
 
   <!-- ===== SCREEN 2: PREP ===== -->
   <div id="screen-prep" class="screen">
+    <div class="prep-topbar">
+      <button class="btn-icon" id="btn-back-prep">← 뒤로</button>
+      <div class="prep-title-bar" id="prep-title-bar"></div>
+      <div style="width:80px"></div>
+    </div>
     <div class="lang-tabs" id="lang-tabs">
       <button class="lang-tab active" data-lang="ko">🇰🇷 한국어</button>
       <button class="lang-tab" data-lang="en">🇺🇸 English</button>
       <button class="lang-tab" data-lang="ja">🇯🇵 日本語</button>
       <button class="lang-tab" data-lang="zh">🇨🇳 中文</button>
     </div>
-    <div class="prep-topbar">
-      <button class="btn-icon" id="btn-back-prep">← 뒤로</button>
-      <div class="prep-timer-box">
-        <span class="prep-timer-label">준비 시간</span>
-        <span class="prep-countdown" id="prep-countdown">30</span>
-        <span class="prep-timer-label">초</span>
-      </div>
-      <button class="btn-primary sm" id="btn-start-record">🎤 녹음 시작</button>
-    </div>
     <div class="prep-body">
-      <div class="prep-meta">
-        <span class="tag" id="prep-category-tag"></span>
-        <span class="tag outline" id="prep-difficulty-tag"></span>
-        <span class="tag outline" id="prep-duration-tag"></span>
-      </div>
-      <h2 class="prep-title" id="prep-title"></h2>
+      <div class="prep-read-hint">방송문을 충분히 읽으신 후 아래 버튼을 눌러 주세요</div>
       <div class="script-card" id="prep-text"></div>
       <div class="checkpoints-box">
         <div class="checkpoints-label">✅ 핵심 체크포인트</div>
@@ -63,6 +102,18 @@
       <div class="tips-box" id="tips-box"></div>
       <div class="model-voice-bar hidden" id="model-voice-bar">
         <button class="btn-model-voice" id="btn-model-voice">🎙 모델 음성 듣기</button>
+      </div>
+    </div>
+    <div class="prep-ready-bar">
+      <button class="btn-ready-record pulse" id="btn-start-record">
+        <span>🎤</span> 준비됐어요 — 녹음 시작
+      </button>
+    </div>
+
+    <!-- 3-2-1 카운트다운 오버레이 -->
+    <div class="countdown-overlay hidden" id="countdown-overlay">
+      <div class="countdown-inner">
+        <div class="countdown-number" id="countdown-number">3</div>
       </div>
     </div>
   </div>
@@ -119,6 +170,23 @@
       <div class="transcript-section">
         <div class="section-heading">📝 인식된 발화 내용</div>
         <div class="transcript-compare" id="transcript-compare"></div>
+      </div>
+
+      <div class="ai-result-section hidden" id="ai-result-section">
+        <div class="section-heading">🤖 AI 상세 분석</div>
+        <div class="diff-words-box" id="diff-words-box"></div>
+        <div class="improvement-box hidden" id="improvement-box">
+          <div class="improvement-label">💬 이렇게 말씀해 보세요</div>
+          <div class="improvement-text" id="improvement-text"></div>
+        </div>
+        <div class="encouragement-box hidden" id="encouragement-box">
+          <div class="encouragement-text" id="encouragement-text"></div>
+        </div>
+      </div>
+
+      <div class="result-bottom-actions">
+        <button class="btn-icon" id="btn-result-select">다른 방송문 선택</button>
+        <button class="btn-primary" id="btn-result-retry-2">↺ 다시 연습</button>
       </div>
     </div>
   </div>
@@ -242,6 +310,12 @@
 
         <!-- Step 1: 파일 선택 -->
         <div id="pdf-step-upload" class="pdf-step">
+          <div class="pdf-apikey-section">
+            <label class="pdf-apikey-label" for="pdf-apikey-input">🔑 Anthropic API 키</label>
+            <input type="password" id="pdf-apikey-input" class="pdf-apikey-input"
+              placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false">
+            <div class="pdf-apikey-hint">API 키는 이 기기의 로컬 스토리지에만 저장되며 Anthropic에만 전송됩니다</div>
+          </div>
           <div class="pdf-drop-zone" id="pdf-drop-zone">
             <div class="pdf-drop-icon">📄</div>
             <div class="pdf-drop-title">PDF 파일을 여기에 드래그하거나</div>
@@ -249,7 +323,7 @@
               파일 선택
               <input type="file" id="pdf-file-input" accept=".pdf" style="display:none">
             </label>
-            <div class="pdf-drop-sub">방송교범 PDF 파일을 선택하면<br>번호 · 제목 · 내용을 자동으로 인식합니다</div>
+            <div class="pdf-drop-sub">AI가 각 페이지를 직접 읽어<br>한국어·영어·일본어·중국어를 자동으로 분리합니다</div>
           </div>
         </div>
 
@@ -291,6 +365,85 @@
     </div>
   </div>
 
+  <!-- ===== SCREEN: ADMIN ===== -->
+  <div id="screen-admin" class="screen">
+    <div class="admin-header">
+      <button class="btn-icon" id="btn-admin-back">← 메인으로</button>
+      <div class="admin-header-title">⚙️ 관리자 패널</div>
+      <div class="admin-version-badge" id="admin-deployed-badge">배포 버전 없음</div>
+    </div>
+    <div class="admin-body">
+
+      <!-- Firebase 설정 섹션 -->
+      <section class="admin-section">
+        <div class="admin-section-title">🔧 Firebase 설정</div>
+        <div class="admin-section-desc">Firebase 콘솔에서 복사한 firebaseConfig 객체를 JSON으로 붙여넣으세요.</div>
+        <textarea id="admin-firebase-cfg" rows="7" class="admin-textarea" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...",...}'></textarea>
+        <div class="admin-row-btns">
+          <button class="btn-primary" id="btn-save-firebase-cfg">설정 저장 &amp; 연결</button>
+          <span class="admin-firebase-status" id="admin-firebase-status"></span>
+        </div>
+      </section>
+
+      <!-- PDF 업로드 섹션 -->
+      <section class="admin-section">
+        <div class="admin-section-title">📄 교범 PDF 업로드 &amp; 배포</div>
+        <div class="admin-row-btns">
+          <input type="text" id="admin-rev-version" class="admin-input" placeholder="개정번호 (예: Rev.23)" style="max-width:200px">
+          <div class="pdf-apikey-section" style="margin:0;flex:1">
+            <input type="password" id="admin-apikey-input" class="pdf-apikey-input" placeholder="Anthropic API 키 (sk-ant-...)">
+          </div>
+        </div>
+        <div class="pdf-drop-zone" id="admin-pdf-drop-zone" style="margin-top:12px">
+          <div class="pdf-drop-icon">📄</div>
+          <div class="pdf-drop-title">방송교범 PDF를 드래그하거나</div>
+          <label class="btn-primary sm" style="cursor:pointer;display:inline-block;margin-top:6px">
+            파일 선택
+            <input type="file" id="admin-pdf-input" accept=".pdf" style="display:none">
+          </label>
+          <div class="pdf-drop-sub">Claude AI가 각 페이지를 직접 읽어 파싱합니다</div>
+        </div>
+
+        <div id="admin-pdf-parsing" class="pdf-parsing-box hidden">
+          <div class="loading-plane" style="font-size:36px">✈</div>
+          <div style="color:var(--gray-700);font-weight:600;margin-top:12px" id="admin-parsing-msg">PDF 분석 중...</div>
+          <div style="color:var(--gray-400);font-size:13px;margin-top:6px" id="admin-parsing-sub"></div>
+        </div>
+
+        <div id="admin-pdf-preview" class="hidden" style="margin-top:16px">
+          <div class="pdf-preview-topbar">
+            <div class="pdf-preview-info" id="admin-preview-info"></div>
+            <div class="pdf-preview-actions">
+              <button class="btn-icon sm" id="admin-select-all">전체 선택</button>
+              <button class="btn-icon sm" id="admin-deselect-all">전체 해제</button>
+            </div>
+          </div>
+          <div class="pdf-script-list" id="admin-script-list" style="max-height:360px;overflow-y:auto"></div>
+          <div class="admin-row-btns" style="margin-top:14px">
+            <button class="btn-primary" id="btn-admin-deploy">🚀 Firestore에 배포하기</button>
+          </div>
+        </div>
+
+        <div id="admin-pdf-error" class="hidden">
+          <div class="pdf-error-box">
+            <div style="font-size:40px">⚠️</div>
+            <div class="pdf-error-msg" id="admin-error-msg"></div>
+            <button class="btn-icon" id="admin-retry-btn">다시 시도</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 버전 관리 섹션 -->
+      <section class="admin-section">
+        <div class="admin-section-title">📋 버전 관리</div>
+        <div id="admin-version-list" class="admin-version-list">
+          <div style="color:var(--gray-400);font-size:13px">Firebase 연결 후 버전 목록이 표시됩니다.</div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
   <!-- ===== LOADING ===== -->
   <div id="loading-overlay" class="loading-overlay hidden">
     <div class="loading-box">
@@ -325,6 +478,9 @@
     </div>
   </div>
 
+  <!-- Firebase SDK (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
   <script defer type="text/javascript" src="/main.js"></script>
 </body>
 </html>

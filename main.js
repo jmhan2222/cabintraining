@@ -1,21 +1,90 @@
+// ===== FIREBASE =====
+let _db = null;
+function getFirebaseConfig() {
+  try { return JSON.parse(localStorage.getItem('cabinvoice_firebase_config') || 'null'); }
+  catch { return null; }
+}
+function saveFirebaseConfig(cfg) {
+  localStorage.setItem('cabinvoice_firebase_config', JSON.stringify(cfg));
+}
+function initFirebase() {
+  const cfg = getFirebaseConfig();
+  if (!cfg || !cfg.apiKey) return false;
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    _db = firebase.firestore();
+    return true;
+  } catch { return false; }
+}
+async function firestoreLoadLatest() {
+  if (!_db) return null;
+  try {
+    const snap = await _db.collection('cabinManual').doc('latest').get();
+    return snap.exists ? snap.data() : null;
+  } catch { return null; }
+}
+async function firestoreSaveLatest(data) {
+  if (!_db) throw new Error('Firebase 미설정');
+  await _db.collection('cabinManual').doc('latest').set(data);
+  await _db.collection('cabinManual').collection('history').doc(data.revVersion).set(data);
+}
+async function firestoreLoadHistory() {
+  if (!_db) return [];
+  try {
+    const snap = await _db.collection('cabinManual').doc('history').collection('versions')
+      .orderBy('updatedAt','desc').limit(5).get();
+    return snap.docs.map(d => d.data());
+  } catch { return []; }
+}
+async function firestoreRollback(revVersion) {
+  if (!_db) throw new Error('Firebase 미설정');
+  const snap = await _db.collection('cabinManual').doc('history').collection('versions').doc(revVersion).get();
+  if (!snap.exists) throw new Error('버전을 찾을 수 없습니다');
+  await _db.collection('cabinManual').doc('latest').set(snap.data());
+}
+
 // ===== SCRIPTS DATA (KO/EN/JA/ZH) =====
 const SCRIPTS = [
   {
     id: 'welcome', icon: '✈️', colorClass: 'c-blue',
     difficulty: '기본', difficultyClass: '',
-    title: '탑승 환영 방송',
+    title: '2.4.2 Safety DEMO: 국제선',
     langs: {
       ko: {
         sttLang: 'ko-KR', idealWPM: 130,
-        checkpoints: ['환영 인사', '항공사명', '출발지·목적지·편명', '기장 소개', '비행시간', '마무리 인사'],
-        keyPhrases: ['안녕하십니까', '탑승해 주신', '환영합니다', '기장', '비행 예정 시간', '감사합니다'],
+        checkpoints: ['DEMO','안전수칙'],
+        keyPhrases: ['앞을 주목해 주세요'],
         tips: ['밝고 따뜻한 목소리로 시작', '편명·목적지는 또렷하게', '마지막 감사합니다에 미소를'],
-        text: `승객 여러분, 안녕하십니까.
-저희 우리항공에 탑승해 주신 것을 진심으로 환영합니다.
-이 비행기는 서울 인천을 출발하여 도쿄 나리타로 향하는 우리항공 201편입니다.
-오늘 비행을 담당하실 기장은 김민준 기장이시며, 비행 예정 시간은 약 2시간 30분입니다.
-저희 객실 승무원 일동은 여러분의 안전하고 편안한 여행을 위해 최선을 다하겠습니다.
-감사합니다.`
+        text: `손님 여러분, 잠시 앞을 주목해 주세요.
+지금부터 안전한 비행을 위한 5가지 수칙을 안내해 드리겠습니다.
+
+첫째, 머리 위 좌석벨트 표시등이 켜지면 벨트를 매 주시고,
+풀 때는 덮개를 위로 올려주세요.
+
+둘째, 산소마스크는 산소가 필요한 비상시
+머리 위 선반에서 저절로 내려옵니다.
+이 때, 방역 마스크 등 호흡에 방해되는 물건을 제거한 뒤,
+마스크를 앞으로 잡아당겨 코와 입에 대고 호흡하세요.
+산소마스크는 본인 먼저 착용한 후 주변 사람을 도와주시기 바랍니다.
+
+셋째, 비상 탈출 시, 선반의 비상등과 바닥의 야광유도선을 따라
+가장 가까운 비상구로 탈출하세요.
+비상구는 총 8개로 오른쪽과 왼쪽에 각각 있습니다.
+
+넷째, 구명복은 좌석 또는 팔걸이 아래에 있습니다.
+머리 위에서부터 입고, 끈을 허리에 돌려 고리에 끼운 후
+몸에 맞게 조여주세요.
+탈출 직전 비상구 앞에서 빨간색 손잡이를 당겨 부풀리고,
+양 옆의 고무관을 이용해 조절하면 됩니다.
+
+손님 여러분, 더 궁금한 내용 있으신가요?
+마지막으로 자세한 안전 수칙은 좌석 앞 안내서를 확인해 주세요.
+
+아울러, 비상구는 반드시 승무원의 지시가 있을 경우에만 개방해야 하며,
+임의로 조작할 경우 최고 10년 징역의 처벌대상이 될 수 있습니다.
+또한, 승무원의 업무 방해 행위, 전자담배를 포함한 기내 흡연, 전자기기 사
+용기준 위반은 항공보안법에 의거하여 처벌받을 수 있으니
+안전한 비행을 위해 협조해 주시기 바랍니다.`
       },
       en: {
         sttLang: 'en-US', idealWPM: 140,
@@ -549,6 +618,14 @@ function _confirmAuth() {
 
 // ===== MODEL VOICE (localStorage) =====
 let _mvAudioUrl = null; // revocable object URL for current playback
+function base64ToBlob(base64) {
+  const parts = base64.split(',');
+  const mime = (parts[0].match(/:(.*?);/)||['','audio/mpeg'])[1];
+  const bin = atob(parts[1]||parts[0]);
+  const arr = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
 function loadModelVoice(scriptId) {
   return localStorage.getItem(`cabinvoice_voice_${scriptId}`) || null;
 }
@@ -565,7 +642,6 @@ function getModelVoiceKey() {
 function _refreshMvUI() {
   const key = getModelVoiceKey();
   const stored = localStorage.getItem(key);
-  const name = stored ? (stored.split(',')[0].includes('audio') ? '음성 파일 등록됨' : '모델 음성 등록됨') : '';
   const hasMv = !!stored;
   $('mv-current').classList.toggle('hidden', !hasMv);
   $('mv-name').textContent = hasMv ? (localStorage.getItem(key + '_name') || '모델 음성 등록됨') : '';
@@ -640,129 +716,252 @@ function buildCustomLang(text, cpStr, langCode) {
   };
 }
 
-// ===== HOME =====
-function renderHome() {
-  const grid = $('script-grid');
-  const customScripts = loadCustomScripts();
-  const overrides = loadOverrides();
-
-  const builtInHTML = SCRIPTS.map(s => {
-    const eff = getEffectiveScript(s.id);
-    const isModified = !!overrides[s.id];
-    return `
-    <div class="script-card-item ${eff.colorClass}" data-id="${s.id}" data-source="builtin" style="position:relative">
-      <button class="scard-edit" data-edit="${s.id}" data-source="builtin" title="편집">✏️ 편집</button>
-      <div class="scard-top">
-        <span class="scard-icon">${eff.icon}</span>
-        <span class="scard-diff ${eff.difficultyClass}">${eff.difficulty}</span>
-      </div>
-      ${isModified ? '<div class="scard-custom-badge" style="background:#fef3c7;color:#92400e">수정됨</div>' : ''}
-      <div class="scard-title">${eff.title}</div>
-      <div class="scard-meta">
-        <span>🇰🇷 한 &nbsp;🇺🇸 EN &nbsp;🇯🇵 日 &nbsp;🇨🇳 中</span>
-        <span>✅ ${eff.langs.ko.checkpoints.length}개 체크포인트</span>
-      </div>
-    </div>`;
-  }).join('');
-
-  const customHTML = customScripts.map(s => {
-    const langBadges = Object.keys(s.langs).map(l => ({'ko':'🇰🇷','en':'🇺🇸','ja':'🇯🇵','zh':'🇨🇳'}[l]||'')).join(' ');
-    const cp = s.langs.ko?.checkpoints?.length || 0;
-    return `
-    <div class="script-card-item c-blue has-delete" data-id="${s.id}" data-source="custom" style="position:relative">
-      <button class="scard-edit" data-edit="${s.id}" data-source="custom" title="편집">✏️ 편집</button>
-      <button class="scard-delete" data-delete="${s.id}" title="삭제">✕ 삭제</button>
-      <div class="scard-top">
-        <span class="scard-icon">${s.icon}</span>
-        <span class="scard-diff ${s.difficultyClass}">${s.difficulty}</span>
-      </div>
-      <div class="scard-custom-badge">내 방송문</div>
-      <div class="scard-title">${s.title}</div>
-      <div class="scard-meta">
-        <span>${langBadges}</span>
-        ${cp ? `<span>✅ ${cp}개 체크포인트</span>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-
-  const clearBtnHTML = customScripts.length
-    ? `<div class="script-card-add card-danger" id="btn-clear-custom">
-        <div class="script-card-add-icon">🗑</div>
-        <div class="script-card-add-label">내 방송문 전체 삭제</div>
-        <div class="script-card-add-sub">등록된 내 방송문<br>${customScripts.length}개를 모두 삭제합니다</div>
-       </div>` : '';
-
-  const actionCardsHTML = `
-    <div class="script-card-add" id="btn-add-custom">
-      <div class="script-card-add-icon">＋</div>
-      <div class="script-card-add-label">직접 입력</div>
-      <div class="script-card-add-sub">방송문안을 직접 입력하여<br>연습할 수 있습니다</div>
-    </div>
-    <div class="script-card-add" id="btn-import-pdf">
-      <div class="script-card-add-icon">📄</div>
-      <div class="script-card-add-label">PDF 가져오기</div>
-      <div class="script-card-add-sub">방송교범 PDF를 분석하여<br>자동으로 등록합니다</div>
-    </div>
-    ${clearBtnHTML}`;
-
-  grid.innerHTML = builtInHTML + customHTML + actionCardsHTML;
-
-  // built-in: 카드 클릭 → 연습 (편집 버튼 제외)
-  grid.querySelectorAll('[data-source="builtin"]').forEach(card => {
-    card.addEventListener('click', e => {
-      if (e.target.closest('[data-edit]')) return;
-      startPrep(getEffectiveScript(card.dataset.id));
-    });
-  });
-
-  // custom: 카드 클릭 → 연습 (버튼 제외)
-  grid.querySelectorAll('[data-source="custom"]').forEach(card => {
-    card.addEventListener('click', e => {
-      if (e.target.closest('[data-edit]') || e.target.closest('[data-delete]')) return;
-      const s = loadCustomScripts().find(s => s.id === card.dataset.id);
-      if (s) startPrep(s);
-    });
-  });
-
-  // 편집 버튼 (관리자 인증 필요)
-  grid.querySelectorAll('[data-edit]').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      requireEditAuth(() => openEditModal(btn.dataset.edit, btn.dataset.source));
-    });
-  });
-
-  // 삭제 버튼 (관리자 인증 필요)
-  grid.querySelectorAll('[data-delete]').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      requireEditAuth(() => {
-        const title = btn.closest('[data-source]').querySelector('.scard-title').textContent;
-        if (confirm(`"${title}" 방송문을 삭제하시겠습니까?`)) deleteCustomScript(btn.dataset.delete);
-      });
-    });
-  });
-
-  $('btn-add-custom').addEventListener('click', () => requireEditAuth(openAddModal));
-  $('btn-import-pdf').addEventListener('click', () => requireEditAuth(openPdfModal));
-  document.getElementById('btn-clear-custom')?.addEventListener('click', () => {
-    requireEditAuth(() => {
-      const n = loadCustomScripts().length;
-      if (confirm(`내 방송문 ${n}개를 모두 삭제하시겠습니까?\n(기본 제공 방송문은 삭제되지 않습니다)`)) {
-        saveCustomScripts([]);
-        renderHome();
+// ===== HOME / SIDEBAR =====
+async function loadAndRenderHome() {
+  // 1. Firestore 로드 시도 (캐시 우선)
+  let firestoreScripts = [];
+  const cached = (() => { try { return JSON.parse(localStorage.getItem('cabinvoice_scripts_cache')||'null'); } catch { return null; } })();
+  if (cached && cached.announcements && (Date.now()-cached.ts < 3600000)) {
+    firestoreScripts = _mapAnnouncementsToScripts(cached.announcements);
+    if ($('rev-badge')) $('rev-badge').textContent = cached.rev || 'OPIc 방식';
+  } else if (initFirebase()) {
+    try {
+      const latest = await firestoreLoadLatest();
+      if (latest && latest.announcements) {
+        firestoreScripts = _mapAnnouncementsToScripts(latest.announcements);
+        localStorage.setItem('cabinvoice_scripts_cache', JSON.stringify({
+          rev: latest.revVersion, announcements: latest.announcements, ts: Date.now()
+        }));
+        if ($('rev-badge')) $('rev-badge').textContent = latest.revVersion || 'OPIc 방식';
       }
+    } catch {}
+  }
+
+  const customScripts = loadCustomScripts();
+  const builtInEffective = SCRIPTS.map(s => getEffectiveScript(s.id));
+
+  // Firestore 있으면 빌트인 대체, 없으면 빌트인 사용
+  const baseScripts = firestoreScripts.length ? firestoreScripts : builtInEffective;
+  _allScripts = [...baseScripts, ...customScripts];
+
+  renderSidebar(_allScripts);
+}
+
+function _mapAnnouncementsToScripts(announcements) {
+  return announcements.map(a => ({
+    id: a.id || a.section,
+    icon: a.icon || '✈️',
+    colorClass: 'c-blue',
+    difficulty: '기본', difficultyClass: '',
+    title: `${a.section || a.id} ${a.title}`,
+    _chapter: a.chapterName || `${a.chapter}장`,
+    _section: a.section || a.id,
+    _chapterNum: a.chapter || 0,
+    langs: {
+      ...(a.ko ? { ko: buildCustomLang(a.ko, (a.checkpoints||[]).join(','), 'ko') } : {}),
+      ...(a.en ? { en: buildCustomLang(a.en, '', 'en') } : {}),
+      ...(a.ja ? { ja: buildCustomLang(a.ja, '', 'ja') } : {}),
+    }
+  })).filter(s => s.langs.ko || s.langs.en);
+}
+
+function renderSidebar(scripts) {
+  const tree = $('sidebar-tree');
+  if (!tree) return;
+
+  // 챕터별 그룹핑
+  const chapters = new Map();
+  const customGroup = [];
+
+  for (const s of scripts) {
+    if (s._custom) {
+      customGroup.push(s);
+    } else {
+      const chKey = s._chapter || '기타';
+      if (!chapters.has(chKey)) chapters.set(chKey, []);
+      chapters.get(chKey).push(s);
+    }
+  }
+
+  let html = '';
+
+  // 챕터 아코디언
+  for (const [chapterName, items] of chapters) {
+    html += `
+    <div class="sidebar-chapter">
+      <button class="sidebar-chapter-btn" data-chapter="${escHtml(chapterName)}">
+        <span class="sidebar-chapter-name">${escHtml(chapterName)}</span>
+        <span class="sidebar-chapter-count">${items.length}</span>
+        <span class="sidebar-chapter-arrow">▾</span>
+      </button>
+      <div class="sidebar-chapter-items">
+        ${items.map(s => _sidebarItemHtml(s)).join('')}
+      </div>
+    </div>`;
+  }
+
+  // 내 방송문
+  if (customGroup.length) {
+    html += `
+    <div class="sidebar-chapter">
+      <button class="sidebar-chapter-btn" data-chapter="__custom">
+        <span class="sidebar-chapter-name">📋 내 방송문</span>
+        <span class="sidebar-chapter-count">${customGroup.length}</span>
+        <span class="sidebar-chapter-arrow">▾</span>
+      </button>
+      <div class="sidebar-chapter-items">
+        ${customGroup.map(s => _sidebarItemHtml(s)).join('')}
+      </div>
+    </div>`;
+  }
+
+  tree.innerHTML = html;
+
+  // 아코디언 토글
+  tree.querySelectorAll('.sidebar-chapter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ch = btn.closest('.sidebar-chapter');
+      ch.classList.toggle('open');
+    });
+  });
+  // 첫 챕터 자동 열기
+  const first = tree.querySelector('.sidebar-chapter');
+  if (first) first.classList.add('open');
+
+  // 항목 클릭
+  tree.querySelectorAll('.sidebar-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const id = item.dataset.id;
+      selectScript(id);
     });
   });
 }
 
+function _sidebarItemHtml(s) {
+  const langDots = ['ko','en','ja','zh'].filter(l => s.langs?.[l]?.text)
+    .map(l => `<span class="lang-dot lang-dot-${l}"></span>`).join('');
+  return `<div class="sidebar-item${_selectedScriptId===s.id?' selected':''}" data-id="${s.id}">
+    <span class="sidebar-item-section">${s._section||''}</span>
+    <span class="sidebar-item-title">${escHtml(s.title)}</span>
+    <span class="sidebar-item-langs">${langDots}</span>
+  </div>`;
+}
+
+function selectScript(id) {
+  _selectedScriptId = id;
+  const s = _allScripts.find(x => x.id === id);
+  if (!s) return;
+
+  // 사이드바 선택 표시
+  document.querySelectorAll('.sidebar-item').forEach(el =>
+    el.classList.toggle('selected', el.dataset.id === id));
+
+  $('detail-empty').classList.add('hidden');
+  $('detail-content').classList.remove('hidden');
+
+  // 챕터 배지
+  const badge = $('detail-chapter-badge');
+  badge.textContent = s._chapter || '';
+  badge.style.display = s._chapter ? '' : 'none';
+
+  $('detail-section-num').textContent = s._section || '';
+  $('detail-title').textContent = s.title;
+
+  // 편집 버튼 (인증된 경우)
+  const editBtn = $('detail-edit-btn');
+  editBtn.classList.remove('hidden');
+  editBtn.dataset.id = id;
+  editBtn.dataset.source = s._custom ? 'custom' : 'builtin';
+
+  // 언어 탭 표시
+  _detailLang = Object.keys(s.langs).find(l => s.langs[l]?.text) || 'ko';
+  _renderDetailLangTabs(s);
+  _renderDetailContent(s, _detailLang);
+
+  // 모바일: 사이드바 닫기
+  if (window.innerWidth <= 768) closeSidebar();
+}
+
+function _renderDetailLangTabs(s) {
+  const tabs = $('detail-lang-tabs');
+  tabs.querySelectorAll('.detail-lang-tab').forEach(tab => {
+    const hasLang = s.langs[tab.dataset.lang]?.text;
+    tab.style.opacity = hasLang ? '' : '0.35';
+    tab.style.pointerEvents = hasLang ? '' : 'none';
+    tab.classList.toggle('active', tab.dataset.lang === _detailLang);
+  });
+}
+
+function _renderDetailContent(s, lang) {
+  const langData = s.langs[lang];
+  if (!langData) return;
+
+  // 변수 하이라이트 ([목적지] 등)
+  const highlightedText = (langData.text||'').replace(/\[([^\]]+)\]/g,
+    '<span class="script-var">[$1]</span>');
+  $('detail-script-box').innerHTML = `<div class="script-text-rendered">${highlightedText.replace(/\n/g,'<br>')}</div>`;
+
+  // 체크포인트
+  const cpEl = $('detail-checkpoints');
+  if (langData.checkpoints?.length) {
+    cpEl.classList.remove('hidden');
+    cpEl.innerHTML = `<div class="checkpoints-label">✅ 핵심 체크포인트</div>
+      <div class="checkpoints-list">${langData.checkpoints.map(c=>`<span class="checkpoint-item">✓ ${c}</span>`).join('')}</div>`;
+  } else {
+    cpEl.classList.add('hidden');
+  }
+
+  // 모델 음성
+  const voiceBtn = $('detail-voice-btn');
+  const hasVoice = !!loadModelVoice(s.id);
+  voiceBtn.classList.toggle('hidden', !hasVoice);
+
+  // 연습 시작 버튼
+  $('detail-start-btn').dataset.id = s.id;
+  $('detail-start-btn').dataset.lang = lang;
+}
+
+function renderHome() {
+  loadAndRenderHome();
+}
+
+function openSidebar() {
+  $('nav-sidebar').classList.add('open');
+  $('sidebar-overlay').classList.remove('hidden');
+}
+function closeSidebar() {
+  $('nav-sidebar').classList.remove('open');
+  $('sidebar-overlay').classList.add('hidden');
+}
+
+function _setupSidebarSearch() {
+  const input = $('sidebar-search');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase().trim();
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+      const title = item.querySelector('.sidebar-item-title')?.textContent.toLowerCase()||'';
+      const sec = item.querySelector('.sidebar-item-section')?.textContent.toLowerCase()||'';
+      const match = !q || title.includes(q) || sec.includes(q);
+      item.style.display = match ? '' : 'none';
+    });
+    if (q) {
+      document.querySelectorAll('.sidebar-chapter').forEach(ch => {
+        const visible = [...ch.querySelectorAll('.sidebar-item')].some(i => i.style.display !== 'none');
+        ch.classList.toggle('open', visible);
+      });
+    }
+  });
+}
+
 // ===== PREP =====
-function startPrep(script) {
+function startPrep(script, lang) {
   state.currentScript = script;
+  if (lang) state.selectedLang = lang;
   clearInterval(state.prepTimerInterval);
   updatePrepContent();
   showScreen('screen-prep');
-  startPrepTimer();
+  // 타이머 없음
 }
 
 function updatePrepContent() {
@@ -784,10 +983,7 @@ function updatePrepContent() {
 
   const lang = s.langs[state.selectedLang];
 
-  $('prep-category-tag').textContent = { ko:'한국어', en:'English', ja:'日本語', zh:'中文' }[state.selectedLang];
-  $('prep-difficulty-tag').textContent = s.difficulty;
-  $('prep-duration-tag').textContent = { ko:'약 40초', en:'approx. 40s', ja:'約40秒', zh:'约40秒' }[state.selectedLang] || '약 40초';
-  $('prep-title').textContent = s.title;
+  if ($('prep-title-bar')) $('prep-title-bar').textContent = s.title;
   $('prep-text').innerHTML = renderScriptText(lang.text);
   // 모델 음성 바
   const hasVoice = !!loadModelVoice(s.id);
@@ -801,21 +997,31 @@ function updatePrepContent() {
     ${lang.tips.map(t => `<div class="tip-item">${t}</div>`).join('')}`;
 }
 
-function startPrepTimer() {
-  state.prepTimeLeft = 30;
-  $('prep-countdown').textContent = 30;
-  $('prep-countdown').classList.remove('urgent');
-  state.prepTimerInterval = setInterval(() => {
-    state.prepTimeLeft--;
-    $('prep-countdown').textContent = state.prepTimeLeft;
-    if (state.prepTimeLeft <= 10) $('prep-countdown').classList.add('urgent');
-    if (state.prepTimeLeft <= 0) clearInterval(state.prepTimerInterval);
-  }, 1000);
-}
+function startPrepTimer() { /* 타이머 제거됨 */ }
 
 // ===== RECORDING =====
 async function startRecording() {
   clearInterval(state.prepTimerInterval);
+
+  // 3-2-1 카운트다운
+  await new Promise(resolve => {
+    const overlay = $('countdown-overlay');
+    const numEl = $('countdown-number');
+    overlay.classList.remove('hidden');
+    let count = 3;
+    numEl.textContent = count;
+    const iv = setInterval(() => {
+      count--;
+      if (count <= 0) {
+        clearInterval(iv);
+        overlay.classList.add('hidden');
+        resolve();
+      } else {
+        numEl.textContent = count;
+      }
+    }, 800);
+  });
+
   const lang = state.currentScript.langs[state.selectedLang];
 
   state.transcript = '';
@@ -840,7 +1046,8 @@ async function startRecording() {
     return;
   }
 
-  state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const AudioCtx = /** @type {any} */ (window).AudioContext || /** @type {any} */ (window).webkitAudioContext;
+  state.audioContext = new AudioCtx();
   state.analyser = state.audioContext.createAnalyser();
   state.analyser.fftSize = 4096;
   state.analyser.smoothingTimeConstant = 0.6;
@@ -942,7 +1149,7 @@ function autoCorrelationPitch(buf, sampleRate) {
 }
 
 function setupSpeechRecognition(langCode) {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SR = /** @type {any} */ (window).SpeechRecognition || /** @type {any} */ (window).webkitSpeechRecognition;
   if (!SR) { $('live-text').textContent = '⚠️ Chrome 브라우저에서만 음성 인식이 지원됩니다.'; return; }
 
   const recog = new SR();
@@ -1222,6 +1429,23 @@ function showResults(result, transcript) {
 
   renderFeedback(result, transcript, lang);
   renderTranscriptCompare(transcript, lang);
+
+  // AI 채점 섹션 초기화
+  const aiSec = $('ai-result-section');
+  if (aiSec) {
+    aiSec.classList.add('hidden');
+    $('diff-words-box').innerHTML = '';
+    $('improvement-box').classList.add('hidden');
+    $('encouragement-box').classList.add('hidden');
+  }
+
+  // AI 채점 (API 키 있을 때만)
+  const anthropicKey = localStorage.getItem('cabinvoice_anthropic_key');
+  if (anthropicKey && transcript && transcript.length > 10) {
+    callClaudeScoring(anthropicKey, lang.text, transcript, state.selectedLang).then(aiResult => {
+      if (aiResult) renderAiResult(aiResult);
+    }).catch(() => {});
+  }
 }
 
 function renderRadar(result) {
@@ -1576,10 +1800,15 @@ function saveScriptFromModal() {
 // PDF 파싱 결과 임시 저장 (import 시 활용)
 let _pdfParsedScripts = [];
 
+let _allScripts = [];  // 전체 방송문 (Firestore + 빌트인 + custom)
+let _selectedScriptId = null;
+let _detailLang = 'ko';
+
 // ===== PDF IMPORT =====
 function openPdfModal() {
   _showPdfStep('upload');
   $('pdf-import-btn').classList.add('hidden');
+  $('pdf-apikey-input').value = localStorage.getItem('cabinvoice_anthropic_key') || '';
   $('pdf-modal').classList.remove('hidden');
 }
 function closePdfModal() { $('pdf-modal').classList.add('hidden'); }
@@ -1595,8 +1824,16 @@ async function handlePdfFile(file) {
     _showPdfError('PDF 파일만 지원합니다. (.pdf 확장자 파일을 선택해 주세요)');
     return;
   }
+  const apiKey = $('pdf-apikey-input').value.trim() ||
+                 localStorage.getItem('cabinvoice_anthropic_key') || '';
+  if (!apiKey) {
+    _showPdfError('Anthropic API 키를 입력해주세요.\nanthropic.com/console 에서 발급받을 수 있습니다.');
+    return;
+  }
+  localStorage.setItem('cabinvoice_anthropic_key', apiKey);
+
   _showPdfStep('parsing');
-  $('pdf-parsing-msg').textContent = 'PDF 텍스트 추출 중...';
+  $('pdf-parsing-msg').textContent = 'PDF 이미지 변환 중...';
   $('pdf-parsing-sub').textContent = file.name;
 
   try {
@@ -1606,33 +1843,28 @@ async function handlePdfFile(file) {
 
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const totalPages = pdf.numPages;
 
-    $('pdf-parsing-msg').textContent = `총 ${pdf.numPages}페이지 처리 중...`;
+    $('pdf-parsing-msg').textContent = `AI로 ${totalPages}페이지 분석 중...`;
 
-    let fullText = '';
-    for (let p = 1; p <= pdf.numPages; p++) {
-      $('pdf-parsing-sub').textContent = `${p} / ${pdf.numPages} 페이지`;
+    const pageResults = [];
+    for (let p = 1; p <= totalPages; p++) {
+      $('pdf-parsing-sub').textContent = `${p} / ${totalPages} 페이지 분석 중...`;
       const page = await pdf.getPage(p);
-      const content = await page.getTextContent();
-      // y좌표 기준으로 줄 묶기
-      const lineMap = new Map();
-      for (const item of content.items) {
-        if (!item.str.trim()) continue;
-        const y = Math.round(item.transform[5]);
-        if (!lineMap.has(y)) lineMap.set(y, []);
-        lineMap.get(y).push({ x: item.transform[4], str: item.str });
-      }
-      const sortedYs = [...lineMap.keys()].sort((a,b) => b - a); // PDF y는 아래서 위로
-      for (const y of sortedYs) {
-        const items = lineMap.get(y).sort((a,b) => a.x - b.x);
-        fullText += items.map(i => i.str).join(' ').trim() + '\n';
-      }
-      fullText += '\n';
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      const imageBase64 = canvas.toDataURL('image/png').split(',')[1];
+
+      const result = await callClaudeVision(apiKey, imageBase64);
+      if (result) pageResults.push(result);
     }
 
-    const scripts = parsePdfScripts(fullText);
+    const scripts = groupPagesByScript(pageResults);
     if (!scripts.length) {
-      _showPdfError('방송문안을 인식하지 못했습니다.\n\n번호로 구분된 목차 구조가 없거나, 스캔 이미지 PDF일 수 있습니다.\n직접 입력 기능을 이용해 주세요.');
+      _showPdfError('방송문안을 인식하지 못했습니다.\n\nAI가 방송문 구조를 찾지 못했습니다.\n방송교범 PDF인지 확인하거나 다시 시도해 주세요.');
       return;
     }
     renderPdfPreview(scripts);
@@ -1641,157 +1873,129 @@ async function handlePdfFile(file) {
   }
 }
 
-// 변형(variant) 분리: "표 제시하여 선택" 구조 처리
-// [{ label, text }] 반환 — 변형 없으면 [{ label:null, text }]
-function splitVariants(rawText) {
-  const MARKERS = ['표 제시하여 선택', '표제시하여선택', '상황에 따라 선택', '선택 사항', '선택사항', '해당 문안 선택'];
-  // "General: 텍스트..." 또는 "수하물 과다 반입: 텍스트..."
-  const LABEL_COLON = /^([가-힣A-Za-z][가-힣A-Za-z0-9 \-\/]{0,28}?)\s*[：:]\s+([\s\S]+)/;
-  // 콜론 없이 레이블 뒤 긴 공백 + 텍스트 (표에서 추출된 경우)
-  const LABEL_SPACE = /^([가-힣A-Za-z][가-힣A-Za-z ]{2,20})\s{3,}([\s\S]{8,})/;
+async function callClaudeVision(apiKey, imageBase64) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1500,
+      system: `항공사 방송교범 PDF 페이지입니다. 이 페이지의 언어와 방송문을 분석하여 JSON으로만 반환하세요.
 
-  const lines = rawText.split('\n').map(l => l.trim());
-  let headerLines = [], variants = [], cur = null, inBlock = false;
+규칙:
+- 언어 코드: ko(한국어), en(영어), ja(일본어), zh(중국어)
+- 일본어: 히라가나/가타카나 원문만 추출, 한글 발음 표기는 제외
+- 헤더(챕터명), 푸터(페이지번호, REV.XX) 제외
+- 조건부 문안(표 구조, General/수하물 과다 반입 등): variants 배열로 추출
 
-  for (const line of lines) {
-    if (!line) { if (cur) cur.text += '\n'; continue; }
-    if (!inBlock && MARKERS.some(m => line.includes(m))) { inBlock = true; continue; }
+반환 형식 (JSON만, 설명 없이):
+단일 문안: {"lang":"ko","num":"2.1.1","title":"방송 제목","text":"방송 내용"}
+복수 문안: {"lang":"ko","num":"2.1.1","title":"방송 제목","variants":[{"label":"General","text":"..."},{"label":"수하물 과다 반입","text":"..."}]}
+방송문 없는 페이지: {"skip":true}`,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imageBase64 } },
+          { type: 'text', text: '이 페이지를 분석해서 JSON으로 추출해주세요.' }
+        ]
+      }]
+    })
+  });
 
-    if (inBlock) {
-      const m = line.match(LABEL_COLON) || line.match(LABEL_SPACE);
-      if (m && m[1].trim().length <= 25) {
-        if (cur) variants.push(cur);
-        cur = { label: m[1].trim(), text: m[2].trim() };
-      } else if (cur) {
-        cur.text += '\n' + line;
-      } else {
-        headerLines.push(line);
-      }
-    } else {
-      headerLines.push(line);
-    }
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API 오류 ${response.status}`);
   }
-  if (cur) variants.push(cur);
 
-  const header = headerLines.join('\n').trim();
-  if (variants.length >= 2) {
-    return variants.map(v => ({
-      label: v.label,
-      text: header ? `${header}\n${v.text.trim()}` : v.text.trim()
-    }));
-  }
-  return [{ label: null, text: rawText.trim() }];
+  const data = await response.json();
+  const raw = (data.content[0]?.text || '').trim();
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[0]);
+    return parsed.skip ? null : parsed;
+  } catch { return null; }
 }
 
-function parsePdfScripts(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  const results = [];
-  let chapter = '', section = '', cur = null;
+function groupPagesByScript(pageResults) {
+  const scriptMap = new Map();
+  const order = [];
 
-  function isChapter(line) {
-    return /^\d+\s*장\s*[_\s]/.test(line) || /^제\s*\d+\s*장/.test(line);
-  }
-  function matchDecimal(line) {
-    const m = line.match(/^(\d+(?:\.\d+)+)\s*(.*)/);
-    return m ? { num: m[1], rest: m[2].trim(), level: m[1].split('.').length } : null;
-  }
-  function iconForChapter(name) {
-    const n = (name || '').toLowerCase();
-    if (n.includes('irre'))                               return '⚠️';
-    if (n.includes('after landing'))                      return '🛬';
-    if (n.includes('en-route') || n.includes('enroute'))  return '☁️';
-    return '✈️';
-  }
-
-  // cur 항목을 변형 분리 후 results에 추가
-  function flushCur() {
-    if (!cur || !cur.rawText.trim()) return;
-    const variants = splitVariants(cur.rawText);
-    if (variants.length === 1 && !variants[0].label) {
-      results.push({ num: cur.num, title: cur.title, chapter: cur.chapter,
-                     section: cur.section, icon: cur.icon, text: variants[0].text });
-    } else {
-      variants.forEach(v => {
-        results.push({ num: cur.num, title: `${cur.title} (${v.label})`,
-                       chapter: cur.chapter, section: cur.section,
-                       icon: cur.icon, text: v.text });
-      });
+  for (const r of pageResults) {
+    if (!r.num) continue;
+    if (!scriptMap.has(r.num)) {
+      scriptMap.set(r.num, { num: r.num, title: r.title || r.num, ko: '', en: '', ja: '', zh: '' });
+      order.push(r.num);
     }
-    cur = null;
-  }
+    const s = scriptMap.get(r.num);
+    if (r.title && !s.title) s.title = r.title;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (isChapter(line)) {
-      flushCur();
-      chapter = line.replace(/^\d+\s*장\s*[_\s]+/, '')
-                    .replace(/^제\s*\d+\s*장\s*/, '').trim() || line;
-      section = '';
-      continue;
-    }
-
-    const dec = matchDecimal(line);
-    if (dec) {
-      if (dec.level === 2) {
-        flushCur();
-        section = `${dec.num} ${dec.rest}`;
-      } else if (dec.level >= 3) {
-        flushCur();
-        let title = dec.rest;
-        if (!title && i + 1 < lines.length
-            && !matchDecimal(lines[i + 1]) && !isChapter(lines[i + 1])) {
-          title = lines[++i];
-        }
-        cur = { num: dec.num, title: title || dec.num,
-                chapter, section, icon: iconForChapter(chapter), rawText: '' };
+    const lang = r.lang;
+    if (['ko','en','ja','zh'].includes(lang)) {
+      if (r.variants && r.variants.length >= 2) {
+        s[lang] = r.variants.map(v => `[${v.label}]\n${v.text.trim()}`).join('\n\n');
       } else {
-        if (cur) cur.rawText += '\n' + line;
+        s[lang] = (r.text || '').trim();
       }
-    } else if (cur) {
-      cur.rawText += (cur.rawText ? '\n' : '') + line;
     }
   }
-  flushCur();
-  return results;
+
+  return order.map(k => scriptMap.get(k)).filter(s => s.ko || s.en || s.ja || s.zh);
 }
 
 function renderPdfPreview(scripts) {
-  _pdfParsedScripts = scripts;           // import 시 icon 등 메타 재활용
+  _pdfParsedScripts = scripts;
   _showPdfStep('preview');
   $('pdf-preview-info').textContent =
     `${scripts.length}개 방송문안 인식됨 — 가져올 항목을 선택·편집하세요`;
   $('pdf-import-btn').classList.remove('hidden');
 
-  let lastChapter = null, lastSection = null;
+  const LANG_LABELS = { ko: '🇰🇷 한국어', en: '🇺🇸 영어', ja: '🇯🇵 일본어', zh: '🇨🇳 중국어' };
+
   const rows = scripts.map((s, i) => {
-    let header = '';
-    if (s.chapter !== lastChapter) {
-      header += `<div class="pdf-chapter-header">${s.icon} ${s.chapter}</div>`;
-      lastChapter = s.chapter; lastSection = null;
-    }
-    if (s.section && s.section !== lastSection) {
-      header += `<div class="pdf-section-header">${s.section}</div>`;
-      lastSection = s.section;
-    }
-    return `${header}
+    const activeLang = ['ko','en','ja','zh'].find(l => s[l]) || 'ko';
+    const langTabs = ['ko','en','ja','zh'].map(l =>
+      `<button class="pdf-lang-tab${l === activeLang ? ' active' : ''}" data-lang="${l}"${!s[l] ? ' style="opacity:.4"' : ''}>${LANG_LABELS[l]}</button>`
+    ).join('');
+    const langPanels = ['ko','en','ja','zh'].map(l =>
+      `<textarea class="pdf-field-textarea${l !== activeLang ? ' hidden' : ''}" data-field="${l}" rows="4">${(s[l] || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`
+    ).join('');
+
+    return `
     <div class="pdf-script-item selected" data-idx="${i}">
       <input type="checkbox" class="pdf-script-check" checked>
       <div class="pdf-script-fields">
         <div class="pdf-script-num-title">
           <span class="pdf-script-num">${s.num}</span>
           <input class="pdf-field-input" placeholder="방송 제목"
-            value="${s.title.replace(/"/g,'&quot;')}" data-field="title">
+            value="${(s.title || '').replace(/"/g,'&quot;')}" data-field="title">
         </div>
-        <textarea class="pdf-field-textarea" rows="4" data-field="text">${s.text}</textarea>
+        <div class="pdf-lang-tabs">${langTabs}</div>
+        ${langPanels}
       </div>
     </div>`;
   }).join('');
 
   $('pdf-script-list').innerHTML = rows;
+
   $('pdf-script-list').querySelectorAll('.pdf-script-check').forEach(cb => {
     cb.addEventListener('change', () =>
       cb.closest('.pdf-script-item').classList.toggle('selected', cb.checked));
+  });
+
+  $('pdf-script-list').querySelectorAll('.pdf-lang-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const item = tab.closest('.pdf-script-item');
+      item.querySelectorAll('.pdf-lang-tab').forEach(t => t.classList.remove('active'));
+      item.querySelectorAll('.pdf-field-textarea').forEach(ta => ta.classList.add('hidden'));
+      tab.classList.add('active');
+      item.querySelector(`[data-field="${tab.dataset.lang}"]`).classList.remove('hidden');
+    });
   });
 }
 
@@ -1810,26 +2014,381 @@ function importSelectedPdfScripts() {
     const idx   = parseInt(item.dataset.idx);
     const meta  = _pdfParsedScripts[idx] || {};
     const title = item.querySelector('[data-field="title"]').value.trim() || '방송문';
-    const text  = item.querySelector('[data-field="text"]').value.trim();
-    if (!text) return;
+    const langs = {};
+    ['ko','en','ja','zh'].forEach(l => {
+      const ta = item.querySelector(`[data-field="${l}"]`);
+      const text = ta ? ta.value.trim() : '';
+      if (text) langs[l] = buildCustomLang(text, '', l);
+    });
+    if (!Object.keys(langs).length) return;
     const id = 'custom_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
     toAdd.push({
       id,
-      icon: meta.icon || '📋',
+      icon: '📋',
       colorClass: 'c-blue',
       difficulty: '기본', difficultyClass: '',
       title: `${meta.num ? meta.num + ' ' : ''}${title}`,
-      langs: { ko: buildCustomLang(text, '', 'ko') },
+      langs,
       _custom: true
     });
   });
   if (!toAdd.length) { alert('선택된 방송문이 없습니다.'); return; }
   const arr = loadCustomScripts();
-  arr.unshift(...[...toAdd].reverse()); // 원래 문서 순서 유지
+  arr.unshift(...[...toAdd].reverse());
   saveCustomScripts(arr);
   closePdfModal();
   renderHome();
   alert(`${toAdd.length}개 방송문안을 가져왔습니다.`);
+}
+
+// ===== CLAUDE AI SCORING =====
+async function callClaudeScoring(apiKey, script, transcript, langCode) {
+  const langName = { ko:'한국어', en:'영어', ja:'일본어', zh:'중국어' }[langCode]||'한국어';
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1500,
+      system: `당신은 항공사 기내방송 전문 평가관입니다.
+원문(script)과 훈련생 발화(transcript)를 비교하여 아래 JSON 형식으로만 반환하세요 (설명 없이).
+
+{
+  "totalScore": 0-100,
+  "categories": {
+    "completeness": { "score": 0-100, "feedback": "...", "missed": [] },
+    "honorifics":   { "score": 0-100, "feedback": "..." },
+    "fluency":      { "score": 0-100, "feedback": "..." },
+    "clarity":      { "score": 0-100, "feedback": "..." }
+  },
+  "diffWords": [
+    { "word": "단어", "status": "correct" }
+  ],
+  "improvementExample": "이렇게 말씀해 보세요...",
+  "encouragement": "응원 메시지"
+}
+
+평가 기준:
+- 안전 관련 단어 누락은 completeness에서 크게 감점
+- '손님 여러분'/'Ladies and gentlemen' 등 호칭 누락 시 honorifics 감점
+- [목적지] [편명] 같은 변수 자리는 어떤 단어든 정답 처리
+- 언어: ${langName}`,
+      messages: [{
+        role: 'user',
+        content: `원문:\n${script}\n\n발화:\n${transcript}`
+      }]
+    })
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const raw = (data.content[0]?.text||'').trim();
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try { return JSON.parse(m[0]); } catch { return null; }
+}
+
+function renderAiResult(ai) {
+  const sec = $('ai-result-section');
+  if (!sec) return;
+  sec.classList.remove('hidden');
+
+  // diff words
+  if (ai.diffWords?.length) {
+    $('diff-words-box').innerHTML = `<div class="diff-words-label">📝 단어 분석</div>
+      <div class="diff-words">${ai.diffWords.map(w => {
+        const cls = w.status==='correct'?'dw-correct':w.status==='missed'?'dw-missed':'dw-added';
+        return `<span class="diff-word ${cls}">${escHtml(w.word)}</span>`;
+      }).join(' ')}</div>`;
+  }
+
+  // improvement
+  if (ai.improvementExample) {
+    $('improvement-box').classList.remove('hidden');
+    $('improvement-text').textContent = ai.improvementExample;
+  }
+
+  // encouragement
+  if (ai.encouragement) {
+    $('encouragement-box').classList.remove('hidden');
+    $('encouragement-text').textContent = ai.encouragement;
+  }
+}
+
+// ===== ADMIN =====
+let _adminParsedScripts = [];
+
+function openAdminScreen() {
+  requireEditAuth(() => {
+    initFirebase();
+    const cfg = getFirebaseConfig();
+    if (cfg) $('admin-firebase-cfg').value = JSON.stringify(cfg, null, 2);
+    // API 키 복원
+    const key = localStorage.getItem('cabinvoice_anthropic_key') || '';
+    $('admin-apikey-input').value = key;
+    _refreshAdminVersion();
+    _refreshAdminVersionList();
+    showScreen('screen-admin');
+  });
+}
+
+function _refreshAdminVersion() {
+  const el = $('admin-deployed-badge');
+  if (!_db) { el.textContent = 'Firebase 미연결'; el.style.background='#fee2e2'; return; }
+  firestoreLoadLatest().then(data => {
+    if (data) {
+      el.textContent = `${data.revVersion} · ${new Date(data.updatedAt?.seconds*1000||Date.now()).toLocaleDateString('ko')} 배포`;
+      el.style.background='#dcfce7';
+    } else {
+      el.textContent = '배포된 버전 없음';
+      el.style.background='#fef9c3';
+    }
+  });
+}
+
+function _refreshAdminVersionList() {
+  const el = $('admin-version-list');
+  if (!_db) return;
+  firestoreLoadHistory().then(list => {
+    if (!list.length) {
+      el.innerHTML = '<div style="color:var(--gray-400);font-size:13px">버전 이력이 없습니다.</div>';
+      return;
+    }
+    el.innerHTML = list.map(v => `
+      <div class="admin-version-item">
+        <div class="admin-version-info">
+          <strong>${v.revVersion}</strong>
+          <span class="admin-version-date">${new Date(v.updatedAt?.seconds*1000||Date.now()).toLocaleString('ko')}</span>
+          <span class="admin-version-count">${v.announcements?.length||0}개</span>
+        </div>
+        <button class="btn-icon sm" data-rev="${v.revVersion}" id="rollback-${v.revVersion.replace(/\./g,'-')}">롤백</button>
+      </div>`).join('');
+    el.querySelectorAll('[data-rev]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(`${btn.dataset.rev} 버전으로 롤백하시겠습니까?`)) return;
+        try {
+          await firestoreRollback(btn.dataset.rev);
+          alert('롤백 완료. 앱을 새로고침하면 적용됩니다.');
+          _refreshAdminVersion();
+        } catch(e) { alert(`롤백 실패: ${e.message}`); }
+      });
+    });
+  });
+}
+
+async function handleAdminPdf(file) {
+  if (!file || file.type !== 'application/pdf') { _showAdminError('PDF 파일만 지원합니다.'); return; }
+  const apiKey = $('admin-apikey-input').value.trim() || localStorage.getItem('cabinvoice_anthropic_key') || '';
+  if (!apiKey) { _showAdminError('Anthropic API 키를 입력해주세요.'); return; }
+  localStorage.setItem('cabinvoice_anthropic_key', apiKey);
+
+  $('admin-pdf-drop-zone').classList.add('hidden');
+  $('admin-pdf-error').classList.add('hidden');
+  $('admin-pdf-preview').classList.add('hidden');
+  $('admin-pdf-parsing').classList.remove('hidden');
+  $('admin-parsing-msg').textContent = 'PDF 이미지 변환 중...';
+  $('admin-parsing-sub').textContent = file.name;
+
+  try {
+    if (!window.pdfjsLib) throw new Error('PDF.js 라이브러리를 불러오지 못했습니다.');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    const total = pdf.numPages;
+    $('admin-parsing-msg').textContent = `AI로 ${total}페이지 분석 중...`;
+
+    const SYSTEM = `항공사 기내방송 교범 PDF 페이지입니다.
+다음을 JSON으로만 반환하세요 (preamble 없이):
+{ "skip": true } — 방송문이 없는 페이지(표지·목차·빈 페이지)
+또는
+{ "lang":"ko", "num":"2.1.1", "title":"방송 제목", "text":"방송 본문" }
+
+규칙:
+- 언어 코드: ko(한국어), en(영어), ja(일본어)
+- 일본어: 히라가나/가타카나만 추출, 한글 발음 표기 제외
+- 헤더(객실승무원 방송교범, 제N장...), 푸터(제정일자, REV.XX, 페이지번호) 제외
+- [목적지] [편명] 같은 변수 그대로 유지
+- 조건부 문안(General/수하물 과다 반입 등 표 구조)은 본문에 포함`;
+
+    const pageResults = [];
+    for (let p = 1; p <= total; p++) {
+      $('admin-parsing-sub').textContent = `${p} / ${total} 페이지...`;
+      const page = await pdf.getPage(p);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      const b64 = canvas.toDataURL('image/png').split(',')[1];
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          system: SYSTEM,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: 'image/png', data: b64 } },
+              { type: 'text', text: '이 페이지를 분석해서 JSON으로 추출해주세요.' }
+            ]
+          }]
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({}));
+        throw new Error(err.error?.message || `API 오류 ${res.status}`);
+      }
+      const data = await res.json();
+      const raw = (data.content[0]?.text||'').trim();
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (m) {
+        try {
+          const parsed = JSON.parse(m[0]);
+          if (!parsed.skip) pageResults.push(parsed);
+        } catch {}
+      }
+    }
+
+    // 페이지 결과를 방송문별로 묶기
+    const scriptMap = new Map();
+    const order = [];
+    for (const r of pageResults) {
+      if (!r.num) continue;
+      if (!scriptMap.has(r.num)) {
+        scriptMap.set(r.num, { num: r.num, title: r.title||r.num, ko:'', en:'', ja:'' });
+        order.push(r.num);
+      }
+      const s = scriptMap.get(r.num);
+      if (r.title && !s.title) s.title = r.title;
+      if (['ko','en','ja'].includes(r.lang)) s[r.lang] = (r.text||'').trim();
+    }
+    _adminParsedScripts = order.map(k => scriptMap.get(k)).filter(s => s.ko||s.en||s.ja);
+
+    if (!_adminParsedScripts.length) { _showAdminError('방송문을 인식하지 못했습니다.'); return; }
+
+    $('admin-pdf-parsing').classList.add('hidden');
+    $('admin-pdf-preview').classList.remove('hidden');
+    $('admin-preview-info').textContent = `${_adminParsedScripts.length}개 방송문 인식됨`;
+
+    const LANG_LABELS = { ko:'🇰🇷 KO', en:'🇺🇸 EN', ja:'🇯🇵 JA' };
+    $('admin-script-list').innerHTML = _adminParsedScripts.map((s, i) => {
+      const activeLang = ['ko','en','ja'].find(l=>s[l])||'ko';
+      const tabs = ['ko','en','ja'].map(l =>
+        `<button class="pdf-lang-tab${l===activeLang?' active':''}" data-lang="${l}"${!s[l]?' style="opacity:.4"':''}>${LANG_LABELS[l]}</button>`
+      ).join('');
+      const panels = ['ko','en','ja'].map(l =>
+        `<textarea class="pdf-field-textarea${l!==activeLang?' hidden':''}" data-field="${l}" rows="3">${(s[l]||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`
+      ).join('');
+      return `
+      <div class="pdf-script-item selected" data-idx="${i}">
+        <input type="checkbox" class="pdf-script-check" checked>
+        <div class="pdf-script-fields">
+          <div class="pdf-script-num-title">
+            <span class="pdf-script-num">${s.num}</span>
+            <input class="pdf-field-input" data-field="title" value="${(s.title||'').replace(/"/g,'&quot;')}" placeholder="방송 제목">
+          </div>
+          <div class="pdf-lang-tabs">${tabs}</div>
+          ${panels}
+        </div>
+      </div>`;
+    }).join('');
+
+    $('admin-script-list').querySelectorAll('.pdf-script-check').forEach(cb => {
+      cb.addEventListener('change', () => cb.closest('.pdf-script-item').classList.toggle('selected', cb.checked));
+    });
+    $('admin-script-list').querySelectorAll('.pdf-lang-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const item = tab.closest('.pdf-script-item');
+        item.querySelectorAll('.pdf-lang-tab').forEach(t=>t.classList.remove('active'));
+        item.querySelectorAll('.pdf-field-textarea').forEach(ta=>ta.classList.add('hidden'));
+        tab.classList.add('active');
+        item.querySelector(`[data-field="${tab.dataset.lang}"]`).classList.remove('hidden');
+      });
+    });
+  } catch(e) {
+    $('admin-pdf-parsing').classList.add('hidden');
+    _showAdminError(`오류: ${e.message}`);
+  }
+}
+
+function _showAdminError(msg) {
+  $('admin-pdf-drop-zone').classList.remove('hidden');
+  $('admin-pdf-parsing').classList.add('hidden');
+  $('admin-pdf-preview').classList.add('hidden');
+  $('admin-pdf-error').classList.remove('hidden');
+  $('admin-error-msg').textContent = msg;
+}
+
+async function deployToFirestore() {
+  const rev = $('admin-rev-version').value.trim();
+  if (!rev) { alert('개정번호를 입력해주세요 (예: Rev.23)'); return; }
+
+  const items = $('admin-script-list').querySelectorAll('.pdf-script-item');
+  const announcements = [];
+  items.forEach(item => {
+    const cb = item.querySelector('.pdf-script-check');
+    if (!cb.checked) return;
+    const idx = parseInt(item.dataset.idx);
+    const meta = _adminParsedScripts[idx]||{};
+    const title = item.querySelector('[data-field="title"]').value.trim()||'방송문';
+    const langs = {};
+    ['ko','en','ja'].forEach(l => {
+      const ta = item.querySelector(`[data-field="${l}"]`);
+      const text = ta?ta.value.trim():'';
+      if (text) langs[l] = text;
+    });
+    if (!Object.keys(langs).length) return;
+
+    // num을 파싱해서 chapter 추출
+    const numParts = (meta.num||'').split('.');
+    const chapter = parseInt(numParts[0])||0;
+    announcements.push({
+      id: meta.num||`item-${idx}`,
+      chapter,
+      chapterName: '',
+      section: meta.num||'',
+      title,
+      ko: langs.ko||'',
+      en: langs.en||'',
+      ja: langs.ja||'',
+      checkpoints: [],
+      icon: '✈'
+    });
+  });
+
+  if (!announcements.length) { alert('배포할 항목이 없습니다.'); return; }
+  if (!confirm(`${announcements.length}개 방송문을 ${rev}로 Firestore에 배포하시겠습니까?`)) return;
+
+  const btn = $('btn-admin-deploy');
+  btn.disabled = true; btn.textContent = '배포 중...';
+  try {
+    if (!_db) throw new Error('Firebase가 연결되지 않았습니다. Firebase 설정을 먼저 완료해주세요.');
+    await firestoreSaveLatest({
+      revVersion: rev,
+      updatedAt: firebase.firestore.Timestamp.now(),
+      announcements
+    });
+    alert(`${rev} 배포 완료! (${announcements.length}개 방송문)`);
+    _refreshAdminVersion();
+    _refreshAdminVersionList();
+    // 캐시 갱신
+    localStorage.setItem('cabinvoice_scripts_cache', JSON.stringify({ rev, announcements, ts: Date.now() }));
+  } catch(e) {
+    alert(`배포 실패: ${e.message}`);
+  } finally {
+    btn.disabled = false; btn.textContent = '🚀 Firestore에 배포하기';
+  }
 }
 
 // ===== EVENTS =====
@@ -1994,4 +2553,72 @@ document.addEventListener('DOMContentLoaded', () => {
     audio.onended = () => { $('btn-model-voice').textContent = '🎙 모델 음성 듣기'; };
     audio.onerror = () => { $('btn-model-voice').textContent = '🎙 모델 음성 듣기'; alert('음성 파일을 재생할 수 없습니다.'); };
   });
+
+  // ===== 관리자 패널 =====
+  $('btn-open-admin').addEventListener('click', openAdminScreen);
+  $('btn-admin-back').addEventListener('click', () => { showScreen('screen-home'); loadAndRenderHome(); });
+  $('btn-save-firebase-cfg').addEventListener('click', () => {
+    try {
+      const cfg = JSON.parse($('admin-firebase-cfg').value);
+      saveFirebaseConfig(cfg);
+      const ok = initFirebase();
+      $('admin-firebase-status').textContent = ok ? '✅ Firebase 연결됨' : '❌ 연결 실패';
+      if (ok) { _refreshAdminVersion(); _refreshAdminVersionList(); }
+    } catch { $('admin-firebase-status').textContent = '❌ JSON 형식 오류'; }
+  });
+  $('admin-pdf-input').addEventListener('change', e => { if (e.target.files[0]) handleAdminPdf(e.target.files[0]); });
+  const adminDropZone = $('admin-pdf-drop-zone');
+  adminDropZone.addEventListener('dragover', e => { e.preventDefault(); adminDropZone.classList.add('drag-over'); });
+  adminDropZone.addEventListener('dragleave', () => adminDropZone.classList.remove('drag-over'));
+  adminDropZone.addEventListener('drop', e => { e.preventDefault(); adminDropZone.classList.remove('drag-over'); const f=e.dataTransfer.files[0]; if(f) handleAdminPdf(f); });
+  $('btn-admin-deploy').addEventListener('click', deployToFirestore);
+  $('admin-select-all').addEventListener('click', () => $('admin-script-list').querySelectorAll('.pdf-script-check').forEach(cb=>{cb.checked=true;cb.closest('.pdf-script-item').classList.add('selected');}));
+  $('admin-deselect-all').addEventListener('click', () => $('admin-script-list').querySelectorAll('.pdf-script-check').forEach(cb=>{cb.checked=false;cb.closest('.pdf-script-item').classList.remove('selected');}));
+  $('admin-retry-btn').addEventListener('click', () => { $('admin-pdf-error').classList.add('hidden'); $('admin-pdf-drop-zone').classList.remove('hidden'); });
+
+  // ===== 사이드바 =====
+  $('btn-toggle-sidebar').addEventListener('click', openSidebar);
+  $('sidebar-overlay').addEventListener('click', closeSidebar);
+  $('btn-sidebar-add').addEventListener('click', () => requireEditAuth(openAddModal));
+  $('btn-sidebar-pdf').addEventListener('click', () => requireEditAuth(openPdfModal));
+  _setupSidebarSearch();
+
+  // 상세 패널 언어 탭
+  $('detail-lang-tabs').querySelectorAll('.detail-lang-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      if (!_selectedScriptId) return;
+      const s = _allScripts.find(x => x.id === _selectedScriptId);
+      if (!s || !s.langs[tab.dataset.lang]?.text) return;
+      _detailLang = tab.dataset.lang;
+      $('detail-lang-tabs').querySelectorAll('.detail-lang-tab').forEach(t => t.classList.toggle('active', t.dataset.lang===_detailLang));
+      _renderDetailContent(s, _detailLang);
+    });
+  });
+
+  // 상세 패널 버튼들
+  $('detail-start-btn').addEventListener('click', () => {
+    if (!_selectedScriptId) return;
+    const s = _allScripts.find(x => x.id === _selectedScriptId);
+    if (s) { state.selectedLang = _detailLang; startPrep(s, _detailLang); }
+  });
+  $('detail-voice-btn').addEventListener('click', () => {
+    if (!_selectedScriptId) return;
+    const s = _allScripts.find(x => x.id === _selectedScriptId);
+    if (!s) return;
+    const base64 = loadModelVoice(s.id);
+    if (!base64) return;
+    if (_mvAudioUrl) { URL.revokeObjectURL(_mvAudioUrl); _mvAudioUrl = null; }
+    const blob = base64ToBlob(base64);
+    _mvAudioUrl = URL.createObjectURL(blob);
+    new Audio(_mvAudioUrl).play().catch(()=>{});
+  });
+  $('detail-edit-btn').addEventListener('click', () => {
+    if (!_selectedScriptId) return;
+    const btn = $('detail-edit-btn');
+    requireEditAuth(() => openEditModal(btn.dataset.id, btn.dataset.source));
+  });
+
+  // 결과 화면 버튼
+  document.getElementById('btn-result-select')?.addEventListener('click', () => showScreen('screen-home'));
+  document.getElementById('btn-result-retry-2')?.addEventListener('click', () => { if (state.currentScript) startPrep(state.currentScript); });
 });
