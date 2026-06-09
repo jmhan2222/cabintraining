@@ -25,7 +25,8 @@ async function getGeminiModel() {
       if (typeof input === 'string') {
         contents = [{ parts: [{ text: input }] }];
       } else if (Array.isArray(input)) {
-        contents = [{ parts: input }];
+        const parts = input.map(p => typeof p === 'string' ? { text: p } : p);
+        contents = [{ parts }];
       } else {
         contents = [input];
       }
