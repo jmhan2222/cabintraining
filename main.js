@@ -16,17 +16,22 @@ function initFirebase() {
     return true;
   } catch { return false; }
 }
-// Firebase AI Logic (Gemini 2.0 Flash)
+// ===== GEMINI (Google AI Developer API) =====
+function getGeminiApiKey() {
+  return localStorage.getItem('cabinvoice_gemini_api_key') || '';
+}
+function saveGeminiApiKey(key) {
+  localStorage.setItem('cabinvoice_gemini_api_key', key);
+  _geminiModel = null; // 키 변경 시 캐시 초기화
+}
 async function getGeminiModel() {
   if (_geminiModel) return _geminiModel;
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) throw new Error('Gemini API 키가 없습니다.\n관리자 패널 → Gemini API 키를 입력해주세요.');
   try {
-    const [{ initializeApp, getApps, getApp }, { getAI, getGenerativeModel, GoogleAIBackend }] = await Promise.all([
-      import('https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js'),
-      import('https://www.gstatic.com/firebasejs/11.10.0/firebase-ai.js')
-    ]);
-    const firebaseApp = getApps().length ? getApp() : initializeApp(FIREBASE_CONFIG);
-    const ai = getAI(firebaseApp, { backend: new GoogleAIBackend() });
-    _geminiModel = getGenerativeModel(ai, { model: 'gemini-2.0-flash' });
+    const { GoogleGenerativeAI } = await import('https://esm.sh/@google/generative-ai@0.24.1');
+    const genAI = new GoogleGenerativeAI(apiKey);
+    _geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     return _geminiModel;
   } catch(e) {
     _geminiModel = null;
@@ -2107,6 +2112,12 @@ function openAdminScreen() {
     initFirebase();
     _refreshAdminVersion();
     _refreshAdminVersionList();
+    // 저장된 Gemini 키가 있으면 마스킹해서 표시
+    const savedKey = getGeminiApiKey();
+    if (savedKey && $('admin-gemini-key')) {
+      $('admin-gemini-key').placeholder = '저장됨: ' + savedKey.slice(0,6) + '…';
+      if ($('admin-gemini-status')) $('admin-gemini-status').textContent = '✅ 키 저장됨';
+    }
     showScreen('screen-admin');
   });
 }
@@ -2518,6 +2529,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = $('admin-firebase-status');
     if (el) el.textContent = ok ? '✅ Firebase 연결됨' : '❌ 연결 실패';
     if (ok) { _refreshAdminVersion(); _refreshAdminVersionList(); }
+  });
+  if ($('btn-save-gemini-key')) $('btn-save-gemini-key').addEventListener('click', () => {
+    const key = ($('admin-gemini-key').value || '').trim();
+    const statusEl = $('admin-gemini-status');
+    if (!key) { if (statusEl) statusEl.textContent = '❌ 키를 입력해주세요'; return; }
+    saveGeminiApiKey(key);
+    $('admin-gemini-key').value = '';
+    $('admin-gemini-key').placeholder = '저장됨: ' + key.slice(0,6) + '…';
+    if (statusEl) statusEl.textContent = '✅ 저장됨';
   });
   $('admin-pdf-input').addEventListener('change', e => { if (e.target.files[0]) handleAdminPdf(e.target.files[0]); });
   const adminDropZone = $('admin-pdf-drop-zone');
