@@ -17,6 +17,32 @@ function initFirebase() {
   } catch { return false; }
 }
 // ===== GEMINI (Cloudflare Pages Function 프록시 경유) =====
+function _showRetryToast(msg) {
+  let el = document.getElementById('_gemini-retry-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = '_gemini-retry-toast';
+    el.style.cssText = [
+      'position:fixed', 'bottom:28px', 'left:50%', 'transform:translateX(-50%)',
+      'background:#1e293b', 'color:#fff', 'padding:12px 22px', 'border-radius:12px',
+      'font-size:14px', 'z-index:9999', 'pointer-events:none',
+      'transition:opacity .25s', 'white-space:nowrap'
+    ].join(';');
+    document.body.appendChild(el);
+  }
+  if (msg) {
+    el.textContent = msg;
+    el.style.opacity = '1';
+  } else {
+    el.style.opacity = '0';
+  }
+}
+
+function _isRetryable(status, errorMsg) {
+  if (status === 429) return true;
+  return /high.demand|overload|quota|rate.limit|503|resource.exhaust/i.test(errorMsg || '');
+}
+
 async function getGeminiModel() {
   if (_geminiModel) return _geminiModel;
   _geminiModel = {
@@ -30,15 +56,41 @@ async function getGeminiModel() {
       } else {
         contents = [input];
       }
-      const res = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'gemini-2.5-flash', contents })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Gemini 오류 (HTTP ${res.status})`);
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      return { response: { text: () => text } };
+
+      const MAX_RETRIES = 3;
+      let lastErr;
+      for (let i = 0; i < MAX_RETRIES; i++) {
+        try {
+          const res = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: 'gemini-2.5-flash', contents })
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            const err = new Error(data.error || `Gemini 오류 (HTTP ${res.status})`);
+            err.status = res.status;
+            throw err;
+          }
+          _showRetryToast(null);
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+          return { response: { text: () => text } };
+        } catch(e) {
+          lastErr = e;
+          if (i < MAX_RETRIES - 1 && _isRetryable(e.status, e.message)) {
+            _showRetryToast(`⏳ 잠시 후 재시도 중... (${i + 2}/${MAX_RETRIES})`);
+            await new Promise(r => setTimeout(r, 3000 * (i + 1)));
+          } else {
+            _showRetryToast(null);
+            if (i === MAX_RETRIES - 1 && _isRetryable(e.status, e.message)) {
+              throw new Error('잠시 후 다시 시도해주세요. (서버 과부하)');
+            }
+            throw e;
+          }
+        }
+      }
+      _showRetryToast(null);
+      throw lastErr;
     }
   };
   return _geminiModel;
