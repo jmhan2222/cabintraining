@@ -310,12 +310,6 @@
 
         <!-- Step 1: 파일 선택 -->
         <div id="pdf-step-upload" class="pdf-step">
-          <div class="pdf-apikey-section">
-            <label class="pdf-apikey-label" for="pdf-apikey-input">🔑 Anthropic API 키</label>
-            <input type="password" id="pdf-apikey-input" class="pdf-apikey-input"
-              placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false">
-            <div class="pdf-apikey-hint">API 키는 이 기기의 로컬 스토리지에만 저장되며 Anthropic에만 전송됩니다</div>
-          </div>
           <div class="pdf-drop-zone" id="pdf-drop-zone">
             <div class="pdf-drop-icon">📄</div>
             <div class="pdf-drop-title">PDF 파일을 여기에 드래그하거나</div>
@@ -323,7 +317,7 @@
               파일 선택
               <input type="file" id="pdf-file-input" accept=".pdf" style="display:none">
             </label>
-            <div class="pdf-drop-sub">AI가 각 페이지를 직접 읽어<br>한국어·영어·일본어·중국어를 자동으로 분리합니다</div>
+            <div class="pdf-drop-sub">Gemini AI가 각 페이지를 직접 읽어<br>한국어·영어·일본어를 자동으로 분리합니다</div>
           </div>
         </div>
 
@@ -390,9 +384,6 @@
         <div class="admin-section-title">📄 교범 PDF 업로드 &amp; 배포</div>
         <div class="admin-row-btns">
           <input type="text" id="admin-rev-version" class="admin-input" placeholder="개정번호 (예: Rev.23)" style="max-width:200px">
-          <div class="pdf-apikey-section" style="margin:0;flex:1">
-            <input type="password" id="admin-apikey-input" class="pdf-apikey-input" placeholder="Anthropic API 키 (sk-ant-...)">
-          </div>
         </div>
         <div class="pdf-drop-zone" id="admin-pdf-drop-zone" style="margin-top:12px">
           <div class="pdf-drop-icon">📄</div>
@@ -401,7 +392,7 @@
             파일 선택
             <input type="file" id="admin-pdf-input" accept=".pdf" style="display:none">
           </label>
-          <div class="pdf-drop-sub">Claude AI가 각 페이지를 직접 읽어 파싱합니다</div>
+          <div class="pdf-drop-sub">Gemini AI가 각 페이지를 직접 읽어 파싱합니다</div>
         </div>
 
         <div id="admin-pdf-parsing" class="pdf-parsing-box hidden">
@@ -478,9 +469,9 @@
     </div>
   </div>
 
-  <!-- Firebase SDK (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+  <!-- Firebase SDK (compat) v11 -->
+  <script src="https://www.gstatic.com/firebasejs/11.3.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore-compat.js"></script>
   <script defer type="text/javascript" src="/main.js"></script>
 </body>
 </html>

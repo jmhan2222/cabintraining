@@ -1,5 +1,6 @@
 // ===== FIREBASE =====
 let _db = null;
+let _geminiModel = null;
 function getFirebaseConfig() {
   try { return JSON.parse(localStorage.getItem('cabinvoice_firebase_config') || 'null'); }
   catch { return null; }
@@ -16,6 +17,25 @@ function initFirebase() {
     return true;
   } catch { return false; }
 }
+// Firebase AI Logic (Gemini 2.0 Flash) — 동적 import로 CDN 모듈 로드
+async function getGeminiModel() {
+  if (_geminiModel) return _geminiModel;
+  if (!firebase.apps.length) {
+    throw new Error('Firebase가 초기화되지 않았습니다.\n관리자 패널 → Firebase 설정을 먼저 완료해주세요.');
+  }
+  try {
+    const { getAI, getGenerativeModel, GoogleAIBackend } = await import(
+      'https://www.gstatic.com/firebasejs/11.3.0/firebase-ai.js'
+    );
+    const ai = getAI(firebase.app(), { backend: new GoogleAIBackend() });
+    _geminiModel = getGenerativeModel(ai, { model: 'gemini-2.0-flash' });
+    return _geminiModel;
+  } catch(e) {
+    _geminiModel = null;
+    throw new Error(`Gemini 초기화 실패: ${e.message}\nFirebase 콘솔에서 AI Logic이 활성화되어 있는지 확인해주세요.`);
+  }
+}
+
 async function firestoreLoadLatest() {
   if (!_db) return null;
   try {
@@ -1439,10 +1459,9 @@ function showResults(result, transcript) {
     $('encouragement-box').classList.add('hidden');
   }
 
-  // AI 채점 (API 키 있을 때만)
-  const anthropicKey = localStorage.getItem('cabinvoice_anthropic_key');
-  if (anthropicKey && transcript && transcript.length > 10) {
-    callClaudeScoring(anthropicKey, lang.text, transcript, state.selectedLang).then(aiResult => {
+  // AI 채점 (Firebase 초기화된 경우 자동 실행)
+  if (firebase.apps.length && transcript && transcript.length > 10) {
+    callGeminiScoring(lang.text, transcript, state.selectedLang).then(aiResult => {
       if (aiResult) renderAiResult(aiResult);
     }).catch(() => {});
   }
@@ -1808,7 +1827,6 @@ let _detailLang = 'ko';
 function openPdfModal() {
   _showPdfStep('upload');
   $('pdf-import-btn').classList.add('hidden');
-  $('pdf-apikey-input').value = localStorage.getItem('cabinvoice_anthropic_key') || '';
   $('pdf-modal').classList.remove('hidden');
 }
 function closePdfModal() { $('pdf-modal').classList.add('hidden'); }
@@ -1824,13 +1842,6 @@ async function handlePdfFile(file) {
     _showPdfError('PDF 파일만 지원합니다. (.pdf 확장자 파일을 선택해 주세요)');
     return;
   }
-  const apiKey = $('pdf-apikey-input').value.trim() ||
-                 localStorage.getItem('cabinvoice_anthropic_key') || '';
-  if (!apiKey) {
-    _showPdfError('Anthropic API 키를 입력해주세요.\nanthropic.com/console 에서 발급받을 수 있습니다.');
-    return;
-  }
-  localStorage.setItem('cabinvoice_anthropic_key', apiKey);
 
   _showPdfStep('parsing');
   $('pdf-parsing-msg').textContent = 'PDF 이미지 변환 중...';
@@ -1845,7 +1856,7 @@ async function handlePdfFile(file) {
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const totalPages = pdf.numPages;
 
-    $('pdf-parsing-msg').textContent = `AI로 ${totalPages}페이지 분석 중...`;
+    $('pdf-parsing-msg').textContent = `Gemini AI로 ${totalPages}페이지 분석 중...`;
 
     const pageResults = [];
     for (let p = 1; p <= totalPages; p++) {
@@ -1858,7 +1869,7 @@ async function handlePdfFile(file) {
       await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
       const imageBase64 = canvas.toDataURL('image/png').split(',')[1];
 
-      const result = await callClaudeVision(apiKey, imageBase64);
+      const result = await callGeminiVision(imageBase64);
       if (result) pageResults.push(result);
     }
 
@@ -1873,19 +1884,9 @@ async function handlePdfFile(file) {
   }
 }
 
-async function callClaudeVision(apiKey, imageBase64) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1500,
-      system: `항공사 방송교범 PDF 페이지입니다. 이 페이지의 언어와 방송문을 분석하여 JSON으로만 반환하세요.
+async function callGeminiVision(imageBase64) {
+  const model = await getGeminiModel();
+  const prompt = `항공사 방송교범 PDF 페이지입니다. 이 페이지의 언어와 방송문을 분석하여 JSON으로만 반환하세요.
 
 규칙:
 - 언어 코드: ko(한국어), en(영어), ja(일본어), zh(중국어)
@@ -1896,25 +1897,16 @@ async function callClaudeVision(apiKey, imageBase64) {
 반환 형식 (JSON만, 설명 없이):
 단일 문안: {"lang":"ko","num":"2.1.1","title":"방송 제목","text":"방송 내용"}
 복수 문안: {"lang":"ko","num":"2.1.1","title":"방송 제목","variants":[{"label":"General","text":"..."},{"label":"수하물 과다 반입","text":"..."}]}
-방송문 없는 페이지: {"skip":true}`,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imageBase64 } },
-          { type: 'text', text: '이 페이지를 분석해서 JSON으로 추출해주세요.' }
-        ]
-      }]
-    })
-  });
+방송문 없는 페이지: {"skip":true}
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `API 오류 ${response.status}`);
-  }
+이 페이지를 분석해서 JSON으로 추출해주세요.`;
 
-  const data = await response.json();
-  const raw = (data.content[0]?.text || '').trim();
-  const match = raw.match(/\{[\s\S]*\}/);
+  const result = await model.generateContent([
+    prompt,
+    { inlineData: { data: imageBase64, mimeType: 'image/png' } }
+  ]);
+  const raw = result.response.text().trim();
+  const match = raw.match(/\{[\s\S]*?\}/);
   if (!match) return null;
   try {
     const parsed = JSON.parse(match[0]);
@@ -2041,21 +2033,11 @@ function importSelectedPdfScripts() {
   alert(`${toAdd.length}개 방송문안을 가져왔습니다.`);
 }
 
-// ===== CLAUDE AI SCORING =====
-async function callClaudeScoring(apiKey, script, transcript, langCode) {
-  const langName = { ko:'한국어', en:'영어', ja:'일본어', zh:'중국어' }[langCode]||'한국어';
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1500,
-      system: `당신은 항공사 기내방송 전문 평가관입니다.
+// ===== GEMINI AI SCORING =====
+async function callGeminiScoring(script, transcript, langCode) {
+  const model = await getGeminiModel();
+  const langName = { ko:'한국어', en:'영어', ja:'일본어', zh:'중국어' }[langCode] || '한국어';
+  const prompt = `당신은 항공사 기내방송 전문 평가관입니다.
 원문(script)과 훈련생 발화(transcript)를 비교하여 아래 JSON 형식으로만 반환하세요 (설명 없이).
 
 {
@@ -2077,16 +2059,16 @@ async function callClaudeScoring(apiKey, script, transcript, langCode) {
 - 안전 관련 단어 누락은 completeness에서 크게 감점
 - '손님 여러분'/'Ladies and gentlemen' 등 호칭 누락 시 honorifics 감점
 - [목적지] [편명] 같은 변수 자리는 어떤 단어든 정답 처리
-- 언어: ${langName}`,
-      messages: [{
-        role: 'user',
-        content: `원문:\n${script}\n\n발화:\n${transcript}`
-      }]
-    })
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const raw = (data.content[0]?.text||'').trim();
+- 언어: ${langName}
+
+원문:
+${script}
+
+발화:
+${transcript}`;
+
+  const result = await model.generateContent(prompt);
+  const raw = result.response.text().trim();
   const m = raw.match(/\{[\s\S]*\}/);
   if (!m) return null;
   try { return JSON.parse(m[0]); } catch { return null; }
@@ -2127,9 +2109,6 @@ function openAdminScreen() {
     initFirebase();
     const cfg = getFirebaseConfig();
     if (cfg) $('admin-firebase-cfg').value = JSON.stringify(cfg, null, 2);
-    // API 키 복원
-    const key = localStorage.getItem('cabinvoice_anthropic_key') || '';
-    $('admin-apikey-input').value = key;
     _refreshAdminVersion();
     _refreshAdminVersionList();
     showScreen('screen-admin');
@@ -2182,9 +2161,6 @@ function _refreshAdminVersionList() {
 
 async function handleAdminPdf(file) {
   if (!file || file.type !== 'application/pdf') { _showAdminError('PDF 파일만 지원합니다.'); return; }
-  const apiKey = $('admin-apikey-input').value.trim() || localStorage.getItem('cabinvoice_anthropic_key') || '';
-  if (!apiKey) { _showAdminError('Anthropic API 키를 입력해주세요.'); return; }
-  localStorage.setItem('cabinvoice_anthropic_key', apiKey);
 
   $('admin-pdf-drop-zone').classList.add('hidden');
   $('admin-pdf-error').classList.add('hidden');
@@ -2199,9 +2175,9 @@ async function handleAdminPdf(file) {
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
     const total = pdf.numPages;
-    $('admin-parsing-msg').textContent = `AI로 ${total}페이지 분석 중...`;
+    $('admin-parsing-msg').textContent = `Gemini AI로 ${total}페이지 분석 중...`;
 
-    const SYSTEM = `항공사 기내방송 교범 PDF 페이지입니다.
+    const ADMIN_PROMPT = `항공사 기내방송 교범 PDF 페이지입니다.
 다음을 JSON으로만 반환하세요 (preamble 없이):
 { "skip": true } — 방송문이 없는 페이지(표지·목차·빈 페이지)
 또는
@@ -2212,8 +2188,11 @@ async function handleAdminPdf(file) {
 - 일본어: 히라가나/가타카나만 추출, 한글 발음 표기 제외
 - 헤더(객실승무원 방송교범, 제N장...), 푸터(제정일자, REV.XX, 페이지번호) 제외
 - [목적지] [편명] 같은 변수 그대로 유지
-- 조건부 문안(General/수하물 과다 반입 등 표 구조)은 본문에 포함`;
+- 조건부 문안(General/수하물 과다 반입 등 표 구조)은 본문에 포함
 
+이 페이지를 분석해서 JSON으로 추출해주세요.`;
+
+    const geminiModel = await getGeminiModel();
     const pageResults = [];
     for (let p = 1; p <= total; p++) {
       $('admin-parsing-sub').textContent = `${p} / ${total} 페이지...`;
@@ -2224,34 +2203,12 @@ async function handleAdminPdf(file) {
       await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
       const b64 = canvas.toDataURL('image/png').split(',')[1];
 
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1500,
-          system: SYSTEM,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: 'image/png', data: b64 } },
-              { type: 'text', text: '이 페이지를 분석해서 JSON으로 추출해주세요.' }
-            ]
-          }]
-        })
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(()=>({}));
-        throw new Error(err.error?.message || `API 오류 ${res.status}`);
-      }
-      const data = await res.json();
-      const raw = (data.content[0]?.text||'').trim();
-      const m = raw.match(/\{[\s\S]*\}/);
+      const res = await geminiModel.generateContent([
+        ADMIN_PROMPT,
+        { inlineData: { data: b64, mimeType: 'image/png' } }
+      ]);
+      const raw = res.response.text().trim();
+      const m = raw.match(/\{[\s\S]*?\}/);
       if (m) {
         try {
           const parsed = JSON.parse(m[0]);
