@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CabinVoice — Firebase 연결 테스트</title>
+<style>
+  body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f8fafc; }
+  h2 { color: #1e293b; }
+  .card { background: #fff; border-radius: 12px; padding: 20px; margin: 16px 0; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  .card h3 { margin: 0 0 12px; font-size: 15px; color: #334155; }
+  button { background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-size: 14px; }
+  button:disabled { background: #94a3b8; cursor: default; }
+  .result { margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; line-height: 1.6; }
+  .ok  { background: #dcfce7; color: #166534; }
+  .err { background: #fee2e2; color: #991b1b; }
+  .run { background: #fef9c3; color: #854d0e; }
+</style>
+</head>
+<body>
+<h2>🔧 Firebase 연결 테스트</h2>
+<p style="color:#64748b;font-size:13px">Firestore DB · Firebase AI Logic (Gemini) 연결 상태를 확인합니다.</p>
+
+<!-- Firestore 테스트 -->
+<div class="card">
+  <h3>1. Firestore 읽기 / 쓰기</h3>
+  <button id="btn-fs">테스트 시작</button>
+  <div id="res-fs" class="result" style="display:none"></div>
+</div>
+
+<!-- Gemini 테스트 -->
+<div class="card">
+  <h3>2. Firebase AI Logic (Gemini 2.0 Flash)</h3>
+  <button id="btn-ai">테스트 시작</button>
+  <div id="res-ai" class="result" style="display:none"></div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/11.3.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore-compat.js"></script>
+
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA2rfs2oY80xb374uyYdc5dVlMgac08OWo",
+  authDomain: "voicepro-18888.firebaseapp.com",
+  projectId: "voicepro-18888",
+  storageBucket: "voicepro-18888.firebasestorage.app",
+  messagingSenderId: "991357763010",
+  appId: "1:991357763010:web:ec0a5d7ee55752b5a1aa5b"
+};
+
+if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.firestore();
+
+function show(id, msg, cls) {
+  const el = document.getElementById(id);
+  el.style.display = 'block';
+  el.className = 'result ' + cls;
+  el.textContent = msg;
+}
+
+// ── Firestore 테스트 ──────────────────────────────
+document.getElementById('btn-fs').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-fs');
+  btn.disabled = true;
+  show('res-fs', '⏳ 테스트 중…', 'run');
+  try {
+    const ts = Date.now();
+    const ref = db.collection('_test').doc('ping');
+    await ref.set({ ts, msg: 'hello' });
+    const snap = await ref.get();
+    const data = snap.data();
+    if (data.ts === ts && data.msg === 'hello') {
+      show('res-fs', `✅ Firestore 쓰기/읽기 성공\n\n저장값: ${JSON.stringify(data)}`, 'ok');
+    } else {
+      show('res-fs', '⚠️ 읽기/쓰기 불일치', 'err');
+    }
+  } catch(e) {
+    show('res-fs', `❌ 오류: ${e.message}`, 'err');
+  }
+  btn.disabled = false;
+});
+
+// ── Gemini AI Logic 테스트 ─────────────────────────
+document.getElementById('btn-ai').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-ai');
+  btn.disabled = true;
+  show('res-ai', '⏳ Gemini 호출 중… (최초 로딩 시 5–10초 소요)', 'run');
+  try {
+    const { getAI, getGenerativeModel, GoogleAIBackend } = await import(
+      'https://www.gstatic.com/firebasejs/11.3.0/firebase-ai.js'
+    );
+    const ai = getAI(firebase.app(), { backend: new GoogleAIBackend() });
+    const model = getGenerativeModel(ai, { model: 'gemini-2.0-flash' });
+    const result = await model.generateContent('한 문장으로 "연결 성공"을 한국어로 알려줘.');
+    const text = result.response.text();
+    show('res-ai', `✅ Gemini AI Logic 성공\n\n응답: ${text}`, 'ok');
+  } catch(e) {
+    show('res-ai', `❌ 오류: ${e.message}\n\nFirebase 콘솔 → 빌드 → AI Logic 활성화 여부를 확인하세요.`, 'err');
+  }
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>
