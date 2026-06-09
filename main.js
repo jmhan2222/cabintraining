@@ -1,18 +1,17 @@
 // ===== FIREBASE =====
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA2rfs2oY80xb374uyYdc5dVlMgac08OWo",
+  authDomain: "voicepro-18888.firebaseapp.com",
+  projectId: "voicepro-18888",
+  storageBucket: "voicepro-18888.firebasestorage.app",
+  messagingSenderId: "991357763010",
+  appId: "1:991357763010:web:ec0a5d7ee55752b5a1aa5b"
+};
 let _db = null;
 let _geminiModel = null;
-function getFirebaseConfig() {
-  try { return JSON.parse(localStorage.getItem('cabinvoice_firebase_config') || 'null'); }
-  catch { return null; }
-}
-function saveFirebaseConfig(cfg) {
-  localStorage.setItem('cabinvoice_firebase_config', JSON.stringify(cfg));
-}
 function initFirebase() {
-  const cfg = getFirebaseConfig();
-  if (!cfg || !cfg.apiKey) return false;
   try {
-    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     _db = firebase.firestore();
     return true;
   } catch { return false; }
@@ -21,7 +20,7 @@ function initFirebase() {
 async function getGeminiModel() {
   if (_geminiModel) return _geminiModel;
   if (!firebase.apps.length) {
-    throw new Error('Firebase가 초기화되지 않았습니다.\n관리자 패널 → Firebase 설정을 먼저 완료해주세요.');
+    throw new Error('Firebase가 초기화되지 않았습니다.');
   }
   try {
     const { getAI, getGenerativeModel, GoogleAIBackend } = await import(
@@ -2107,8 +2106,6 @@ let _adminParsedScripts = [];
 function openAdminScreen() {
   requireEditAuth(() => {
     initFirebase();
-    const cfg = getFirebaseConfig();
-    if (cfg) $('admin-firebase-cfg').value = JSON.stringify(cfg, null, 2);
     _refreshAdminVersion();
     _refreshAdminVersionList();
     showScreen('screen-admin');
@@ -2117,6 +2114,7 @@ function openAdminScreen() {
 
 function _refreshAdminVersion() {
   const el = $('admin-deployed-badge');
+  if (!_db) { initFirebase(); }
   if (!_db) { el.textContent = 'Firebase 미연결'; el.style.background='#fee2e2'; return; }
   firestoreLoadLatest().then(data => {
     if (data) {
@@ -2330,7 +2328,8 @@ async function deployToFirestore() {
   const btn = $('btn-admin-deploy');
   btn.disabled = true; btn.textContent = '배포 중...';
   try {
-    if (!_db) throw new Error('Firebase가 연결되지 않았습니다. Firebase 설정을 먼저 완료해주세요.');
+    if (!_db) { initFirebase(); }
+    if (!_db) throw new Error('Firebase 연결에 실패했습니다.');
     await firestoreSaveLatest({
       revVersion: rev,
       updatedAt: firebase.firestore.Timestamp.now(),
@@ -2350,6 +2349,7 @@ async function deployToFirestore() {
 
 // ===== EVENTS =====
 document.addEventListener('DOMContentLoaded', () => {
+  initFirebase();
   renderHome();
   showScreen('screen-home');
 
@@ -2514,14 +2514,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===== 관리자 패널 =====
   $('btn-open-admin').addEventListener('click', openAdminScreen);
   $('btn-admin-back').addEventListener('click', () => { showScreen('screen-home'); loadAndRenderHome(); });
-  $('btn-save-firebase-cfg').addEventListener('click', () => {
-    try {
-      const cfg = JSON.parse($('admin-firebase-cfg').value);
-      saveFirebaseConfig(cfg);
-      const ok = initFirebase();
-      $('admin-firebase-status').textContent = ok ? '✅ Firebase 연결됨' : '❌ 연결 실패';
-      if (ok) { _refreshAdminVersion(); _refreshAdminVersionList(); }
-    } catch { $('admin-firebase-status').textContent = '❌ JSON 형식 오류'; }
+  if ($('btn-save-firebase-cfg')) $('btn-save-firebase-cfg').addEventListener('click', () => {
+    const ok = initFirebase();
+    const el = $('admin-firebase-status');
+    if (el) el.textContent = ok ? '✅ Firebase 연결됨' : '❌ 연결 실패';
+    if (ok) { _refreshAdminVersion(); _refreshAdminVersionList(); }
   });
   $('admin-pdf-input').addEventListener('change', e => { if (e.target.files[0]) handleAdminPdf(e.target.files[0]); });
   const adminDropZone = $('admin-pdf-drop-zone');
