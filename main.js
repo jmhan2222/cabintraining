@@ -327,8 +327,8 @@ function extractKeyPhrases(text, lang) {
   return result.length ? result : ['방송'];
 }
 function buildCustomLang(text, cpStr, langCode) {
-  const sttMap = { ko:'ko-KR', en:'en-US', ja:'ja-JP', zh:'zh-CN' };
-  const wpmMap = { ko:130, en:140, ja:110, zh:118 };
+  const sttMap = { ko:'ko-KR', en:'en-US', ja:'ja-JP', ca:'zh-CN' };
+  const wpmMap = { ko:130, en:140, ja:110, ca:118 };
   const checkpoints = cpStr ? cpStr.split(',').map(s=>s.trim()).filter(Boolean) : [];
   return {
     sttLang: sttMap[langCode] || 'ko-KR',
@@ -469,7 +469,7 @@ function renderSidebar(scripts) {
 }
 
 function _sidebarItemHtml(s) {
-  const langDots = ['ko','en','ja','zh'].filter(l => s.langs?.[l]?.text)
+  const langDots = ['ko','en','ja','ca'].filter(l => s.langs?.[l]?.text)
     .map(l => `<span class="lang-dot lang-dot-${l}"></span>`).join('');
   return `<div class="sidebar-item${_selectedScriptId===s.id?' selected':''}" data-id="${s.id}">
     <span class="sidebar-item-section">${s._section||''}</span>
@@ -662,7 +662,7 @@ async function startRecording() {
   state.audioChunks = [];
   state.recordingStart = Date.now();
 
-  $('record-title').textContent = `${state.currentScript.title} · ${{ ko:'한국어', en:'English', ja:'日本語', zh:'中文' }[state.selectedLang]}`;
+  $('record-title').textContent = `${state.currentScript.title} · ${{ ko:'한국어', en:'English', ja:'日本語', ca:'中文' }[state.selectedLang]}`;
   $('record-timer').textContent = '00:00';
   $('live-text').textContent = '말씀해 주세요...';
   $('script-peek-text').innerHTML = renderScriptText(lang.text);
@@ -1283,7 +1283,7 @@ function _resetModal() {
   document.getElementById('custom-title').value = '';
   document.getElementById('custom-icon').value = '📋';
   document.getElementById('custom-difficulty').value = '기본';
-  ['ko','en','ja','zh'].forEach(l => {
+  ['ko','en','ja','ca'].forEach(l => {
     const ta = document.getElementById(`custom-text-${l}`);
     if (ta) ta.value = '';
   });
@@ -1334,7 +1334,7 @@ function openEditModal(id, source) {
   document.getElementById('custom-icon').value = script.icon || '📋';
   document.getElementById('custom-difficulty').value = script.difficulty || '기본';
 
-  ['ko','en','ja','zh'].forEach(l => {
+  ['ko','en','ja','ca'].forEach(l => {
     const ta = document.getElementById(`custom-text-${l}`);
     if (ta && script.langs[l]) ta.value = script.langs[l].text || '';
   });
@@ -1370,7 +1370,7 @@ function saveScriptFromModal() {
     const base = _allScripts.find(s => s.id === _modalState.editId);
     const overrides = loadOverrides();
     const newLangs = {};
-    ['ko','en','ja','zh'].forEach(l => {
+    ['ko','en','ja','ca'].forEach(l => {
       const ta = document.getElementById(`custom-text-${l}`);
       const text = ta?.value.trim();
       if (text) {
@@ -1393,7 +1393,7 @@ function saveScriptFromModal() {
     if (idx === -1) { closeCustomModal(); return; }
     const langs = {};
     langs.ko = buildCustomLang(koText, cpStr, 'ko');
-    ['en','ja','zh'].forEach(l => {
+    ['en','ja','ca'].forEach(l => {
       const text = document.getElementById(`custom-text-${l}`)?.value.trim();
       if (text) langs[l] = buildCustomLang(text, '', l);
     });
@@ -1404,7 +1404,7 @@ function saveScriptFromModal() {
     // 새 방송문 추가
     const langs = {};
     langs.ko = buildCustomLang(koText, cpStr, 'ko');
-    ['en','ja','zh'].forEach(l => {
+    ['en','ja','ca'].forEach(l => {
       const text = document.getElementById(`custom-text-${l}`)?.value.trim();
       if (text) langs[l] = buildCustomLang(text, '', l);
     });
@@ -1473,7 +1473,7 @@ async function handlePdfFile(file) {
     const USER_PROMPT = `항공사 방송교범 PDF 페이지들입니다. 각 페이지를 순서대로 분석하여 JSON 배열로만 반환하세요.
 
 규칙:
-- 언어 코드: ko(한국어), en(영어), ja(일본어), zh(중국어)
+- 언어 코드: ko(한국어), en(영어), ja(일본어), ca(중국어)
 - 일본어: 히라가나/가타카나 원문만 추출, 한글 발음 표기는 제외
 - 헤더(챕터명), 푸터(페이지번호, REV.XX) 제외
 - 조건부 문안(표 구조, General/수하물 과다 반입 등): variants 배열로 추출
@@ -1561,14 +1561,14 @@ function groupPagesByScript(pageResults) {
   for (const r of pageResults) {
     if (!r.num) continue;
     if (!scriptMap.has(r.num)) {
-      scriptMap.set(r.num, { num: r.num, title: r.title || r.num, ko: '', en: '', ja: '', zh: '' });
+      scriptMap.set(r.num, { num: r.num, title: r.title || r.num, ko: '', en: '', ja: '', ca: '' });
       order.push(r.num);
     }
     const s = scriptMap.get(r.num);
     if (r.title && !s.title) s.title = r.title;
 
     const lang = r.lang;
-    if (['ko','en','ja','zh'].includes(lang)) {
+    if (['ko','en','ja','ca'].includes(lang)) {
       if (r.variants && r.variants.length >= 2) {
         s[lang] = r.variants.map(v => `[${v.label}]\n${v.text.trim()}`).join('\n\n');
       } else {
@@ -1577,7 +1577,7 @@ function groupPagesByScript(pageResults) {
     }
   }
 
-  return order.map(k => scriptMap.get(k)).filter(s => s.ko || s.en || s.ja || s.zh);
+  return order.map(k => scriptMap.get(k)).filter(s => s.ko || s.en || s.ja || s.ca);
 }
 
 function renderPdfPreview(scripts) {
@@ -1587,14 +1587,14 @@ function renderPdfPreview(scripts) {
     `${scripts.length}개 방송문안 인식됨 — 가져올 항목을 선택·편집하세요`;
   $('pdf-import-btn').classList.remove('hidden');
 
-  const LANG_LABELS = { ko: '🇰🇷 한국어', en: '🇺🇸 영어', ja: '🇯🇵 일본어', zh: '🇨🇳 중국어' };
+  const LANG_LABELS = { ko: '🇰🇷 한국어', en: '🇺🇸 영어', ja: '🇯🇵 일본어', ca: '🇨🇳 중국어' };
 
   const rows = scripts.map((s, i) => {
-    const activeLang = ['ko','en','ja','zh'].find(l => s[l]) || 'ko';
-    const langTabs = ['ko','en','ja','zh'].map(l =>
+    const activeLang = ['ko','en','ja','ca'].find(l => s[l]) || 'ko';
+    const langTabs = ['ko','en','ja','ca'].map(l =>
       `<button class="pdf-lang-tab${l === activeLang ? ' active' : ''}" data-lang="${l}"${!s[l] ? ' style="opacity:.4"' : ''}>${LANG_LABELS[l]}</button>`
     ).join('');
-    const langPanels = ['ko','en','ja','zh'].map(l =>
+    const langPanels = ['ko','en','ja','ca'].map(l =>
       `<textarea class="pdf-field-textarea${l !== activeLang ? ' hidden' : ''}" data-field="${l}" rows="4">${(s[l] || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`
     ).join('');
 
@@ -1647,7 +1647,7 @@ function importSelectedPdfScripts() {
     const meta  = _pdfParsedScripts[idx] || {};
     const title = item.querySelector('[data-field="title"]').value.trim() || '방송문';
     const langs = {};
-    ['ko','en','ja','zh'].forEach(l => {
+    ['ko','en','ja','ca'].forEach(l => {
       const ta = item.querySelector(`[data-field="${l}"]`);
       const text = ta ? ta.value.trim() : '';
       if (text) langs[l] = buildCustomLang(text, '', l);
@@ -1676,7 +1676,7 @@ function importSelectedPdfScripts() {
 // ===== GEMINI AI SCORING =====
 async function callGeminiScoring(script, transcript, langCode) {
   const model = await getGeminiModel();
-  const langName = { ko:'한국어', en:'영어', ja:'일본어', zh:'중국어' }[langCode] || '한국어';
+  const langName = { ko:'한국어', en:'영어', ja:'일본어', ca:'중국어' }[langCode] || '한국어';
   const prompt = `당신은 항공사 기내방송 전문 평가관입니다.
 원문(script)과 훈련생 발화(transcript)를 비교하여 아래 JSON 형식으로만 반환하세요 (설명 없이).
 
