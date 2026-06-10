@@ -123,462 +123,6 @@ async function firestoreRollback(revVersion) {
   await _db.collection('cabinManual').doc('latest').set(snap.data());
 }
 
-// ===== SCRIPTS DATA (KO/EN/JA/ZH) =====
-const SCRIPTS = [
-  {
-    id: 'welcome', icon: '✈️', colorClass: 'c-blue',
-    difficulty: '기본', difficultyClass: '',
-    title: '2.4.2 Safety DEMO: 국제선',
-    langs: {
-      ko: {
-        sttLang: 'ko-KR', idealWPM: 130,
-        checkpoints: ['DEMO','안전수칙'],
-        keyPhrases: ['앞을 주목해 주세요'],
-        tips: ['밝고 따뜻한 목소리로 시작', '편명·목적지는 또렷하게', '마지막 감사합니다에 미소를'],
-        text: `손님 여러분, 잠시 앞을 주목해 주세요.
-지금부터 안전한 비행을 위한 5가지 수칙을 안내해 드리겠습니다.
-
-첫째, 머리 위 좌석벨트 표시등이 켜지면 벨트를 매 주시고,
-풀 때는 덮개를 위로 올려주세요.
-
-둘째, 산소마스크는 산소가 필요한 비상시
-머리 위 선반에서 저절로 내려옵니다.
-이 때, 방역 마스크 등 호흡에 방해되는 물건을 제거한 뒤,
-마스크를 앞으로 잡아당겨 코와 입에 대고 호흡하세요.
-산소마스크는 본인 먼저 착용한 후 주변 사람을 도와주시기 바랍니다.
-
-셋째, 비상 탈출 시, 선반의 비상등과 바닥의 야광유도선을 따라
-가장 가까운 비상구로 탈출하세요.
-비상구는 총 8개로 오른쪽과 왼쪽에 각각 있습니다.
-
-넷째, 구명복은 좌석 또는 팔걸이 아래에 있습니다.
-머리 위에서부터 입고, 끈을 허리에 돌려 고리에 끼운 후
-몸에 맞게 조여주세요.
-탈출 직전 비상구 앞에서 빨간색 손잡이를 당겨 부풀리고,
-양 옆의 고무관을 이용해 조절하면 됩니다.
-
-손님 여러분, 더 궁금한 내용 있으신가요?
-마지막으로 자세한 안전 수칙은 좌석 앞 안내서를 확인해 주세요.
-
-아울러, 비상구는 반드시 승무원의 지시가 있을 경우에만 개방해야 하며,
-임의로 조작할 경우 최고 10년 징역의 처벌대상이 될 수 있습니다.
-또한, 승무원의 업무 방해 행위, 전자담배를 포함한 기내 흡연, 전자기기 사
-용기준 위반은 항공보안법에 의거하여 처벌받을 수 있으니
-안전한 비행을 위해 협조해 주시기 바랍니다.`
-      },
-      en: {
-        sttLang: 'en-US', idealWPM: 140,
-        checkpoints: ['Greeting', 'Airline name', 'Flight number & destination', 'Captain intro', 'Flight time', 'Closing'],
-        keyPhrases: ['welcome', 'Woori Air', 'flight', 'captain', 'flight time', 'thank you'],
-        tips: ['Warm, clear opening tone', 'Emphasize flight number and destination', 'Smile through the closing'],
-        text: `Ladies and gentlemen, good day.
-Welcome aboard Woori Air. This is Woori Air flight 201, departing Seoul Incheon International Airport for Tokyo Narita International Airport.
-Your captain today is Captain Kim Min-jun, and our estimated flight time is approximately two hours and thirty minutes.
-Our cabin crew are fully dedicated to ensuring your safety and comfort throughout the journey.
-Thank you.`
-      },
-      ja: {
-        sttLang: 'ja-JP', idealWPM: 115,
-        checkpoints: ['ご挨拶', '航空会社名', '便名・目的地', '機長紹介', '飛行時間', '締めの言葉'],
-        keyPhrases: ['こんにちは', 'ご搭乗', 'ありがとうございます', '機長', '飛行予定時間', 'よろしくお願いいたします'],
-        tips: ['落ち着いた丁寧なトーンで', '便名・目的地は明確に', '長音をしっかり伸ばして'],
-        text: `お客様、こんにちは。
-ウリ航空にご搭乗いただき、誠にありがとうございます。
-この便は、ソウル仁川国際空港を出発し、東京成田国際空港へ向かうウリ航空201便でございます。
-本日の機長はキム・ミンジュン機長でございます。飛行予定時間は約2時間30分でございます。
-客室乗務員一同、皆様の安全で快適な空の旅のため、精一杯努めてまいります。
-どうぞよろしくお願いいたします。`
-      },
-      zh: {
-        sttLang: 'zh-CN', idealWPM: 120,
-        checkpoints: ['问候语', '航空公司名', '航班号·目的地', '机长介绍', '飞行时间', '结束语'],
-        keyPhrases: ['您好', '欢迎乘坐', '航班', '机长', '飞行时间', '感谢'],
-        tips: ['声调准确，语气亲切', '航班号·目的地发音清晰', '结尾要充满感谢之情'],
-        text: `各位旅客，您好。
-欢迎乘坐我们航空。本次航班是从首尔仁川国际机场出发，飞往东京成田国际机场的我们航空201航班。
-今天为您驾驶飞机的机长是金民俊机长，预计飞行时间约为两小时三十分钟。
-全体客舱乘务员将竭诚为您提供安全舒适的乘坐体验。
-感谢您的乘坐。`
-      }
-    }
-  },
-  {
-    id: 'safety', icon: '🛡️', colorClass: 'c-orange',
-    difficulty: '중급', difficultyClass: 'medium',
-    title: '이륙 전 안전 안내',
-    langs: {
-      ko: {
-        sttLang: 'ko-KR', idealWPM: 125,
-        checkpoints: ['출발 예정', '좌석 벨트', '금연', '전자기기', '비상구', '협조 감사'],
-        keyPhrases: ['좌석 벨트', '착용', '흡연', '금지', '비행 모드', '비상구', '감사합니다'],
-        tips: ['차분하고 명확하게', '중요 항목마다 강세', '진심 어린 협조 요청'],
-        text: `승객 여러분, 잠시 후 항공기가 출발할 예정입니다. 안전을 위해 다음 사항을 안내해 드리겠습니다.
-좌석 벨트는 허리에 꼭 맞게 착용하시고, 항공기가 완전히 착륙하여 좌석 벨트 착용 표시등이 꺼질 때까지 착용해 주시기 바랍니다.
-기내 흡연은 법으로 금지되어 있으며, 화장실 내 흡연도 금지됩니다.
-휴대용 전자기기는 비행 모드로 전환해 주시고, 이륙 및 착륙 시에는 사용을 자제해 주시기 바랍니다.
-비상구 위치는 앞쪽과 뒤쪽에 있으며, 가장 가까운 비상구가 뒤쪽에 있을 수 있습니다.
-안전한 여행을 위해 협조해 주셔서 감사합니다.`
-      },
-      en: {
-        sttLang: 'en-US', idealWPM: 135,
-        checkpoints: ['Departure notice', 'Seatbelt', 'No smoking', 'Electronic devices', 'Emergency exits', 'Thank you'],
-        keyPhrases: ['seatbelt', 'fasten', 'smoking', 'prohibited', 'flight mode', 'emergency exits', 'thank you'],
-        tips: ['Calm, authoritative tone', 'Pause between each safety item', 'Make passengers feel reassured'],
-        text: `Ladies and gentlemen, we will be departing shortly. For your safety, please note the following.
-Please fasten your seatbelt securely around your waist, and keep it fastened whenever you are seated.
-Smoking is strictly prohibited on board, including in the lavatories.
-Please set your portable electronic devices to flight mode and refrain from using them during takeoff and landing.
-Emergency exits are located at the front and rear of the aircraft. The nearest exit may be behind you.
-Thank you for your cooperation and have a safe flight.`
-      },
-      ja: {
-        sttLang: 'ja-JP', idealWPM: 110,
-        checkpoints: ['出発案内', 'シートベルト', '禁煙', '電子機器', '非常口', 'ご協力のお礼'],
-        keyPhrases: ['シートベルト', 'お締め', '喫煙', '禁止', '機内モード', '非常口', 'ありがとうございます'],
-        tips: ['落ち着いた安心感のある声で', '各項目をはっきり区切って', '最後は感謝の気持ちを込めて'],
-        text: `お客様、まもなく出発いたします。安全のため、以下の点についてご案内いたします。
-シートベルトはウエストにしっかりとお締めいただき、着席中は常にシートベルトをお締めください。
-機内での喫煙は法律により禁止されております。お手洗いでの喫煙も禁じられております。
-携帯電子機器は機内モードに設定していただき、離着陸時のご使用はご遠慮ください。
-非常口は前方と後方にございます。最も近い非常口が後方にある場合もございます。
-皆様のご協力をよろしくお願いいたします。ありがとうございます。`
-      },
-      zh: {
-        sttLang: 'zh-CN', idealWPM: 118,
-        checkpoints: ['起飞通知', '安全带', '禁止吸烟', '电子设备', '紧急出口', '感谢配合'],
-        keyPhrases: ['安全带', '系好', '禁止吸烟', '飞行模式', '紧急出口', '感谢'],
-        tips: ['沉稳清晰的语气', '每项安全提示要停顿', '四声发音要准确'],
-        text: `各位旅客，本次航班即将起飞。为了您的安全，请注意以下事项。
-请将安全带牢固系好，并在座位上时保持系好状态。
-机内全程严禁吸烟，包括在洗手间内。
-请将随身电子设备调至飞行模式，起飞和降落期间请勿使用。
-紧急出口位于机舱前后部，最近的紧急出口可能在您身后。
-感谢您的配合，祝您旅途安全。谢谢。`
-      }
-    }
-  },
-  {
-    id: 'cruise', icon: '☁️', colorClass: 'c-green',
-    difficulty: '기본', difficultyClass: '',
-    title: '순항 고도 도달 안내',
-    langs: {
-      ko: {
-        sttLang: 'ko-KR', idealWPM: 130,
-        checkpoints: ['순항 고도 도달', '좌석 벨트 안내', '좌석 이용', '서비스 예고', '인사'],
-        keyPhrases: ['순항 고도', '좌석 벨트', '서비스', '편안한', '여행'],
-        tips: ['여유롭고 편안한 톤', '승객이 긴장을 풀 수 있도록', '서비스 예고 시 기대감 전달'],
-        text: `승객 여러분, 저희 항공기는 현재 순항 고도에 도달하였습니다.
-좌석 벨트 착용 표시등이 꺼졌습니다만, 갑작스러운 기류 변화에 대비하여 착석 시에는 항상 좌석 벨트를 가볍게 착용해 주시기 바랍니다.
-이제 좌석을 편안하게 젖히실 수 있으며, 기내 엔터테인먼트 서비스를 이용하실 수 있습니다.
-잠시 후 음료 및 기내식 서비스를 시작하겠습니다.
-편안하고 즐거운 여행 되십시오.`
-      },
-      en: {
-        sttLang: 'en-US', idealWPM: 140,
-        checkpoints: ['Cruising altitude', 'Seatbelt reminder', 'Seat recline', 'Service announcement', 'Closing'],
-        keyPhrases: ['cruising altitude', 'seatbelt', 'recline', 'service', 'comfortable', 'enjoy'],
-        tips: ['Relaxed and warm tone', 'Help passengers unwind', 'Build anticipation for service'],
-        text: `Ladies and gentlemen, we have now reached our cruising altitude.
-Although the seatbelt sign has been turned off, we recommend keeping your seatbelt loosely fastened whenever you are seated, in case of unexpected turbulence.
-You may now recline your seats and enjoy the in-flight entertainment.
-We will begin our beverage and meal service shortly.
-Please sit back, relax, and enjoy your flight.`
-      },
-      ja: {
-        sttLang: 'ja-JP', idealWPM: 112,
-        checkpoints: ['巡航高度到達', 'シートベルト案内', 'リクライニング案内', 'サービス予告', '締めの言葉'],
-        keyPhrases: ['巡航高度', 'シートベルト', 'お座席', 'サービス', 'ごゆっくり'],
-        tips: ['ゆったりとしたリラックスしたトーンで', '乗客が安心できるよう丁寧に', '長音をしっかり伸ばして'],
-        text: `お客様、ただいま巡航高度に達しました。
-シートベルト着用サインが消えましたが、突然の揺れに備え、お座席でのシートベルトの着用をお勧めいたします。
-お座席のリクライニングをご利用いただけます。また、機内エンターテインメントもお楽しみいただけます。
-まもなく、お飲み物と機内食のサービスを開始いたします。
-どうぞごゆっくりお過ごしください。`
-      },
-      zh: {
-        sttLang: 'zh-CN', idealWPM: 118,
-        checkpoints: ['到达巡航高度', '安全带提示', '座椅使用', '服务预告', '结束语'],
-        keyPhrases: ['巡航高度', '安全带', '座椅', '服务', '舒适'],
-        tips: ['轻松愉快的语气', '让乘客放松下来', '对服务预告要充满期待感'],
-        text: `各位旅客，本次航班已到达巡航高度。
-安全带指示灯已关闭，但为防止突然气流颠簸，建议在座位上时保持安全带松紧适度地系好。
-现在可以调整座椅靠背，并享用机内娱乐服务。
-稍后我们将开始提供饮料及机餐服务。
-请放松心情，享受愉快的旅途。`
-      }
-    }
-  },
-  {
-    id: 'meal', icon: '🍽️', colorClass: 'c-purple',
-    difficulty: '중급', difficultyClass: 'medium',
-    title: '기내식 서비스 안내',
-    langs: {
-      ko: {
-        sttLang: 'ko-KR', idealWPM: 128,
-        checkpoints: ['서비스 시작 예고', '메뉴 안내', '음료 안내', '좌석 정리', '알레르기 안내', '호출 버튼'],
-        keyPhrases: ['기내식', '비빔밥', '파스타', '음료', '테이블', '알레르기', '호출 버튼'],
-        tips: ['메뉴를 맛있게 들리도록', '알레르기 안내는 명확하게', '친근하고 도움이 되는 인상'],
-        text: `승객 여러분, 잠시 후 기내식 서비스를 시작하겠습니다.
-오늘 제공해 드리는 기내식은 비빔밥과 크림 파스타 두 가지이며, 음료는 주스, 탄산음료, 생수, 커피, 녹차를 준비하였습니다.
-식사 전 테이블을 내려주시고 좌석을 원래 위치로 세워 주시기 바랍니다.
-알레르기가 있으신 승객께서는 승무원에게 미리 말씀해 주시기 바랍니다.
-필요하신 사항이 있으시면 좌석 위 호출 버튼을 눌러 주세요.
-감사합니다.`
-      },
-      en: {
-        sttLang: 'en-US', idealWPM: 138,
-        checkpoints: ['Service announcement', 'Menu options', 'Beverages', 'Tray table', 'Allergy notice', 'Call button'],
-        keyPhrases: ['meal service', 'bibimbap', 'pasta', 'beverages', 'tray table', 'allergy', 'call button'],
-        tips: ['Make the food sound appetizing', 'Clear and distinct menu items', 'Warm and attentive tone'],
-        text: `Ladies and gentlemen, we will begin our meal service shortly.
-Today we are offering two meal options: bibimbap and creamy pasta. Available beverages include juice, soft drinks, water, coffee, and green tea.
-Please lower your tray table and return your seat to the upright position before the meal.
-If you have any food allergies, please inform our cabin crew in advance.
-If you need any assistance, please press the call button above your seat.
-Thank you.`
-      },
-      ja: {
-        sttLang: 'ja-JP', idealWPM: 108,
-        checkpoints: ['サービス開始予告', 'メニュー案内', 'お飲み物案内', 'テーブル準備', 'アレルギー案内', 'コールボタン'],
-        keyPhrases: ['機内食', 'ビビンバ', 'パスタ', 'お飲み物', 'テーブル', 'アレルギー', 'コールボタン'],
-        tips: ['食欲をそそるような明るいトーンで', 'アレルギー案内は特に明確に', '親切で丁寧な言い回しを'],
-        text: `お客様、まもなく機内食のサービスを開始いたします。
-本日のお食事はビビンバとクリームパスタの二種類をご用意しております。お飲み物はジュース、炭酸飲料、お水、コーヒー、緑茶をご用意しております。
-お食事の前にテーブルをお開きになり、お座席を元の位置にお戻しください。
-食物アレルギーのあるお客様は、事前に客室乗務員にお申し付けください。
-ご不明な点がございましたら、頭上のコールボタンをお押しください。
-ありがとうございます。`
-      },
-      zh: {
-        sttLang: 'zh-CN', idealWPM: 116,
-        checkpoints: ['服务开始通知', '餐食介绍', '饮料介绍', '餐桌准备', '过敏提示', '呼叫按钮'],
-        keyPhrases: ['机餐', '拌饭', '意大利面', '饮料', '餐桌', '过敏', '呼叫按钮'],
-        tips: ['让食物听起来美味', '过敏提示要清晰', '亲切热情的服务态度'],
-        text: `各位旅客，我们即将开始机餐服务。
-今日为您提供两种餐食：拌饭和奶油意大利面。饮料包括果汁、碳酸饮料、矿泉水、咖啡和绿茶。
-用餐前请放下餐桌，并将座椅调回原位。
-如果您有食物过敏，请提前告知乘务员。
-如需帮助，请按头顶上方的呼叫按钮。
-谢谢。`
-      }
-    }
-  },
-  {
-    id: 'prelanding', icon: '🛬', colorClass: 'c-yellow',
-    difficulty: '기본', difficultyClass: '',
-    title: '착륙 준비 안내',
-    langs: {
-      ko: {
-        sttLang: 'ko-KR', idealWPM: 125,
-        checkpoints: ['착륙 예정', '목적지명', '좌석 벨트', '등받이·테이블', '전자기기', '착석 유지'],
-        keyPhrases: ['착륙', '나리타', '좌석 벨트', '등받이', '테이블', '비행 모드'],
-        tips: ['차분하고 안정감 있게', '각 지시사항을 명확히 구분', '안도감을 주는 마무리'],
-        text: `승객 여러분, 잠시 후 저희 항공기는 도쿄 나리타 국제공항에 착륙할 예정입니다.
-좌석 벨트를 착용해 주시고, 등받이와 테이블을 원래 위치로 세워 주시기 바랍니다.
-휴대용 전자기기는 비행 모드를 유지해 주시고, 창문 덮개를 열어 주시기 바랍니다.
-착륙 후 항공기가 완전히 정지하고 좌석 벨트 착용 표시등이 꺼질 때까지 자리에 앉아 계시기 바랍니다.
-감사합니다.`
-      },
-      en: {
-        sttLang: 'en-US', idealWPM: 132,
-        checkpoints: ['Landing notice', 'Destination name', 'Seatbelt', 'Seat & table', 'Electronic devices', 'Remain seated'],
-        keyPhrases: ['landing', 'Narita', 'seatbelt', 'upright position', 'tray table', 'flight mode', 'remain seated'],
-        tips: ['Calm and reassuring tone', 'Clear instructions in sequence', 'Warm closing'],
-        text: `Ladies and gentlemen, we will shortly be landing at Tokyo Narita International Airport.
-Please fasten your seatbelt and return your seat back and tray table to the upright and locked position.
-Please keep your portable electronic devices in flight mode and open your window shades.
-After landing, please remain seated until the aircraft has come to a complete stop and the seatbelt sign has been turned off.
-Thank you.`
-      },
-      ja: {
-        sttLang: 'ja-JP', idealWPM: 108,
-        checkpoints: ['着陸予告', '目的地名', 'シートベルト', 'シート・テーブル', '電子機器', '着席維持'],
-        keyPhrases: ['着陸', '成田', 'シートベルト', 'お座席', 'テーブル', '機内モード'],
-        tips: ['落ち着いた安心感のある声で', '各指示を明確に伝える', '温かい締めの言葉を'],
-        text: `お客様、まもなく東京成田国際空港に着陸いたします。
-シートベルトをお締めいただき、お座席の背もたれとテーブルを元の位置にお戻しください。
-携帯電子機器は機内モードを維持していただき、窓のシェードをお開けください。
-着陸後、航空機が完全に停止し、シートベルト着用サインが消えるまで、お座席にお座りください。
-ありがとうございます。`
-      },
-      zh: {
-        sttLang: 'zh-CN', idealWPM: 115,
-        checkpoints: ['降落通知', '目的地名称', '安全带', '座椅·桌板', '电子设备', '保持就座'],
-        keyPhrases: ['降落', '成田', '安全带', '靠背', '桌板', '飞行模式'],
-        tips: ['沉稳安心的语气', '每条指令清晰传达', '温暖的结束语'],
-        text: `各位旅客，本次航班即将降落至东京成田国际机场。
-请系好安全带，并将座椅靠背和小桌板恢复原位。
-请将随身电子设备保持飞行模式，并打开遮阳板。
-落地后，请在飞机完全停稳、安全带指示灯熄灭之前保持就座。
-谢谢。`
-      }
-    }
-  },
-  {
-    id: 'arrival', icon: '🏁', colorClass: 'c-green',
-    difficulty: '기본', difficultyClass: '',
-    title: '도착 안내 방송',
-    langs: {
-      ko: {
-        sttLang: 'ko-KR', idealWPM: 130,
-        checkpoints: ['도착 안내', '현지 시각', '현지 기온', '착석 유지', '수하물 주의', '감사 인사'],
-        keyPhrases: ['도착', '나리타', '현지 시각', '기온', '수하물', '감사합니다'],
-        tips: ['도착의 기쁨과 안도감', '현지 정보는 또렷하게', '진심 어린 감사 인사'],
-        text: `승객 여러분, 저희 항공기는 도쿄 나리타 국제공항에 무사히 도착하였습니다.
-현지 시각은 오후 2시 30분이며, 현재 기온은 섭씨 18도입니다.
-비행기가 완전히 멈추고 좌석 벨트 착용 표시등이 꺼진 후에 자리에서 일어나 주시기 바랍니다.
-짐칸에 보관하신 수하물을 꺼내실 때에는 안전에 주의해 주시기 바랍니다.
-저희 우리항공을 이용해 주셔서 대단히 감사합니다. 즐겁고 행복한 여행 되시기 바랍니다.
-감사합니다.`
-      },
-      en: {
-        sttLang: 'en-US', idealWPM: 138,
-        checkpoints: ['Arrival announcement', 'Local time', 'Temperature', 'Remain seated', 'Overhead bins', 'Thank you'],
-        keyPhrases: ['arrived', 'Narita', 'local time', 'temperature', 'overhead bins', 'thank you'],
-        tips: ['Warm and joyful tone', 'Clear local info', 'Heartfelt thank-you closing'],
-        text: `Ladies and gentlemen, we have arrived at Tokyo Narita International Airport.
-The local time is 2:30 in the afternoon, and the current temperature is 18 degrees Celsius.
-Please remain seated until the aircraft has come to a complete stop and the seatbelt sign has been turned off.
-When retrieving your belongings from the overhead bins, please take care as items may have shifted during the flight.
-Thank you for flying with Woori Air. We hope you had an enjoyable journey and look forward to welcoming you on board again.
-Thank you.`
-      },
-      ja: {
-        sttLang: 'ja-JP', idealWPM: 110,
-        checkpoints: ['到着案内', '現地時刻', '現地気温', '着席維持', '手荷物注意', 'お礼の言葉'],
-        keyPhrases: ['到着', '成田', '現地時刻', '気温', '手荷物', 'ありがとうございました'],
-        tips: ['到着の安堵感と喜びを', '現地情報は明確に', '心からの感謝を込めて'],
-        text: `お客様、ただいま東京成田国際空港に無事到着いたしました。
-現地時刻は午後2時30分、現在の気温は摂氏18度でございます。
-航空機が完全に停止し、シートベルト着用サインが消えるまで、お座席にお座りください。
-頭上の荷物棚からお荷物をお取り出しの際は、落下にご注意ください。
-本日はウリ航空をご利用いただき、誠にありがとうございました。またのご搭乗を心よりお待ち申し上げております。`
-      },
-      zh: {
-        sttLang: 'zh-CN', idealWPM: 118,
-        checkpoints: ['到达通知', '当地时间', '当地温度', '保持就座', '行李提示', '感谢语'],
-        keyPhrases: ['到达', '成田', '当地时间', '温度', '行李', '感谢'],
-        tips: ['到达时的喜悦与安慰', '当地信息要清晰', '真诚的感谢结束语'],
-        text: `各位旅客，本次航班已安全抵达东京成田国际机场。
-当地时间为下午2时30分，目前气温为摄氏18度。
-请在飞机完全停稳、安全带指示灯熄灭后再起身。
-取放头顶行李架中的物品时，请注意安全，防止物品掉落。
-感谢您乘坐我们航空。希望您旅途愉快，期待再次为您服务。谢谢。`
-      }
-    }
-  },
-  {
-    id: 'turbulence', icon: '⛈️', colorClass: 'c-red',
-    difficulty: '고급', difficultyClass: 'hard',
-    title: '난기류 안내 방송',
-    langs: {
-      ko: {
-        sttLang: 'ko-KR', idealWPM: 120,
-        checkpoints: ['상황 설명', '좌석 복귀 지시', '좌석 벨트', '화장실 금지', '안전 보장', '사과'],
-        keyPhrases: ['기상', '흔들릴', '좌석 벨트', '착용', '화장실', '안전', '죄송합니다'],
-        tips: ['침착하고 안정적인 목소리', '공황 없이 명확한 지시', '빠르고 정확하게'],
-        text: `승객 여러분, 현재 기상 상황으로 인해 항공기가 흔들릴 수 있습니다.
-안전을 위해 즉시 좌석으로 돌아가 좌석 벨트를 착용해 주시기 바랍니다.
-화장실 이용도 잠시 삼가 주시기 바랍니다.
-기장과 승무원들은 여러분의 안전을 위해 최선을 다하고 있습니다.
-불편을 드려 대단히 죄송합니다. 안정될 때까지 잠시만 기다려 주시기 바랍니다.`
-      },
-      en: {
-        sttLang: 'en-US', idealWPM: 128,
-        checkpoints: ['Situation', 'Return to seat', 'Fasten seatbelt', 'Lavatories', 'Safety assurance', 'Apology'],
-        keyPhrases: ['turbulence', 'return', 'seatbelt', 'fasten', 'lavatories', 'safety', 'sorry'],
-        tips: ['Calm but urgent', 'Clear direct instructions', 'Reassure without alarming'],
-        text: `Ladies and gentlemen, we are currently experiencing turbulence due to weather conditions.
-For your safety, please return to your seats immediately and fasten your seatbelt.
-Please also refrain from using the lavatories at this time.
-Your captain and cabin crew are doing their utmost to ensure your safety.
-We apologize for the inconvenience and ask for your patience until conditions improve.`
-      },
-      ja: {
-        sttLang: 'ja-JP', idealWPM: 105,
-        checkpoints: ['状況説明', '着席指示', 'シートベルト', 'トイレ使用禁止', '安全確保', 'お詫び'],
-        keyPhrases: ['気流', '揺れ', 'シートベルト', 'お締め', 'お手洗い', '安全', '申し訳'],
-        tips: ['落ち着いた安心できる声で', 'パニックを起こさせないように', '迅速かつ明確に'],
-        text: `お客様、ただいま気流の影響により、航空機が揺れることがございます。
-安全のため、ただちにお座席にお戻りになり、シートベルトをお締めください。
-お手洗いのご使用もしばらくお控えください。
-機長および客室乗務員は、皆様の安全確保に全力を尽くしております。
-ご不便をおかけし、大変申し訳ございません。安定するまでしばらくお待ちください。`
-      },
-      zh: {
-        sttLang: 'zh-CN', idealWPM: 112,
-        checkpoints: ['情况说明', '返回座位', '系好安全带', '禁用洗手间', '安全保障', '道歉'],
-        keyPhrases: ['气流颠簸', '座位', '安全带', '系好', '洗手间', '安全', '抱歉'],
-        tips: ['冷静而有力的声音', '清晰直接的指令', '让乘客感到安心'],
-        text: `各位旅客，由于气象原因，飞机目前可能出现颠簸。
-为了您的安全，请立即返回座位并系好安全带。
-同时请暂时不要使用洗手间。
-机长和乘务员正在全力确保各位旅客的安全。
-给您带来不便，深感抱歉。请耐心等候，直至飞行恢复平稳。`
-      }
-    }
-  },
-  {
-    id: 'delay', icon: '⏰', colorClass: 'c-red',
-    difficulty: '고급', difficultyClass: 'hard',
-    title: '출발 지연 안내',
-    langs: {
-      ko: {
-        sttLang: 'ko-KR', idealWPM: 120,
-        checkpoints: ['인사', '지연 원인', '지연 시간', '사과', '이유 설명', '대기 요청', '보상 서비스', '재사과'],
-        keyPhrases: ['지연', '점검', '죄송합니다', '안전', '양해', '음료 서비스'],
-        tips: ['진심 어린 사과', '지연 이유와 시간 명확하게', '보상 서비스로 불편 최소화'],
-        text: `승객 여러분, 안녕하십니까.
-현재 기술적인 점검으로 인해 출발이 약 30분 지연되고 있습니다.
-불편을 드려 대단히 죄송합니다.
-승객 여러분의 안전한 운항을 위해 반드시 필요한 점검임을 양해해 주시기 바랍니다.
-추가적인 안내가 있을 때까지 좌석에서 기다려 주시기 바랍니다.
-기다리시는 동안 음료 서비스를 제공해 드리겠습니다.
-불편을 끼쳐드려 다시 한번 사과드립니다.`
-      },
-      en: {
-        sttLang: 'en-US', idealWPM: 128,
-        checkpoints: ['Greeting', 'Cause of delay', 'Delay duration', 'Apology', 'Explanation', 'Wait request', 'Compensation', 'Second apology'],
-        keyPhrases: ['delay', 'technical', 'sorry', 'safety', 'understand', 'beverage service', 'apologize'],
-        tips: ['Sincere apology in voice', 'Clear reason and time', 'Offer compensation warmly'],
-        text: `Ladies and gentlemen, good day.
-We regret to inform you that our departure has been delayed by approximately 30 minutes due to a technical inspection.
-We sincerely apologize for this inconvenience.
-This inspection is absolutely necessary to ensure the safety of your flight, and we kindly ask for your understanding.
-Please remain in your seats and await further announcements.
-We will be providing complimentary beverage service while you wait.
-Once again, we sincerely apologize for the inconvenience.`
-      },
-      ja: {
-        sttLang: 'ja-JP', idealWPM: 105,
-        checkpoints: ['ご挨拶', '遅延原因', '遅延時間', 'お詫び', '理由説明', '待機のお願い', 'サービス案内', '再度のお詫び'],
-        keyPhrases: ['遅延', '点検', '申し訳', '安全', 'ご了承', 'お飲み物'],
-        tips: ['心からのお詫びを伝える', '理由と時間を明確に', 'サービスで不便を和らげる'],
-        text: `お客様、こんにちは。
-ただいま技術的な点検のため、出発が約30分遅延しております。
-大変ご迷惑をおかけし、誠に申し訳ございません。
-この点検は皆様の安全な運航のために必要不可欠なものでございます。ご理解いただけますようお願いいたします。
-追加のご案内があるまで、お座席でお待ちいただけますようお願いいたします。
-お待ちの間、お飲み物のサービスをご提供いたします。
-重ねてお詫び申し上げます。`
-      },
-      zh: {
-        sttLang: 'zh-CN', idealWPM: 112,
-        checkpoints: ['问候语', '延误原因', '延误时间', '道歉', '理由说明', '等待请求', '补偿服务', '再次道歉'],
-        keyPhrases: ['延误', '检查', '抱歉', '安全', '理解', '饮料服务'],
-        tips: ['真诚的道歉语气', '清楚说明原因和时间', '提供服务表示诚意'],
-        text: `各位旅客，您好。
-由于技术检查，本次航班出发延误约30分钟。
-给您带来不便，我们深感抱歉。
-此次检查是为确保飞行安全所必须进行的，请您理解与谅解。
-请在座位上等待，直到有进一步通知。
-等待期间，我们将为您提供免费饮料服务。
-再次为给您带来的不便深表歉意。`
-      }
-    }
-  }
-];
-
 // ===== 실제 체크리스트 정의 =====
 const CHECKLIST = {
   fluency: {
@@ -657,7 +201,7 @@ function loadOverrides() {
 function saveOverrides(obj) { localStorage.setItem('cabinvoice_overrides', JSON.stringify(obj)); }
 function getEffectiveScript(id) {
   const overrides = loadOverrides();
-  const base = SCRIPTS.find(s => s.id === id);
+  const base = _allScripts.find(s => s.id === id);
   if (!base) return null;
   return overrides[id] ? { ...base, ...overrides[id], langs: { ...base.langs, ...overrides[id].langs } } : base;
 }
@@ -798,7 +342,8 @@ function buildCustomLang(text, cpStr, langCode) {
 
 // ===== HOME / SIDEBAR =====
 async function loadAndRenderHome() {
-  // 1. Firestore 로드 시도 (캐시 우선)
+  _renderSidebarLoading();
+
   let firestoreScripts = [];
   const cached = (() => { try { return JSON.parse(localStorage.getItem('cabinvoice_scripts_cache')||'null'); } catch { return null; } })();
   if (cached && cached.announcements && (Date.now()-cached.ts < 3600000)) {
@@ -818,13 +363,14 @@ async function loadAndRenderHome() {
   }
 
   const customScripts = loadCustomScripts();
-  const builtInEffective = SCRIPTS.map(s => getEffectiveScript(s.id));
-
-  // Firestore 있으면 빌트인 대체, 없으면 빌트인 사용
-  const baseScripts = firestoreScripts.length ? firestoreScripts : builtInEffective;
-  _allScripts = [...baseScripts, ...customScripts];
+  _allScripts = [...firestoreScripts, ...customScripts];
 
   renderSidebar(_allScripts);
+}
+
+function _renderSidebarLoading() {
+  const tree = $('sidebar-tree');
+  if (tree) tree.innerHTML = '<div style="padding:32px 16px;text-align:center;color:var(--gray-400);font-size:14px">방송문 로딩 중...</div>';
 }
 
 function _mapAnnouncementsToScripts(announcements) {
@@ -848,6 +394,11 @@ function _mapAnnouncementsToScripts(announcements) {
 function renderSidebar(scripts) {
   const tree = $('sidebar-tree');
   if (!tree) return;
+
+  if (!scripts.length) {
+    tree.innerHTML = '<div style="padding:32px 16px;text-align:center;color:var(--gray-400);font-size:13px">방송문 데이터가 없습니다.<br>관리자 패널에서 JSON을 업로드해 주세요.</div>';
+    return;
+  }
 
   // 챕터별 그룹핑
   const chapters = new Map();
@@ -1816,7 +1367,7 @@ function saveScriptFromModal() {
 
   if (_modalState.mode === 'edit' && _modalState.editSource === 'builtin') {
     // 기본 방송문 편집 → override에 저장
-    const base = SCRIPTS.find(s => s.id === _modalState.editId);
+    const base = _allScripts.find(s => s.id === _modalState.editId);
     const overrides = loadOverrides();
     const newLangs = {};
     ['ko','en','ja','zh'].forEach(l => {
@@ -2425,6 +1976,46 @@ async function deployToFirestore() {
   }
 }
 
+async function deployJsonToFirestore() {
+  const fileInput = $('admin-json-input');
+  const file = fileInput?.files?.[0];
+  if (!file) { alert('announcements.json 파일을 선택해주세요.'); return; }
+
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch { alert('JSON 파싱 오류: 올바른 JSON 파일인지 확인해주세요.'); return; }
+
+  if (!data.announcements || !Array.isArray(data.announcements) || !data.revVersion) {
+    alert('올바른 announcements.json 형식이 아닙니다.\n(revVersion, announcements 필드 필요)');
+    return;
+  }
+
+  if (!confirm(`${data.announcements.length}개 방송문을 ${data.revVersion}으로 Firestore에 업로드하시겠습니까?`)) return;
+
+  const btn = $('btn-admin-json-deploy');
+  btn.disabled = true; btn.textContent = '업로드 중...';
+  try {
+    if (!_db) { initFirebase(); }
+    if (!_db) throw new Error('Firebase 연결에 실패했습니다.');
+    await firestoreSaveLatest({
+      revVersion: data.revVersion,
+      updatedAt: firebase.firestore.Timestamp.now(),
+      announcements: data.announcements
+    });
+    localStorage.setItem('cabinvoice_scripts_cache', JSON.stringify({
+      rev: data.revVersion, announcements: data.announcements, ts: Date.now()
+    }));
+    alert(`${data.revVersion} 업로드 완료! (${data.announcements.length}개 방송문)\n앱을 새로고침하면 반영됩니다.`);
+    _refreshAdminVersion();
+    _refreshAdminVersionList();
+  } catch(e) {
+    alert(`업로드 실패: ${e.message}`);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Firestore에 업로드';
+  }
+}
+
 // ===== EVENTS =====
 document.addEventListener('DOMContentLoaded', () => {
   initFirebase();
@@ -2604,6 +2195,7 @@ document.addEventListener('DOMContentLoaded', () => {
   adminDropZone.addEventListener('dragleave', () => adminDropZone.classList.remove('drag-over'));
   adminDropZone.addEventListener('drop', e => { e.preventDefault(); adminDropZone.classList.remove('drag-over'); const f=e.dataTransfer.files[0]; if(f) handleAdminPdf(f); });
   $('btn-admin-deploy').addEventListener('click', deployToFirestore);
+  $('btn-admin-json-deploy').addEventListener('click', deployJsonToFirestore);
   $('admin-select-all').addEventListener('click', () => $('admin-script-list').querySelectorAll('.pdf-script-check').forEach(cb=>{cb.checked=true;cb.closest('.pdf-script-item').classList.add('selected');}));
   $('admin-deselect-all').addEventListener('click', () => $('admin-script-list').querySelectorAll('.pdf-script-check').forEach(cb=>{cb.checked=false;cb.closest('.pdf-script-item').classList.remove('selected');}));
   $('admin-retry-btn').addEventListener('click', () => { $('admin-pdf-error').classList.add('hidden'); $('admin-pdf-drop-zone').classList.remove('hidden'); });

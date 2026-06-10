@@ -377,6 +377,21 @@
         </div>
       </section>
 
+      <!-- JSON 직접 업로드 섹션 -->
+      <section class="admin-section">
+        <div class="admin-section-title">📂 announcements.json 직접 업로드</div>
+        <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">
+          프로젝트 루트의 <code>announcements.json</code> 파일을 선택하면 Firestore에 바로 업로드됩니다.
+        </div>
+        <div class="admin-row-btns">
+          <label class="btn-icon" style="cursor:pointer;display:inline-block">
+            파일 선택
+            <input type="file" id="admin-json-input" accept=".json" style="display:none">
+          </label>
+          <button class="btn-primary" id="btn-admin-json-deploy">Firestore에 업로드</button>
+        </div>
+      </section>
+
       <!-- PDF 업로드 섹션 -->
       <section class="admin-section">
         <div class="admin-section-title">📄 교범 PDF 업로드 &amp; 배포</div>
