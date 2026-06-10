@@ -1390,6 +1390,59 @@ html, body {
 
 /* ===== AI RESULT SECTION ===== */
 .ai-result-section { margin-top: 28px; }
+
+/* 잘한 점 박스 (상단 초록) */
+.ai-good-points-box { background: linear-gradient(135deg,#f0fdf4,#dcfce7); border: 1.5px solid #86efac; border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
+.ai-good-points-label { font-size: 13px; font-weight: 800; color: #166534; margin-bottom: 8px; }
+.ai-good-point-item { font-size: 14px; color: #15803d; line-height: 1.7; }
+
+/* 점수 + 등급 헤더 */
+.ai-score-header { display: flex; flex-direction: row; align-items: center; gap: 18px; background: #fff; border: 1.5px solid var(--gray-200); border-radius: 14px; padding: 18px 22px; margin-bottom: 14px; }
+.ai-score-value { font-size: 56px; font-weight: 800; line-height: 1; letter-spacing: -2px; flex-shrink: 0; }
+.ai-score-meta { display: flex; flex-direction: column; gap: 5px; }
+.ai-score-label { font-size: 12px; color: var(--gray-500); }
+.ai-grade-badge { display: inline-block; color: #fff; font-size: 15px; font-weight: 800; padding: 4px 14px; border-radius: 99px; letter-spacing: 0.5px; }
+.ai-grade-note { font-size: 11px; color: var(--gray-400); }
+
+/* 카테고리 바 */
+.ai-categories-box { background: #fff; border: 1.5px solid var(--gray-200); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
+.ai-cat-bar-row { margin-bottom: 16px; }
+.ai-cat-bar-row:last-child { margin-bottom: 0; }
+.ai-cat-bar-header { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.ai-cat-icon { font-size: 14px; }
+.ai-cat-name { font-size: 13px; font-weight: 700; color: var(--gray-700); flex: 1; }
+.ai-cat-score { font-size: 14px; font-weight: 800; }
+.ai-cat-bar-track { height: 7px; background: var(--gray-100); border-radius: 99px; margin-bottom: 6px; overflow: hidden; }
+.ai-cat-bar-fill { height: 100%; border-radius: 99px; transition: width .6s ease; }
+.ai-cat-feedback { font-size: 12px; color: var(--gray-500); line-height: 1.6; }
+
+/* 발음 오류 예시 */
+.ai-pron-details { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.ai-pron-detail-item { font-size: 12px; color: #1e40af; background: #eff6ff; border-radius: 8px; padding: 5px 10px; line-height: 1.5; }
+
+/* 누락 키워드 */
+.ai-missed-box { background: #fff7ed; border: 1.5px solid #fed7aa; border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; }
+.ai-missed-label { font-size: 12px; font-weight: 700; color: #c2410c; margin-bottom: 6px; }
+.ai-missed-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-missed-item { background: #fee2e2; color: #991b1b; font-size: 12px; padding: 3px 9px; border-radius: 6px; }
+
+/* 핵심 개선 포인트 */
+.ai-improvement-box { background: #fff7ed; border: 2px solid #fb923c; border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
+.ai-improvement-label { font-size: 13px; font-weight: 800; color: #c2410c; margin-bottom: 8px; }
+.ai-improvement-text { font-size: 14px; color: #7c2d12; line-height: 1.7; }
+
+/* 응원 메시지 */
+.ai-encouragement-box { background: linear-gradient(135deg,#ecfdf5,#f0fdf4); border: 1.5px solid #a7f3d0; border-radius: 12px; padding: 16px 18px; text-align: center; margin-bottom: 14px; }
+.ai-encouragement-text { font-size: 15px; font-weight: 600; color: #065f46; }
+
+/* 액션 버튼 */
+.ai-action-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 4px; margin-bottom: 6px; flex-wrap: wrap; }
+.btn-ai-retry, .btn-ai-select { padding: 11px 22px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: opacity .15s; }
+.btn-ai-retry  { background: #3b82f6; color: #fff; }
+.btn-ai-select { background: var(--gray-100); color: var(--gray-700); border: 1.5px solid var(--gray-200); }
+.btn-ai-retry:hover, .btn-ai-select:hover { opacity: .85; }
+
+/* 하위 호환 (기존 diff-word 등 혹시 남아있을 경우) */
 .diff-words-box { background: #fff; border: 1.5px solid var(--gray-200); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
 .diff-words-label { font-size: 13px; font-weight: 700; color: var(--gray-700); margin-bottom: 10px; }
 .diff-words { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1402,23 +1455,7 @@ html, body {
 .improvement-text { font-size: 14px; color: #1e40af; line-height: 1.7; }
 .encouragement-box { background: linear-gradient(135deg,#ecfdf5,#f0fdf4); border: 1.5px solid #a7f3d0; border-radius: 12px; padding: 16px 18px; text-align: center; }
 .encouragement-text { font-size: 15px; font-weight: 600; color: #065f46; }
-/* AI score header */
-.ai-score-header { display: flex; flex-direction: column; align-items: center; background: #fff; border: 1.5px solid var(--gray-200); border-radius: 14px; padding: 22px 18px 18px; margin-bottom: 14px; }
-.ai-score-value { font-size: 54px; font-weight: 800; line-height: 1; letter-spacing: -2px; }
-.ai-score-label { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
 .ai-score-grade { font-size: 14px; font-weight: 700; margin-top: 6px; }
-/* AI category bars */
-.ai-categories-box { background: #fff; border: 1.5px solid var(--gray-200); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
-.ai-cat-bar-row { margin-bottom: 16px; }
-.ai-cat-bar-row:last-child { margin-bottom: 0; }
-.ai-cat-bar-header { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
-.ai-cat-icon { font-size: 14px; }
-.ai-cat-name { font-size: 13px; font-weight: 700; color: var(--gray-700); flex: 1; }
-.ai-cat-score { font-size: 14px; font-weight: 800; }
-.ai-cat-bar-track { height: 7px; background: var(--gray-100); border-radius: 99px; margin-bottom: 6px; overflow: hidden; }
-.ai-cat-bar-fill { height: 100%; border-radius: 99px; transition: width .6s ease; }
-.ai-cat-feedback { font-size: 12px; color: var(--gray-500); line-height: 1.5; }
-.ai-cat-missed { font-size: 12px; color: #ef4444; margin-top: 3px; }
 
 .result-bottom-actions {
   display: flex; justify-content: center; gap: 12px; margin-top: 32px; flex-wrap: wrap;

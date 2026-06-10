@@ -1072,9 +1072,7 @@ function showResults(result, transcript) {
   const aiSec = $('ai-result-section');
   if (aiSec) {
     aiSec.classList.add('hidden');
-    $('diff-words-box').innerHTML = '';
-    $('improvement-box').classList.add('hidden');
-    $('encouragement-box').classList.add('hidden');
+    aiSec.innerHTML = '';
   }
 
   // AI 채점 (Firebase 초기화된 경우 자동 실행)
@@ -1685,39 +1683,89 @@ async function callGeminiScoring(script, transcript, langCode, checkpoints) {
   const model = await getGeminiModel();
   const langName = { ko:'한국어', en:'영어', ja:'일본어', ca:'중국어' }[langCode] || '한국어';
   const cpText = checkpoints?.length
-    ? `\n핵심 체크포인트 (completeness 평가 시 누락 여부 확인):\n${checkpoints.map(c=>`- ${c}`).join('\n')}\n`
+    ? `\n핵심 체크포인트 (누락 여부 반드시 확인):\n${checkpoints.map(c=>`- ${c}`).join('\n')}\n`
     : '';
+
+  const isKoEn = langCode === 'ko' || langCode === 'en';
+  const isJaCa = langCode === 'ja' || langCode === 'ca';
+  const maxFluency = isJaCa ? 25 : 30;
+  const maxPron    = isJaCa ? 25 : 20;
+  const totalDesc  = isJaCa
+    ? '유창성(25)+분위기/목소리(25)+억양(25)+발음(25)=100점'
+    : '유창성(30)+분위기/목소리(25)+억양(25)+발음(20)=100점';
+  const gradeRule = isKoEn
+    ? 'score 90이상→grade"A", 75이상→"B", 60이상→"C", 59이하→"미취득"'
+    : 'score 85이상→grade"PASS", 84이하→"FAIL"';
+
+  const criteriaMap = {
+    ko: `[한국어 채점 기준 (100점)]
+유창성(30): 끊어읽기(5)·속도80-120WPM(5)·핵심단어강조(5)·문안숙지(5)·말하는듯한연출(10)
+분위기/목소리(25): 발성안정충분한음량(10)·따뜻하고신뢰감있는톤(10)·친근함(5)
+억양(25): 조사어미자연스러운처리(10)·전반적억양(10)·고른억양단조롭지않게(5)
+발음(20): 정확성(10)—비ː행기장음/안전(안젼X)/좌석(좌썩X)/있습니다끝자음명확 | 명확성(10)—끝자음탈락없이또렷/모음정확구분`,
+    en: `[English Scoring Criteria (100 points)]
+Fluency(30): chunk reading(5)·speed100-130WPM(5)·content-word stress(5)·script mastery(5)·natural spoken feel(10)
+Atmosphere/Voice(25): projection & volume(10)·warm professional tone(10)·Dear Passengers warmth(5)
+Intonation(25): stress pattern & rhythm(10)·sentence flow(10)·falling/rising final tone(5)
+Pronunciation(20): accuracy(10)—seatbelt(seat·belt✓싯벨트✗) fasten(FAS·n✓패스튼✗) oxygen(OK·si·jn✓악시전✗) emergency(i·MUR·jn·see✓) | clarity(10)—no consonant drops, natural 'and' liaison, accurate th`,
+    ja: `[일본어 채점 기준 (100점)]
+유창성(25): 끊어읽기(5)·문안숙지(5)·속도(5)·자연스러운연출(10)
+분위기/목소리(25): 품격있고따뜻한톤(8)·발성(7)·친절함(5)·과장없이자연스럽게(5)
+억양(25): 평판형두고형일본어고유억양(10)·고른억양(5)·장음정확처리(5)·ます·ください어미(5)
+발음(25): 장음정확(7)·ざずぜぞ/じゃじゅじょ고유발음(6)·ん뒤음변화&촉음っ정지(6)·あいうえお5모음정확-です→デス✓デウス✗(6)`,
+    ca: `[중국어 채점 기준 (100점)]
+유창성(25): 끊어읽기(5)·문안숙지(5)·속도(5)·자연스러운연출(10)
+분위기/목소리(25): 톤(8)·발성(7)·친절함(5)·과장없이(5)
+억양(25): 4성+경성—1성高平·2성上扬·3성曲折·4성下降(10)·고른억양(5)·중국어특유리듬감(5)·어미처리(5)
+발음(25): 성조정확(10)·zh·ch·sh·r권설음-zh혀말아z와구별(6)·ü·ian·uan운모(6)·p·t·k·q·x·ch기식유무(3)`
+  };
+  const criteria = criteriaMap[langCode] || criteriaMap.ko;
+
   const prompt = `당신은 항공사 기내방송 전문 평가관입니다.
-원문(script)과 훈련생 발화(transcript)를 비교하여 아래 JSON 형식으로만 반환하세요 (설명 없이).
+언어: ${langName} | 배점: ${totalDesc}
+${gradeRule}
+${criteria}
 
-{
-  "totalScore": 0-100,
-  "categories": {
-    "completeness": { "score": 0-100, "feedback": "...", "missed": ["누락된 핵심표현"] },
-    "honorifics":   { "score": 0-100, "feedback": "..." },
-    "fluency":      { "score": 0-100, "feedback": "..." },
-    "clarity":      { "score": 0-100, "feedback": "..." }
-  },
-  "diffWords": [
-    { "word": "단어", "status": "correct|missed|added" }
-  ],
-  "improvementExample": "전체 방송문 중 개선이 필요한 부분만 올바르게 수정한 예시",
-  "encouragement": "훈련생을 격려하는 따뜻한 한 문장"
-}
+[STT 기술 오류 → 감점 없음]
+• 띄어쓰기 오류(기내 에→기내에), 쉼표/마침표 누락
+• 조사/어미 미세 변형(~이니↔~이니까), 유사 발음 단어(나고↔나오고)
+• [목적지][편명][공항] 등 변수 자리는 어떤 단어든 정답
+• 선택 문안 중 하나만 말해도 정답
 
-평가 기준:
-- completeness(완성도): 원문 핵심 내용 포함 여부. 안전 관련 단어 누락 시 크게 감점. 체크포인트 항목 누락 시 missed 배열에 기록
-- honorifics(호칭·경어): '손님 여러분'/'Ladies and gentlemen' 등 적절한 호칭과 경어체 사용
-- fluency(유창성): 자연스러운 발화 흐름, 적절한 속도와 리듬
-- clarity(명확성): 발음의 명확성, 핵심 정보 전달력
-- [목적지] [편명] 같은 변수 자리는 어떤 단어든 정답 처리
-- 언어: ${langName}
+[실제 감점 항목]
+• 핵심 키워드 완전 누락
+• 중요 안전 정보 순서 바뀜
+• 실제 발음 부정확 (위 언어별 발음 기준)
+
+[피드백 원칙]
+• 잘한 점 반드시 먼저 언급
+• STT 오류로 인한 감점은 피드백에서 제외
+• "이 부분이 승객에게 이렇게 들렸을 거예요" 형태로 구체적 안내
+• 따뜻하고 격려하는 톤
 ${cpText}
 원문:
 ${script}
 
 발화:
-${transcript}`;
+${transcript}
+
+아래 JSON만 반환하세요 (설명 없이, 주석 없이):
+{
+  "language": "${langCode}",
+  "score": 0-100 정수,
+  "grade": ${isKoEn ? '"A" 또는 "B" 또는 "C" 또는 "미취득"' : '"PASS" 또는 "FAIL"'},
+  "categories": {
+    "fluency":       { "score": 0-${maxFluency} 정수, "feedback": "잘한 점 먼저, 개선점 포함 1-2문장" },
+    "atmosphere":    { "score": 0-25 정수, "feedback": "1-2문장" },
+    "intonation":    { "score": 0-25 정수, "feedback": "1-2문장" },
+    "pronunciation": { "score": 0-${maxPron} 정수, "feedback": "1-2문장",
+                       "details": ["발음 오류 예시: 예) fasten → '패스튼'으로 들렸어요. '파슨'으로 연습해보세요"] }
+  },
+  "goodPoints": ["잘한 점 첫 번째", "잘한 점 두 번째 (있으면)"],
+  "missedKeywords": ["누락된 핵심 키워드 (없으면 빈 배열)"],
+  "improvementTip": "가장 중요한 개선 포인트 1가지 — 이 부분이 승객에게 이렇게 들렸을 거예요 형태로",
+  "encouragement": "따뜻한 응원 메시지 한 줄"
+}`;
 
   const result = await model.generateContent(prompt);
   const raw = result.response.text().trim();
@@ -1731,66 +1779,114 @@ function renderAiResult(ai) {
   if (!sec) return;
   sec.classList.remove('hidden');
 
+  const lang = ai.language || state.selectedLang;
+  const isKoEn = lang === 'ko' || lang === 'en';
+  const isJaCa = lang === 'ja' || lang === 'ca';
+  const score = typeof ai.score === 'number' ? ai.score : 0;
+  const grade = ai.grade || (isKoEn ? '미취득' : 'FAIL');
+
+  const gradeColor = isKoEn
+    ? (grade === 'A' ? '#16a34a' : grade === 'B' ? '#2563eb' : grade === 'C' ? '#d97706' : '#dc2626')
+    : (grade === 'PASS' ? '#16a34a' : '#dc2626');
+
+  const maxScores = isJaCa
+    ? { fluency: 25, atmosphere: 25, intonation: 25, pronunciation: 25 }
+    : { fluency: 30, atmosphere: 25, intonation: 25, pronunciation: 20 };
+
   const catMeta = {
-    completeness: { name:'완성도', icon:'✅', color:'#22c55e' },
-    honorifics:   { name:'호칭·경어', icon:'🙏', color:'#f59e0b' },
-    fluency:      { name:'유창성', icon:'🗣', color:'#3b82f6' },
-    clarity:      { name:'명확성', icon:'🔊', color:'#8b5cf6' }
+    fluency:       { name: '유창성',        icon: '💨', color: '#10b981', max: maxScores.fluency },
+    atmosphere:    { name: '분위기/목소리',  icon: '🎙',  color: '#f59e0b', max: maxScores.atmosphere },
+    intonation:    { name: '억양',          icon: '〰️', color: '#8b5cf6', max: maxScores.intonation },
+    pronunciation: { name: '발음',          icon: '🗣',  color: '#3b82f6', max: maxScores.pronunciation }
   };
 
-  const score = ai.totalScore ?? 0;
-  const scoreColor = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444';
-  const scoreGrade = score >= 90 ? '최우수' : score >= 80 ? '우수' : score >= 70 ? '보통' : '노력 필요';
+  // 잘한 점 — 초록 박스 (상단)
+  const goodPointsHtml = ai.goodPoints?.length
+    ? `<div class="ai-good-points-box">
+        <div class="ai-good-points-label">👏 잘하셨어요!</div>
+        ${ai.goodPoints.map(p => `<div class="ai-good-point-item">✓ ${escHtml(p)}</div>`).join('')}
+      </div>`
+    : '';
 
+  // 점수 + 등급 헤더
+  const gradeHtml = isKoEn
+    ? `<span class="ai-grade-badge" style="background:${gradeColor}">${grade}등급</span>
+       <div class="ai-grade-note">A≥90 / B≥75 / C≥60 / 미취득&lt;60</div>`
+    : `<span class="ai-grade-badge" style="background:${gradeColor}">${grade}</span>
+       <div class="ai-grade-note">PASS: 85점 이상</div>`;
+
+  const scoreHeaderHtml = `
+    <div class="ai-score-header">
+      <div class="ai-score-value" style="color:${gradeColor}">${score}</div>
+      <div class="ai-score-meta">
+        <div class="ai-score-label">AI 평가 점수 / 100</div>
+        ${gradeHtml}
+      </div>
+    </div>`;
+
+  // 카테고리별 점수 바
   const catsHtml = Object.entries(ai.categories || {}).map(([key, cat]) => {
-    const m = catMeta[key] || { name: key, icon: '•', color: '#64748b' };
-    const missedHtml = cat.missed?.length
-      ? `<div class="ai-cat-missed">누락: ${cat.missed.map(v => escHtml(v)).join(', ')}</div>` : '';
+    const m = catMeta[key];
+    if (!m) return '';
+    const pct = Math.round((Math.min(cat.score, m.max) / m.max) * 100);
+    const pronDetailsHtml = (key === 'pronunciation' && cat.details?.length)
+      ? `<div class="ai-pron-details">
+          ${cat.details.map(d => `<div class="ai-pron-detail-item">💬 ${escHtml(d)}</div>`).join('')}
+         </div>`
+      : '';
     return `<div class="ai-cat-bar-row">
       <div class="ai-cat-bar-header">
         <span class="ai-cat-icon">${m.icon}</span>
         <span class="ai-cat-name">${m.name}</span>
-        <span class="ai-cat-score" style="color:${m.color}">${cat.score}점</span>
+        <span class="ai-cat-score" style="color:${m.color}">${cat.score}<span style="font-size:11px;color:#94a3b8">/${m.max}</span></span>
       </div>
       <div class="ai-cat-bar-track">
-        <div class="ai-cat-bar-fill" style="width:${cat.score}%;background:${m.color}"></div>
+        <div class="ai-cat-bar-fill" style="width:${pct}%;background:${m.color}"></div>
       </div>
       <div class="ai-cat-feedback">${escHtml(cat.feedback || '')}</div>
-      ${missedHtml}
+      ${pronDetailsHtml}
     </div>`;
   }).join('');
 
-  const diffHtml = ai.diffWords?.length ? `
-    <div class="diff-words-box">
-      <div class="diff-words-label">📝 단어 분석</div>
-      <div class="diff-words">${ai.diffWords.map(w => {
-        const cls = w.status==='correct'?'dw-correct':w.status==='missed'?'dw-missed':'dw-added';
-        return `<span class="diff-word ${cls}">${escHtml(w.word)}</span>`;
-      }).join(' ')}</div>
-    </div>` : '';
+  // 누락 키워드
+  const missedHtml = ai.missedKeywords?.length
+    ? `<div class="ai-missed-box">
+        <div class="ai-missed-label">⚠️ 누락된 핵심 키워드</div>
+        <div class="ai-missed-list">${ai.missedKeywords.map(k => `<span class="ai-missed-item">${escHtml(k)}</span>`).join('')}</div>
+      </div>`
+    : '';
 
-  const improveHtml = ai.improvementExample ? `
-    <div class="improvement-box">
-      <div class="improvement-label">💬 이렇게 말씀해 보세요</div>
-      <div class="improvement-text">${escHtml(ai.improvementExample)}</div>
-    </div>` : '';
+  // 핵심 개선 포인트 (강조 박스)
+  const improvHtml = ai.improvementTip
+    ? `<div class="ai-improvement-box">
+        <div class="ai-improvement-label">🎯 핵심 개선 포인트</div>
+        <div class="ai-improvement-text">${escHtml(ai.improvementTip)}</div>
+      </div>`
+    : '';
 
-  const encourageHtml = ai.encouragement ? `
-    <div class="encouragement-box">
-      <div class="encouragement-text">${escHtml(ai.encouragement)}</div>
-    </div>` : '';
+  // 응원 메시지
+  const encourageHtml = ai.encouragement
+    ? `<div class="ai-encouragement-box">
+        <div class="ai-encouragement-text">💙 ${escHtml(ai.encouragement)}</div>
+      </div>`
+    : '';
+
+  // 액션 버튼
+  const buttonsHtml = `
+    <div class="ai-action-buttons">
+      <button class="btn-ai-retry" onclick="if(state.currentScript) startPrep(state.currentScript)">🔄 다시 연습</button>
+      <button class="btn-ai-select" onclick="showScreen('screen-home')">📋 다른 방송문 선택</button>
+    </div>`;
 
   sec.innerHTML = `
     <div class="section-heading">🤖 AI 상세 분석</div>
-    <div class="ai-score-header">
-      <div class="ai-score-value" style="color:${scoreColor}">${score}</div>
-      <div class="ai-score-label">AI 평가 점수</div>
-      <div class="ai-score-grade" style="color:${scoreColor}">${scoreGrade}</div>
-    </div>
+    ${goodPointsHtml}
+    ${scoreHeaderHtml}
     <div class="ai-categories-box">${catsHtml}</div>
-    ${diffHtml}
-    ${improveHtml}
+    ${missedHtml}
+    ${improvHtml}
     ${encourageHtml}
+    ${buttonsHtml}
   `;
 }
 
