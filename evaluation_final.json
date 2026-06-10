@@ -1,0 +1,274 @@
+{
+  "revVersion": "Rev.23",
+  "updatedAt": "2026-03-30",
+  "announcements": [
+    {
+      "id": "2-1-1", "chapter": 2, "chapterName": "On Ground", "section": "2.1.1",
+      "title": "항공기 출발 준비", "evalLang": ["ko","en","ja","ca"], "quarters_ko_en": ["Q1"], "quarters_ja_ca": ["Q1"],
+      "ko": "손님 여러분, 우리 비행기는 [목적지]까지 가는 제주항공 [편명]입니다.\n\n[General] 휴대한 짐은 앞 좌석 밑 또는 선반에 보관해 주시고,\n\n[수하물 과다 반입] 오늘 [기내 수하물이 많아 / 만석으로] 선반 공간이 부족할 것으로 예상됩니다. 캐리어를 제외한 작은 짐이나 깨지기 쉬운 물건은 앞 좌석 밑에 보관해 주시고,\n\n모든 전자기기는 비행기 모드로 사용하거나 전원을 꺼주시기 바랍니다.",
+      "en": "Dear Passengers, this is Jeju Air flight [편명] bound for [목적지].\n\n[General] Please stow your baggage in the overhead bins or under the seat in front of you.\n\n[수하물 과다 반입] Due to today's full cabin, storage space is limited. Please keep small size baggage or fragile items under the seat in front of you.\n\nAlso, please ensure that all electronic devices are set to airplane mode or switched off.",
+      "ja": "みなさま、とうきは チェジュこうくう [편명]びん [목적지] ゆきでございます。\n\n[General] おてにもつは まえの ざせきの した、または しゅうのうだなを ごりようください。\n\n[수하물 과다 반입] ほんじつは [きないの おてにもつが おおいため / まんせきとなっており] しゅうのうだなの スペースぶそくが よそうされます。ちいさな おてにもつ、または こわれやすい おてにもつは まえの ざせきの したに おいれください。\n\nまた、すべての でんしききは きないモードに せっていするか、でんげんを おきりください。",
+      "ca": "各位旅客，你们好！欢迎乘坐济州航空公司[편명]次航班前往[목적지]。\n\n[General] 请将您的行李放在前排座椅下，或上面的行李架内。\n\n[수하물 과다 반입] 另外，因为今天满客，预计行李架空间不足。除了行李箱以外，小件或易碎物品，请放在前排座椅下面。\n\n请把电子设备调成为飞行模式或关机。",
+      "checkpoints": ["[목적지]", "[편명]", "전자기기 비행기 모드"]
+    },
+    {
+      "id": "2-1-2", "chapter": 2, "chapterName": "On Ground", "section": "2.1.2",
+      "title": "보조배터리 규정", "evalLang": ["ko","en"], "quarters_ko_en": ["Q4"],
+      "ko": "손님 여러분,\n\n보조배터리, 전자담배, 라이터는 선반에 보관할 수 없으며,\n\n보조배터리는 단락 방지 조치하여 직접 소지하거나 앞 좌석 주머니에 보관하시기 바랍니다.\n\n또한, 보조배터리와 전자담배는 기내에서 충전이 불가하며,\n\n전자기기가 좌석에 끼거나, 뜨거워지고 부풀어 오를 경우에는 승무원에게 즉시 알려주시기 바랍니다.",
+      "en": "Dear Passengers,\n\nPower banks, electronic cigarettes, and lighters must not be placed in the overhead bins.\n\nPlease carry power banks with you or keep them in the seat pocket with proper short-circuit protection.\n\nIn addition, charging power banks or electronic cigarettes is not permitted on board.\n\nIf you notice any device getting stuck in the seat, swelling, or overheating, please inform the cabin crew immediately.",
+      "checkpoints": ["보조배터리", "전자담배", "라이터", "선반 보관 불가", "충전 불가"]
+    },
+    {
+      "id": "2-3", "chapter": 2, "chapterName": "On Ground", "section": "2.3",
+      "title": "Welcome", "evalLang": ["ko","en","ja","ca"], "quarters_ko_en": ["Q1"], "quarters_ja_ca": ["Q1"],
+      "ko": "손님 여러분, 안녕하세요! 제주항공 탑승을 환영합니다.\n\n[10분 초과 지연 시] [▶지연 사유](로/으로) 출발이 늦어진 점 [죄송합니다. / 양해해 주시기 바랍니다.]\n\n오늘 [목적지]까지 비행시간은 이륙 후 ___시간 ___분으로 예상됩니다.\n\n[무단 촬영 제한] (또한,) 기내에서 승무원 및 타인을 무단 촬영할 경우, 기내 질서 유지를 위해 제한될 수 있음을 알려드립니다.\n\n안전한 비행을 위해 승무원 안내에 적극 협조해 주세요! 고맙습니다.",
+      "en": "Dear passengers, welcome aboard Jeju Air!\n\n[10분 초과 지연 시] We are delayed due to [▶지연 사유]. Thank you for your understanding.\n\nOur flight time will be ___ hour(s) and ___ minute(s) after take-off.\n\n[무단 촬영 제한] In addition, unauthorized filming of cabin crew or other passengers on board may be restricted to maintain cabin order.\n\nPlease help out our cabin crew for the safe flight. Thank you.",
+      "ja": "みなさま、[おはようございます。/ こんにちは。/ こんばんは。]\n\nほんじつは ごとうじょう ありがとうございます。\n\n[10분 초과 지연 시] また、[▶지연 사유]により しゅっぱつが おくれたてん [おわび もうしあげます。/ ごりょうしょうおねがいいたします。]\n\n[목적지] までの ひこうじかんは りりくご ___じかん ___ふん(ぷん)を よていしております。\n\n[무단 촬영 제한] また、きないで じょうむいんや ほかの おきゃくさまを むだんで さつえいする ことは きないの ちつじょいじのため、おことわりしております。\n\nあんぜんな そらのたびのため、じょうむいんからの あんないに ごきょうりょく おねがいいたします。ありがとうございました。",
+      "ca": "亲爱的旅客们，您好。欢迎您选乘济州航空[편명]次航班前往[목적지]。\n\n[10분 초과 지연 시] 由于[▶지연 사유]耽误了您的旅程，希望您能谅解。\n\n到达[목적지]的预计飞行时间是___个小时___分钟。\n\n[무단 촬영 제한] 此外，如在机舱内擅自拍摄乘务员或其他旅客，为维护机舱秩序，可能会受到限制。\n\n为了安全飞行，请积极协助乘务员的指示。谢谢！",
+      "checkpoints": ["제주항공 환영", "[목적지]", "비행시간", "승무원 협조"]
+    },
+    {
+      "id": "2-4-1", "chapter": 2, "chapterName": "On Ground", "section": "2.4.1",
+      "title": "Safety DEMO: 국내선", "evalLang": ["ko","en"], "quarters_ko_en": ["Q1","Q2","Q3","Q4"],
+      "ko": "손님 여러분, 잠시 앞을 주목해 주세요.\n\n지금부터 안전한 비행을 위한 5가지 수칙을 안내해 드리겠습니다.\n\n첫째, 머리 위 좌석벨트 표시등이 켜지면 벨트를 매 주시고, 풀 때는 덮개를 위로 올려주세요.\n\n둘째, 산소마스크는 산소가 필요한 비상시 머리 위 선반에서 저절로 내려옵니다. 이 때, 방역 마스크 등 호흡에 방해되는 물건을 제거한 뒤, 마스크를 앞으로 잡아당겨 코와 입에 대고 호흡하세요. 산소마스크는 본인 먼저 착용한 후 주변 사람을 도와주시기 바랍니다.\n\n셋째, 비상 탈출 시, 선반의 비상등과 바닥의 야광유도선을 따라 가장 가까운 비상구로 탈출하세요. 비상구는 총 8개로 오른쪽과 왼쪽에 각각 있습니다.\n\n넷째, 구명복은 좌석 또는 팔걸이 아래에 있습니다. 머리 위에서부터 입고, 끈을 허리에 돌려 고리에 끼운 후 몸에 맞게 조여주세요. 탈출 직전 비상구 앞에서 빨간색 손잡이를 당겨 부풀리고, 양 옆의 고무관을 이용해 조절하면 됩니다.\n\n손님 여러분, 더 궁금한 내용 있으신가요? 마지막으로 자세한 안전 수칙은 좌석 앞 안내서를 확인해 주세요.\n\n아울러, 비상구는 반드시 승무원의 지시가 있을 경우에만 개방해야 하며, 임의로 조작할 경우 최고 10년 징역의 처벌대상이 될 수 있습니다.\n\n또한, 승무원의 업무 방해 행위, 전자담배를 포함한 기내 흡연, 전자기기 사용기준 위반은 항공보안법에 의거하여 처벌받을 수 있으니 안전한 비행을 위해 협조해 주시기 바랍니다.",
+      "en": "Dear Passengers,\n\nEmergency exits must only be opened under the instruction of cabin crew. Unauthorized operation may result in imprisonment of up to 10 years.\n\nIn addition, obstructing cabin crew, smoking of any kind including electronic cigarettes, and improper use of electronic devices, are punishable under aviation security laws.\n\nWe ask for your cooperation to ensure a safe flight.",
+      "checkpoints": ["5가지 수칙", "좌석벨트", "산소마스크", "비상구 8개", "구명복", "비상구 승무원 지시"]
+    },
+    {
+      "id": "2-4-2", "chapter": 2, "chapterName": "On Ground", "section": "2.4.2",
+      "title": "Safety DEMO: 국제선", "evalLang": ["ko","en","ja","ca"], "quarters_ko_en": ["Q1","Q2","Q3","Q4"], "quarters_ja_ca": ["Q1"],
+      "ko": "손님 여러분, 잠시 앞을 주목해주세요.\n\n지금부터 안전한 비행을 위한 5가지 수칙을 안내해 드리겠습니다.\n\n첫째, 머리 위 좌석벨트 표시등이 켜지면 벨트를 매 주시고, 풀 때는 덮개를 위로 올려주세요.\n\n둘째, 산소마스크는 산소가 필요한 비상시 머리 위 선반에서 저절로 내려옵니다. 이 때, 방역 마스크 등 호흡에 방해되는 물건을 제거한 뒤, 마스크를 앞으로 잡아당겨 코와 입에 대고 호흡하세요. 산소마스크는 본인 먼저 착용한 후 주변사람을 도와주시기 바랍니다.\n\n셋째, 비상 탈출 시, 선반의 비상등과 바닥의 야광 유도선을 따라 가장 가까운 비상구로 탈출하세요. 비상구는 총 8개로 오른쪽과 왼쪽에 각각 있습니다.\n\n넷째, 구명복은 좌석 (또는 팔걸이) 아래에 있습니다. 머리 위에서부터 입고 끈을 허리에 돌려 고리에 끼운 후 몸에 맞게 조여주세요. 탈출 직전 비상구 앞에서 빨간색 손잡이를 당겨 부풀리고, 양 옆의 고무관을 이용해 조절하면 됩니다.\n\n자세한 안전 수칙은 좌석 앞 안내서를 확인해 주세요.\n\n아울러, 비상구는 반드시 승무원의 지시가 있을 경우에만 개방해야 하며, 임의로 조작할 경우 최고 10년 징역의 처벌대상이 될 수 있습니다.\n\n또한, 승무원의 업무 방해 행위, 전자담배를 포함한 기내 흡연, 전자기기 사용기준 위반은 항공보안법에 의거하여 처벌받을 수 있으니 안전한 비행을 위해 협조해 주시기 바랍니다.",
+      "en": "Dear passengers,\n\nPlease direct your attention to the cabin crew for the safety demonstration.\n\nWhen the seatbelt sign is on, please fasten your seatbelt. To unfasten the seatbelt, simply lift up the buckle.\n\nIn case of an emergency, an oxygen mask will automatically drop down from the overhead bins. Please remove your face mask before using the oxygen mask. Pull the mask down and cover your nose and mouth. Secure your own mask before helping others.\n\nDuring an evacuation, emergency lights will guide you to the nearest exits. This aircraft has eight emergency exits, four on each side.\n\nYour life jacket is located under your seat (or next to your armrest). Put the life jacket over your head. Wrap the strap around your waist and tighten it by pulling. Inflate your life jacket only at the exit door. To inflate, pull the red taps downwards and manually blow into the red tubes.\n\nFor more information, please refer to the safety information card in your seat pocket.\n\nEmergency exits must only be opened under the instruction of cabin crew. Unauthorized operation may result in imprisonment of up to 10 years.\n\nIn addition, obstructing cabin crew, smoking of any kind including electronic cigarettes, and improper use of electronic devices, are punishable under aviation security laws.\n\nWe ask for your cooperation to ensure a safe flight.",
+      "ja": "ひじょうくちは かならず じょうむいんの しじが ある ばあいのみ おあけください。むだんで そうさした ばあい、さいだい 10ねんの ちょうえきになる かのうせいがあります。\n\nまた、じょうむいんの ぎょうむぼうがいこうい、でんしタバコを ふくむ きないでの きつえん、そして でんしききしようきじゅんの いはんは、こうくうほあんほうにより しょばつの たいしょうとなります。\n\nあんぜんな うんこうのため、みなさまの ごきょうりょく おねがいいたします。",
+      "ca": "紧急出口必须在乘务员指示下才能开启。如擅自操作，最高可判处十年有期徒刑。\n\n此外，妨碍乘务员执行职务、在机内吸烟包括电子烟、违反电子设备使用规定等，均可依据航空安全法受到处罚。\n\n为了您的安全与顺利的飞行，请予以配合。",
+      "checkpoints": ["5가지 수칙", "좌석벨트", "산소마스크", "비상구 8개", "구명복", "비상구 승무원 지시"]
+    },
+    {
+      "id": "2-5-1", "chapter": 2, "chapterName": "On Ground", "section": "2.5.1",
+      "title": "기내 기름 냄새", "evalLang": ["ko","en"], "quarters_ko_en": ["Q2"],
+      "ko": "손님 여러분, 기내에 기름 냄새가 나고 있습니다.\n\n일시적으로 나타나는 현상이니 양해해 주시기 바랍니다.",
+      "en": "Dear passengers, the fuel odor will diminish shortly.\n\nThank you for your understanding.",
+      "checkpoints": ["일시적 현상", "양해"]
+    },
+    {
+      "id": "2-5-2", "chapter": 2, "chapterName": "On Ground", "section": "2.5.2",
+      "title": "기내 온도 상승", "evalLang": ["ko","en"], "quarters_ko_en": ["Q3"],
+      "ko": "손님 여러분, 기내 온도는 이륙 후 적절하게 조절되니 양해해 주시기 바랍니다.",
+      "en": "Dear passengers, the cabin temperature will stabilize shortly after take-off.\n\nThank you for your understanding.",
+      "checkpoints": ["이륙 후 조절", "양해"]
+    },
+    {
+      "id": "2-5-3", "chapter": 2, "chapterName": "On Ground", "section": "2.5.3",
+      "title": "기내 결로 현상", "evalLang": ["ko","en"], "quarters_ko_en": ["Q4"],
+      "ko": "손님 여러분, 항공기 외부와 내부의 온도 차이로 기내에 물방울이 맺혀 떨어질 수 있습니다.\n\n일시적으로 나타나는 현상이니 양해해 주시기 바랍니다.",
+      "en": "Dear passengers,\n\nCabin condensation occurs due to temperature differences.\n\nIt will be resolved once the cabin temperature stabilizes.\n\nThank you for your understanding.",
+      "checkpoints": ["온도 차이", "일시적 현상"]
+    },
+    {
+      "id": "3-1", "chapter": 3, "chapterName": "En-Route", "section": "3.1",
+      "title": "Fasten Seatbelt Sign On/Off", "evalLang": ["ko","en"], "quarters_ko_en": ["Q2"],
+      "ko": "[Off] 손님 여러분, 좌석벨트 표시등이 꺼졌습니다. 그러나 비행기가 갑자기 흔들릴 수 있으니 항상 좌석벨트를 매 주시기 바랍니다.\n\n[On] 손님 여러분, 기류 변화로 비행기가 계속해서 흔들릴 것으로 예상됩니다. 안전을 위해 머리 위 좌석벨트 표시등이 꺼질 때까지 자리에 앉아 잠시만 더 기다려 주시기 바랍니다.\n\n보조배터리, 전자담배, 라이터는 선반에 보관할 수 없으며, 보조배터리는 단락 방지 조치하여 직접 소지하거나 앞 좌석 주머니에 보관하시기 바랍니다.\n\n또한 보조배터리와 전자담배는 기내에서 충전이 불가하며, 전자기기가 좌석에 끼거나, 뜨거워지고 부풀어 오를 경우에는 승무원에게 즉시 알려주시기 바랍니다.",
+      "en": "[Off] Dear Passengers, the fasten seatbelt sign is now off. However, please keep your seatbelt fastened in case of turbulence.\n\n[On] Dear Passengers, we will be continuously passing through turbulence. For your safety, please keep your seatbelt fastened until the fasten seatbelt sign is turned off.\n\nPower banks, electronic cigarettes, and lighters must not be placed in the overhead bins. Please carry power banks with you or keep them in the seat pocket with proper short-circuit protection.\n\nCharging power banks or electronic cigarettes is not permitted on board. If you notice any device getting stuck in the seat, swelling, or overheating, please inform the cabin crew immediately.",
+      "checkpoints": ["좌석벨트 표시등", "보조배터리", "전자담배"]
+    },
+    {
+      "id": "3-3", "chapter": 3, "chapterName": "En-Route", "section": "3.3",
+      "title": "서류 서비스", "evalLang": ["ko","en"], "quarters_ko_en": ["Q1"],
+      "ko": "[서류 배포] 손님 여러분, 입국 서류를 준비해 드리겠습니다. (사전에 온라인을 통해 신고한 분은 입국 서류를 작성하지 않으셔도 됩니다.) 작성 방법은 제주항공 애플리케이션을 확인해 주세요.\n\n[일본] 손님 여러분, 일본 입국에 필요한 [입국/세관]신고서는 기내에서 제공하지 않고 있습니다. 입국 전까지 Visit Japan Web으로 신고해 주세요.\n\n[대한민국] 손님 여러분, 입국 서류를 준비해 드리겠습니다. 신고대상물품을 소지한 분은 세관신고서를 요청해 주세요.",
+      "en": "[서류 배포] Dear passengers, we will be distributing the entry documents. For further guidelines, please refer to the Jeju Air application.\n\n[일본] Dear Passengers, Arrival Card and customs declaration form are not provided on flights to Japan. Please complete your registration through Visit Japan Web.\n\n[대한민국] Dear passengers, we will be distributing the entry documents. If you are carrying items to declare, it is mandatory to fill out a customs declaration form.",
+      "checkpoints": ["입국 서류", "[국가]"]
+    },
+    {
+      "id": "3-4-3", "chapter": 3, "chapterName": "En-Route", "section": "3.4.3",
+      "title": "에어카페", "evalLang": ["ko","en"], "quarters_ko_en": ["Q1"],
+      "ko": "손님 여러분, (식사와) 스낵 그리고 굿즈를 구매할 수 있는 에어카페를 시작하겠습니다. 구매를 원하는 분은 승무원에게 말씀해 주세요.\n\n[외부 주류] 기내에서는 에어카페에서 구매한 주류만 섭취가 가능하며, 주류 구매 시 수량이 제한되니 참고해 주세요.",
+      "en": "Dear Passengers, AIR CAFÉ sales are now commencing. If you would like to purchase any AIR CAFÉ items, please contact our cabin crew.\n\n[외부 주류] Please be aware that alcohol purchased from outside is not permitted and we may limit ordering additional alcohol.",
+      "checkpoints": ["에어카페", "승무원 문의"]
+    },
+    {
+      "id": "3-4-4", "chapter": 3, "chapterName": "En-Route", "section": "3.4.4",
+      "title": "기내 면세", "evalLang": ["ko","en"], "quarters_ko_en": ["Q2","Q4"],
+      "ko": "손님 여러분, 기내 면세품 판매를 시작하겠습니다.\n\n면세 예약 주문서를 작성하면 귀국 편에 상품 수령이 가능하니, 구매를 원하는 분은 승무원에게 말씀해 주세요.\n\n신용카드 결제 시 탑승권도 함께 준비해 주시기 바랍니다.",
+      "en": "Dear Passengers, In-flight duty-free sales are now commencing. By filling out the pre-order form now, you can receive the items on your return flight.\n\nFor more information, please refer to the duty-free brochure.",
+      "checkpoints": ["면세품", "탑승권", "신용카드"]
+    },
+    {
+      "id": "3-5-1", "chapter": 3, "chapterName": "En-Route", "section": "3.5.1",
+      "title": "Turbulence Light/Moderate/Severe", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q2"],
+      "ja": "みなさま、\n\n[생략 가능] ただいま、(ひじょうに) きりゅうの ふあんていな ところを つうかしております。/ これよりさき (ひじょうに) きりゅうの ふあんていな ところを つうかする よていです。\n\nシートベルトを しっかりと おしめください。\n\n[필요 시] これよりさきは おてあらいの ごりようなど、ざせきの いどうは しばらく ごえんりょください。また、おこさまづれの おきゃくさまは おこさまの シートベルトも ごかくにんください。なお、おてあらいに いらっしゃる おきゃくさまは ちかくの てすりに おつかまりになり、ごじしんの あんぜんかくほ おねがいいたします。",
+      "ca": "各位旅客，\n\n[생략 가능] 由于飞机遇有不稳定气流，正在（严重）颠簸。/ 由于飞机遇有不稳定气流，将会（严重）颠簸。\n\n请系好安全带。\n\n[필요 시] 请不要离开座位和使用洗手间，也确认您的孩子系好安全带。而且，正在使用卫生间的乘客，请握紧把手，确保安全。",
+      "checkpoints": ["좌석벨트", "기류 불안정", "화장실 제한"]
+    },
+    {
+      "id": "3-7", "chapter": 3, "chapterName": "En-Route", "section": "3.7",
+      "title": "Light Off/금연 안내", "evalLang": ["ko","en","ja"], "quarters_ko_en": ["Q3"], "quarters_ja_ca": ["Q2"],
+      "ko": "손님 여러분, 편안한 휴식을 위해 기내 조명을 어둡게 조절하겠습니다.\n\n조명이 필요한 분은 머리 위 독서등을 사용해 주세요.\n\n아울러, 화장실은 앞쪽과 뒤쪽에 있으니 참고하시기 바랍니다.\n\n[금연 안내] 기내에서는 전자담배를 포함한 흡연이 금지돼 있으며, 흡연 시 항공보안법에 따라 처벌대상이 될 수 있습니다.",
+      "en": "Dear passengers, cabin lights will now be turned off.\n\nPlease use the reading light in the panel above you.\n\nLavatories are located at the front and rear of the aircraft.\n\n[금연 안내] Also, smoking and use of electronic cigarettes are not permitted during the entire flight. You could be fined if you violate aviation security laws.",
+      "ja": "みなさま、きないの しょうめいを くらく ちょうせつさせて いただきます。ライトが ひつような おきゃくさまは うえの ライトボタンを ごりようください。おてあらいは ぜんぽうと こうほうに ございます。\n\nタバコは でんしタバコを ふくめ、きないでは すべて きんえんとなっております。きつえんの さい、こうくうほあんほうにより、しょばつ されることが ありますので。",
+      "checkpoints": ["조명 어둡게", "화장실 위치", "금연"]
+    },
+    {
+      "id": "3-9-1", "chapter": 3, "chapterName": "En-Route", "section": "3.9.1",
+      "title": "CIQ 규정: O/B", "evalLang": ["ko","en"], "quarters_ko_en": ["Q1","Q4"],
+      "ko": "손님 여러분,\n해외 가축 전염병과 식물 병해충의 국내 유입 방지를 위하여, [국가]에서 생산된 축산 식품과 생과일은 한국으로 절대 반입할 수 없습니다. 또한, 축산 시설 방문은 자제해 주시고, 축산관련업 종사자는 한국으로 다시 입국할 경우 소독 등 필요한 조치를 받으시기 바랍니다.\n\n[필리핀] 아울러, 입국 심사 전 e-Travel을 통해 반드시 세관 신고를 완료해야 합니다. 신고하지 않거나 허위 신고 시 당국 규정에 따라 엄격한 처벌을 받을 수 있습니다.",
+      "en": "Dear Passengers,\nIf you are returning to Korea, carrying any livestock products, fresh fruits, or plants is strictly prohibited. Also, we advise you to refrain from visiting livestock facilities during your stay.\n\n[필리핀] In addition, you must complete customs declaration through e-Travel. Non-declaration or false declaration will be subjected to legal punishment under the regulations of the authorities.",
+      "checkpoints": ["축산 식품 반입 금지", "생과일 반입 금지"]
+    },
+    {
+      "id": "3-9-2", "chapter": 3, "chapterName": "En-Route", "section": "3.9.2",
+      "title": "CIQ 규정: 대한민국", "evalLang": ["ko","en"], "quarters_ko_en": ["Q3"],
+      "ko": "대한민국 입국 전 안내 말씀드리겠습니다.\n\n해외 가축 전염병과 식물 병해충 국내유입 방지를 위하여 육류, 햄, 육포와 같은 축산 식품과 생과일은 절대 반입할 수 없습니다.\n\n자진 신고하지 않고 불법 반입할 경우 과태료가 부과되니 유의하시기 바랍니다.\n\n또한, 해외 여행객은 축산시설 방문을 자제해 주시고, 가축전염병 발생 국가에 방문한 축산관련업 종사자는 소독 등 필요한 조치를 받으시기 바랍니다.",
+      "en": "Dear passengers,\n\nTo prevent foreign infectious diseases entering Korea, bringing livestock products or fresh fruits is strictly prohibited.\n\nPlease be aware that failure to voluntarily declare these items may result in a fine.\n\nAlso, as an international traveler, we advise you to refrain from visiting livestock facilities during your stay.",
+      "checkpoints": ["축산 식품 반입 금지", "과태료", "축산시설 방문 자제"]
+    },
+    {
+      "id": "3-10", "chapter": 3, "chapterName": "En-Route", "section": "3.10",
+      "title": "Approach", "evalLang": ["ko","en","ja","ca"], "quarters_ko_en": ["Q2","Q4"], "quarters_ja_ca": ["Q2"],
+      "ko": "손님 여러분, 잠시 후 [공항]에 착륙하겠습니다.\n\n좌석벨트를 매 주시고 등받이와 테이블, 팔걸이는 제자리로 정리해 주시기 바라며, 창문 덮개는 완전히 열어 주시기 바랍니다.\n\n안전을 위해 짐 보관 상태를 다시 한 번 확인해주시고, 지금부터 화장실 사용이 불가함을 알려드립니다.",
+      "en": "Dear passengers, we will be landing soon.\n\nPlease fasten your seatbelt and return your seatback, tray table, arm rest to the original position and keep your window shade open.\n\nAlso please ensure that your carry-on baggage is properly stowed.\n\nFor safety reasons, the lavatories are now closed.",
+      "ja": "みなさま、まもなく ちゃくりくいたします。\n\nシートベルトを おしめください。ざせきの せもたれ、テーブル、ひじかけは もとのいちに おもどしください。まどの ひよけは あけた じょうたいに していただきますよう おねがいいたします。\n\nあんぜんのため、おてにもつが てきせつに しゅうのうされているか ごかくにんください。ただいまより、あんぜんな ちゃくりくのため おてあらいの ごしようを せいげんいたします。",
+      "ca": "各位旅客，我们即将到达[공항]。\n\n请系好安全带，调直椅背，收起小桌板，放下扶手，把遮光板打开。\n\n而且，请再次确认您的随身行李存放状态。为了安全，请不要使用洗手间。",
+      "checkpoints": ["[공항]", "좌석벨트", "등받이·테이블·팔걸이", "창문 덮개 열기", "화장실 사용 불가"]
+    },
+    {
+      "id": "4-1-1", "chapter": 4, "chapterName": "After Landing", "section": "4.1.1",
+      "title": "Farewell: Normal", "evalLang": ["ko","en","ja","ca"], "quarters_ko_en": ["Q2","Q3"], "quarters_ja_ca": ["Q2"],
+      "ko": "손님 여러분,\n\n[목적지]에 오신 것을 환영합니다.\n\n안전을 위해 머리 위 좌석벨트 표시등이 꺼질 때까지 자리에 앉아 잠시만 더 기다려 주세요.\n\n그리고 비행기가 완전히 멈춘 후 선반을 개방할 때에는 안에 있는 물건이 떨어지지 않도록 주의하시기 바랍니다.\n\n고맙습니다.",
+      "en": "Dear passengers, welcome to [목적지]!\n\nFor your safety, please remain seated with your seatbelt fastened until the fasten seatbelt sign is turned off.\n\nAlso, please be careful when opening the overhead bins as items may fall out.\n\nThank you for flying with Jeju Air and we hope to see you again soon.",
+      "ja": "みなさま、[목적지]へ ようこそ！\n\nあんぜんのため シートベルト ちゃくようのサインが きえるまで おざせきにて すわって おまちください。\n\nまた、しゅうのうだなを あけるさいは なかの ものが おちないよう ごちゅういください。\n\nありがとうございました。",
+      "ca": "尊敬的各位旅客，欢迎您来到[목적지]。\n\n为了您的安全，安全带指示灯熄灭之前，请不要离开座位。\n\n而且，安全带指示灯熄灭后，打开行李架时，请注意里面的东西掉落。\n\n祝您旅途愉快，并期待与您再次见面。谢谢。",
+      "checkpoints": ["[목적지] 환영", "좌석벨트 표시등", "선반 개방 주의"]
+    },
+    {
+      "id": "4-5", "chapter": 4, "chapterName": "After Landing", "section": "4.5",
+      "title": "하기 안내", "evalLang": ["ko","en","ja","ca"], "quarters_ko_en": ["Q3"], "quarters_ja_ca": ["Q2"],
+      "ko": "손님 여러분, [지금부터 / 잠시 후] 앞쪽 문으로 내리겠습니다.\n\n[Steps] 터미널까지 [버스로 / 걸어서] 이동할 예정이니 계단에서 미끄러지거나 넘어지지 않도록 조심하세요.\n\n[Baggage] 승객 간 짐이 바뀌거나 분실되는 경우가 있습니다. 또한, 좌석 앞 주머니에 귀중품을 놓고 가는 경우가 있으니 다시 한번 확인해 주세요.\n\n다음에 다시 뵙기를 기대하겠습니다.",
+      "en": "Dear passengers, you [may now / will] deplane through the front door.\n\n[Steps] Please watch your step while going down the stairs.\n\n[Baggage] Please check that you have all your personal belongings with you leaving the aircraft.\n\nWe hope to see you again soon. Thank you.",
+      "ja": "みなさま、[ただいまから / まもなく] おおりいただけます。\n\n[Steps] ターミナルまでは [バス/とほ]での いどうとなりますので、おおりのさいは あしもとに ごちゅういください。\n\n[Baggage] おおりのさいは、おわすれものの ないよう あらためて おたしかめください。\n\nみなさまの またの ごとうじょう こころより おまちしております。ありがとうございました。",
+      "ca": "各位旅客，[现在 / 稍后]可以通过前舱门下机。\n\n[Steps] 下台阶时，请注意脚下安全而小心滑倒。\n\n[Baggage] 请再次确认是否拿错或遗漏了行李。另外，有时把贵重物品放在座位前面的口袋里丢失，请再次确认。\n\n下次再会。谢谢！",
+      "checkpoints": ["앞쪽 문", "분실물 확인", "다음 탑승 기대"]
+    },
+    {
+      "id": "5-1-3-1", "chapter": 5, "chapterName": "On Ground IRRE", "section": "5.1.3.1",
+      "title": "ATC Holding: Push-Back 지연", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q1"],
+      "ja": "みなさま、とうきは しゅっぱつ じゅんびを おえましたが、[▶비정상 상황 예문]により、げんざいの いちで たいきするよう しじを うけました。\n\n[およそ___ふん(ぷん)ごに / まもなく] しゅっぱつする よていですので、ひきつづき おざせきにて すわって おまちください。\n\nみなさまの ごりょうしょうのほど おねがいいたします。",
+      "ca": "各位旅客，我们的飞机已做好起飞准备，由于[▶비정상 상황 예문]，在原地等待。\n\n[将于___分钟后 / 稍后]会出发，请系好安全带继续在座位上等待。\n\n谢谢您的谅解。",
+      "checkpoints": ["출발 준비 완료", "대기 지시", "착석 요청"]
+    },
+    {
+      "id": "5-1-3-2", "chapter": 5, "chapterName": "On Ground IRRE", "section": "5.1.3.2",
+      "title": "ATC Holding: 활주로 (이륙 지연)", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q2"],
+      "ja": "みなさま、とうきは げんざい [▶비정상 상황 예문により / かんせいとうからの] りりく きょかを まっております。\n\nとうきの りりくじゅんばんは___ばんめで、[およそ___ふん(ぷん)ごに / まもなく] りりくする よていです。\n\nみなさまの ごりょうしょうのほど おねがいいたします。",
+      "ca": "各位旅客，由于[▶비정상 상황 예문 / 航空管制的指示]，我们正在等待起飞许可。\n\n目前我们的起飞顺序是第___位，[大约___分钟后 / 稍后]将会起飞。\n\n谢谢您的谅解。",
+      "checkpoints": ["이륙 허가 대기", "이륙 순서"]
+    },
+    {
+      "id": "5-1-5", "chapter": 5, "chapterName": "On Ground IRRE", "section": "5.1.5",
+      "title": "Tarmac Delay", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q2","Q4"],
+      "ja": "みなさま、とうきは ただいま [▶비정상 상황 예문]のため、ゲートで [たいきして / そちを とって] おります。\n\n[국가]の かんれんの きていに したがって ただいまから スナックと おみずを ていきょういたします。\n\n[およそ___ふん(ぷん) ごに しゅっぱつする みこみであり / さぎょうが おわりしだい / じょうきょうが よくなりしだい しゅっぱつさせて いただく よていであり]、くわしいことは きまりしだい ごあんないさせて いただきますので、おざせきにて すわって おまちください。\n\n[ごふべんを おかけいたしまして たいへん もうしわけございません。/ みなさまの ごりょうしょうのほど おねがいいたします。]",
+      "ca": "各位旅客，目前由于[▶비정상 상황 예문]，我们在停机位[等待/采取措施]。\n\n按照[국가]的有关规定，从现在开始提供小吃和矿泉水。\n\n[将于___分钟后 / 稍后出发 / 工作结束后会出发。]\n\n[给您带来不便，我们深表歉意。/ 请大家谅解。]",
+      "checkpoints": ["주기장 대기", "스낵·생수 제공", "[국가] 관련 규정"]
+    },
+    {
+      "id": "5-1-6", "chapter": 5, "chapterName": "On Ground IRRE", "section": "5.1.6",
+      "title": "지연 후 항공기 출발", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q3"],
+      "ja": "みなさま、おまたせいたしました。\n\n[가. かんせいとうからの きょかが おり / 나. きゅうゆを おえ / 다. こうくうきの てんけんを おえ / 라. [출발지/목적지]の てんこうが よくなり / 마. こうくうきの [じょせつ / じょひょう] さぎょうを おえ]\n\nまもなく しゅっぱついたします。\n\nまた、ざせきの せもたれ、テーブル、ひじかけは もとのいちに おもどしください。まどの ひよけは あけた じょうたいに していただきますよう おねがいいたします。",
+      "ca": "各位旅客，谢谢您的耐心等待。我们的飞机[가. 从航空管制获得了起飞许可 / 나. 加油结束 / 다. 飞机测试完毕 / 라. 机场天气好转 / 마. 结束[除雪/除冰]工作]即将出发。\n\n请系好安全带，调直椅背，收起小桌板，放下扶手，把遮光板打开。",
+      "checkpoints": ["대기 감사", "출발 임박", "좌석벨트", "창문 덮개 열기"]
+    },
+    {
+      "id": "5-2-1", "chapter": 5, "chapterName": "On Ground IRRE", "section": "5.2.1",
+      "title": "(자발적) 승객 하기", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q1"],
+      "ja": "ごあんないもうしあげます。\n\n[자발적 하기] ただいま いちぶの おきゃくさまが ひこうきから おおりになったため、こうくうほうにより きないの ほあんけんさを おこなう よていです。\n\n[승객 하기] [▶비정상 상황 예문]のため、[いちぶ / すべて]の おきゃくさまに おおりいただく よていです。\n\n[객실 대기] じょうむいんの あんないが あるまで おざせきにて すわって おまちください。\n[Gate 대기] たいへん おてすうですが、ただいまより すべての にもつを もって おおりになったあと、くうこうの まちあいしつで おまちください。\n\nみなさまの あんぜんのための そちとなりますので、ごりょうしょうのほど おねがいいたします。",
+      "ca": "各位旅客，由于[자발적 하기: 已搭乘的旅客突然决定下机，根据航空安保法需要将对客舱进行安全检查。/ 승객 하기: 由于[▶비정상 상황 예문]将要进行[一些/所有]旅客的下机。]\n\n[객실 대기] 直到乘务员再通知您，请在座位上耐心等待。\n[Gate 대기] 请大家带齐所有行李物品下机，在候机厅等候。\n\n这是为了安全起飞的必要程序，请大家谅解。",
+      "checkpoints": ["하기 안내", "보안 점검", "짐 소지"]
+    },
+    {
+      "id": "5-2-3", "chapter": 5, "chapterName": "On Ground IRRE", "section": "5.2.3",
+      "title": "보안 점검 후 출발", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q1","Q4"],
+      "ja": "みなさま、おまたせいたしました。\n\nいちぶの おきゃくさまが おおりに なった ことにより、こうくうほあんほうに したがって ほあんけんさを じっしいたしました。\n\nあんぜんじょうの もんだいは ないことが かくにんできましたので、きないの じゅんびが おわり しだい、しゅっぱついたします。",
+      "ca": "各位旅客，感谢您的耐心等待。\n\n由于部分旅客的原因，我们依据航空安全法进行了安全检查。\n\n经确认没有任何安全问题，本次航班将在机舱准备完成后立即起飞。",
+      "checkpoints": ["대기 감사", "보안 점검 완료", "이상 없음 확인"]
+    },
+    {
+      "id": "5-3", "chapter": 5, "chapterName": "On Ground IRRE", "section": "5.3",
+      "title": "Door 재 개방", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q2"],
+      "ja": "みなさま、げんざい とうきは\n\n[항공기 점검] こうくうきの てんけんのため、ふたたび ドアを あけました。\n[자발적 하기] いちぶの おきゃくさまに おおりいただくため、ふたたび ドアを あけました。\n[외부 요청] かんけいきかんの ようせいにより、ふたたび ドアを あけました。\n[기타] [▶비정상 상황 예문]により、ふたたび ドアを あけました。\n\n[정확한 시간] しゅっぱつまでは およそ___ふん(ぷん) ほど かかるみこみです。\n[시간 미정] てんけんが おわりしだい しゅっぱつさせて いただく よていです。\n\n[ごふべんを おかけいたしまして たいへん もうしわけございません。/ みなさまの ごりょうしょうのほど おねがいいたします。]",
+      "ca": "各位旅客，现在\n\n[항공기 점검] 为了飞机安全检测，我们再次打开了舱门。\n[자발적 하기] 由于已搭乘的旅客突然决定下机，我们再次打开了舱门。\n[외부 요청] 由于有关部门要求，我们再次打开了舱门。\n[기타] 由于[▶비정상 상황 예문]，我们再次打开了舱门。\n\n请大家在座位上坐好并耐心等待。\n[给您带来不便，我们深表歉意。/ 请大家谅解。]",
+      "checkpoints": ["Door 재개방 이유", "출발 예정"]
+    },
+    {
+      "id": "5-4-2", "chapter": 5, "chapterName": "On Ground IRRE", "section": "5.4.2",
+      "title": "Return to Ramp 이후 Gate 안내", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q3"],
+      "ja": "みなさま、とうきは [▶비정상 상황 예문]により、ただいま もとの ゲートに とうちゃくいたしました。\n\nくわしいことは きまりしだい ごあんないさせて いただきますので、おざせきにて すわって おまちください。\n\n[ごふべんを おかけいたしまして たいへん もうしわけございません。/ みなさまの ごりょうしょうのほど おねがいいたします。]",
+      "ca": "各位旅客，由于[▶비정상 상황 예문]，我们的飞机重新回到了停机位。\n\n详细内容到达停机位后再通知您。\n\n[给您带来不便，我们深表歉意。/ 请大家谅解。]",
+      "checkpoints": ["Gate 도착", "추가 안내 예정", "착석 대기"]
+    },
+    {
+      "id": "5-6-2", "chapter": 5, "chapterName": "On Ground IRRE", "section": "5.6.2",
+      "title": "운항승무원 교체", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q3"],
+      "ja": "ごあんないもうしあげます。\n\nこうくうあんぜんほうによって さだめられた きちょうの きんむじかんを こえたため、かんれんの きていにより きちょうの こうたいが おこなわれる よていです。\n\nじゅんびが おわりしだい しゅっぱつする よていですので おざせきにて すわって おまちください。\n\nみなさまの あんぜんのための そちとなりますので ごりょうしょうのほど おねがいいたします。",
+      "ca": "各位旅客，由于机长已超过航空安全法规定的工作时间，我们需要进行机长的替换。\n\n准备结束后将会出发，这是为了安全起飞的必要措施，请大家谅解。",
+      "checkpoints": ["운항승무원 교체", "근무시간 초과", "출발 예정"]
+    },
+    {
+      "id": "5-8-1", "chapter": 5, "chapterName": "On Ground IRRE", "section": "5.8.1",
+      "title": "이륙중단: 운항승무원에게 연락이 없을 경우", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q4"],
+      "ja": "みなさま、とうきは あんぜんのため りりくを ちゅうだんいたしました。\n\nくわしいことは じょうほうが はいりしだい あらためて ごあんないいたしますので、おざせきにて すわって おまちください。\n\nみなさまの ごりょうしょうのほど おねがいいたします。",
+      "ca": "各位旅客，为了确保安全，我们的飞机决定中断起飞了。\n\n有进一步消息，我们会尽快通知您。\n\n请大家在座位上坐好并耐心等待。谢谢您的谅解。",
+      "checkpoints": ["이륙 중단", "안전", "착석 대기"]
+    },
+    {
+      "id": "6-1", "chapter": 6, "chapterName": "En-Route IRRE", "section": "6.1",
+      "title": "공중 선회 (Holding)", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q1","Q2"],
+      "ja": "みなさま、とうきは げんざい [공항]の\n\n[기상 악화] てんきの きゅうへん により、\n[시정] [のうむ / おおゆき] により しかいが よくないため、\n[활주로] かっそうろに [ほかの ひこうき / しょうがいぶつ]が あるため、\n[관제탑 지시] かんせいとうからの しじにより、\n[기타] [▶비정상 상황 예문] により、\n\n[착륙 정보 미수신] [およそ___ふん(ぷん) かん / しばらく] たいきする よていです。シートベルトを おしめください。くわしいことは じょうほうが はいりしだい あらためて ごあんない いたしますので みなさまの ごりょうしょうのほど おねがいいたします。\n\n[착륙 정보 수신] もくてきち ふきんの じょうくうで いちじ たいきして おります。[やく___ふん(ぷん)ごに / まもなく] ちゃくりく いたしますので、シートベルトを おしめください。",
+      "ca": "各位旅客，由于[공항]\n\n[기상 악화] 上空的天气突然恶化，\n[시정] [云层/浓雾]导致的视野不清，\n[활주로] 跑道上有[其他飞机/障碍物]，\n[관제탑 지시] 航空管制的指示，\n[기타] [▶비정상 상황 예문]，\n\n[착륙 정보 미수신] 我们[要等待将于___分钟/稍后]会着陆。请您系好安全带。具体事项我们会及时告诉您。请您谅解。\n\n[착륙 정보 수신] 我们刚才在目的地附近上空短暂盘旋等待。[预计在约___分钟后/稍后]进行降落，请您系好安全带。",
+      "checkpoints": ["공중 선회 이유", "대기 시간", "좌석벨트"]
+    },
+    {
+      "id": "6-2-2", "chapter": 6, "chapterName": "En-Route IRRE", "section": "6.2.2",
+      "title": "Go-Around(복행): 운항승무원에게 연락이 있을 경우", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q2"],
+      "ja": "みなさま、とうきは ちゃくりくとちゅう、\n\n[기상 악화] てんきの きゅうへん により、\n[시정] [のうむ / おおゆき] により しかいが よくないため、\n[활주로] かっそうろに [ほかの ひこうき / しょうがいぶつ]が あるため、\n[관제탑 지시] かんせいとうからの しじにより、\n[불안정 접근] あんぜんな ちゃくりくが ほしょうできなかったので\n[기타] [▶비정상 상황 예문]により、\n\nあんぜんのため ちゃくりくを ちゅうだんいたしました。\n\nのちほど あらためて ちゃくりくの じゅんびを いたしますので みなさまの ごりょうしょうのほど おねがいいたします。",
+      "ca": "各位旅客，我们的飞机在着陆的过程中，\n\n[기상 악화] 由于上空的天气突然恶化，\n[시정] 由于[云层/浓雾]导致的视野不清，\n[활주로] 由于跑道上有[其他飞机/障碍物]，\n[관제탑 지시] 由于航空管制的指示，\n[불안정 접근] 由于着陆条件不稳定，\n[기타] [▶비정상 상황 예문]，\n\n正在重新上调高度。稍后将会重新准备着陆，请您理解。",
+      "checkpoints": ["복행 이유", "재착륙 준비"]
+    },
+    {
+      "id": "6-3-2", "chapter": 6, "chapterName": "En-Route IRRE", "section": "6.3.2",
+      "title": "회항 취소", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q4"],
+      "ja": "ごあんないもうしあげます。とうきは [▶비정상 상황 예문]により、[공항①]に りんじちゃくりくする よていでしたが、\n\n[기상] [목적지]の てんきが よくなり、\n[환자 승객] かんじゃの じょうたいが よくなり、\n[관제탑] かんせいとうからの しじにより、\n[활주로 재개] かっそうろが さいかいしはじめ、\n\nさいしょの もくてきちの [공항②]の ちゃくりくに へんこうしなおしました。\n\nおよそ___じかん___ふん(ぷん) ごに [공항②]に とうちゃくする みこみでございます。みなさまの ごりょうしょうのほど おねがいいたします。",
+      "ca": "各位旅客，由于[▶비정상 상황 예문]，本次航班原计划在[공항①]着陆。\n\n[기상] 但随着天气好转，\n[환자 승객] 但随病人的情况好转了，\n[관제탑] 但根据塔台指示，\n[활주로 재개] 但随跑道重新开放，\n\n我们将改飞原定目的地[공항②]。\n\n预计大约[시간]分钟后抵达[공항②]。感谢各位旅客的理解与配合。",
+      "checkpoints": ["회항 취소", "원래 목적지 복귀", "도착 예정 시간"]
+    },
+    {
+      "id": "6-8-1", "chapter": 6, "chapterName": "En-Route IRRE", "section": "6.8.1",
+      "title": "반려동물 IRRE 발생 시", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q2","Q4"],
+      "ja": "みなさま、ただいま きないで ペットが [ひどく ほえ / ケージを だっしゅつし]、はやく かいけつできるよう さいぜんを つくしております。\n\n[케이지 탈출 시] なお、きないで ペットを はっけんした ばあいは さわらず おちかくの じょうむいんに おしらせください。\n\nみなさまの ごりょうしょうのほど おねがいいたします。",
+      "ca": "各位旅客，由于客舱内发生宠物[吠叫/逃离宠物包]，我们会尽最大努力解决，请您谅解。\n\n[케이지 탈출 시] 如果您在客舱内发现有宠物，请不要接触，立即与乘务员联系。",
+      "checkpoints": ["반려동물 IRRE", "해결 노력", "접촉 금지"]
+    },
+    {
+      "id": "6-9", "chapter": 6, "chapterName": "En-Route IRRE", "section": "6.9",
+      "title": "배상 동의서 배포", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q3","Q4"],
+      "ja": null,
+      "ca": null,
+      "note": "KO/EN만 PDF에 수록. JA/CA 미수록 확인됨.",
+      "ko": "손님 여러분,\n\n지금부터 배상동의서를 준비해 드리겠습니다.\n\n동의서를 모두 작성하신 분은 승무원에게 제출해 주시기 바랍니다.\n\n배상 관련 자세한 내용은 목적지 공항 도착 후 운송 직원에게 문의해 주시기 바랍니다.\n\n고맙습니다.",
+      "en": "Dear Passengers,\n\nwe will now begin preparing compensation agreement forms.\n\nPlease submit the completed forms to the cabin crew.\n\nFor more information, please contact the ground staff after arriving at the destination airport.\n\nWe appreciate your understanding.",
+      "checkpoints": ["배상 동의서", "승무원 제출", "운송 직원 문의"]
+    },
+    {
+      "id": "7-2", "chapter": 7, "chapterName": "After Landing IRRE", "section": "7.2",
+      "title": "주기장 도착 후 추가 지연", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q1","Q3"],
+      "ja": "みなさま、とうきは ただいま\n\n[출입국] ほうむしょうからの [にゅうこうきょか / ぜいかん てつづき]を まっております。\n[기상 악화] [공항]の てんこうの かいふくを まっております。\n[항공기 점검] こうくうきの あんぜんてんけんちゅうで ございます。\n\nくわしいことは きまりしだい ごあんないさせて いただきますので あんないがあるまで、いましばらく おざせきにて おまちください。\n\n[ごふべんを おかけいたしまして たいへん もうしわけございません。/ みなさまの ごりょうしょうのほど おねがいいたします。]",
+      "ca": "各位旅客，我们的飞机\n\n[출입국] 正在等待有关部门的[入境许可/海关处理]程序。\n[기상 악화] 正在等待[공항]机场天气好转。\n[항공기 점검] 正在进行飞机安全检测。\n\n请大家在座位上耐心等待。\n[给您带来不便，我们深表歉意。/ 请大家谅解。]",
+      "checkpoints": ["주기장 도착", "추가 대기 이유", "착석 대기"]
+    },
+    {
+      "id": "별표3-분실물", "chapter": 0, "chapterName": "별표", "section": "별표3",
+      "title": "분실물 Paging", "evalLang": ["ja","ca"], "quarters_ja_ca": ["Q1","Q3"],
+      "ja": "[기내 밖] [분실물]を おわすれになった かたが いらっしゃいましたら、じょうむいんに おしらせください。\n\n[객실] きないで [분실물]を はっけんされた かたが いらっしゃいましたら、じょうむいんに おしらせください。",
+      "ca": "[기내 밖] 遗失了[분실물]的旅客，请通知乘务员。\n\n[객실] 有位旅客在客舱内遗失了[분실물]。如果有发现的旅客，请通知乘务员。",
+      "checkpoints": ["[분실물]", "승무원 통보"]
+    }
+  ]
+}
