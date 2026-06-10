@@ -1388,6 +1388,14 @@ html, body {
 }
 #screen-prep { position: relative; }
 
+/* ===== BILINGUAL (JA 독음 + 원문) ===== */
+.bilingual-pair { margin-bottom: 6px; }
+.bilingual-reading  { font-size: 12px; color: #94a3b8; line-height: 1.5; letter-spacing: 0.02em; }
+.bilingual-original { font-size: 15px; color: #1e293b; line-height: 1.75; }
+.bilingual-header   { display: inline-block; font-size: 12px; font-weight: 700; color: #475569;
+                      background: #f1f5f9; border-radius: 5px; padding: 2px 8px; margin: 8px 0 4px; }
+.bilingual-sep      { height: 10px; }
+
 /* ===== AI RESULT SECTION ===== */
 .ai-result-section { margin-top: 28px; }
 

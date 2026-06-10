@@ -305,6 +305,53 @@ function renderScriptText(text) {
   return `<div class="script-text-rendered">${html}</div>`;
 }
 
+// 일본어 독음(한글) + 원문(히라가나) 쌍 렌더링
+function renderBilingualScript(text, langCode) {
+  if (langCode !== 'ja') return renderScriptText(text);
+
+  const hasJapanese = s => /[぀-ヿ一-鿿]/.test(s);
+  const isSectionHeader = s => /^\[[^\]]+\]$/.test(s.trim()) && !hasJapanese(s);
+  const hv = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
+
+  const lines = text.split('\n');
+  let html = '';
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i].trim();
+
+    if (!line) {
+      html += '<div class="bilingual-sep"></div>';
+      i++;
+      continue;
+    }
+
+    if (isSectionHeader(line)) {
+      html += `<div class="bilingual-header">${hv(line)}</div>`;
+      i++;
+      continue;
+    }
+
+    // 현재 줄이 한글 독음이고 다음 줄이 일본어 원문이면 쌍으로 렌더
+    const nextLine = lines[i + 1]?.trim() || '';
+    if (!hasJapanese(line) && nextLine && hasJapanese(nextLine)) {
+      html += `<div class="bilingual-pair">
+        <div class="bilingual-reading">${hv(line)}</div>
+        <div class="bilingual-original">${hv(nextLine)}</div>
+      </div>`;
+      i += 2;
+    } else if (hasJapanese(line)) {
+      html += `<div class="bilingual-pair"><div class="bilingual-original">${hv(line)}</div></div>`;
+      i++;
+    } else {
+      html += `<div class="bilingual-pair"><div class="bilingual-reading">${hv(line)}</div></div>`;
+      i++;
+    }
+  }
+
+  return `<div class="script-text-rendered">${html}</div>`;
+}
+
 // ===== CUSTOM SCRIPTS (localStorage) =====
 function loadCustomScripts() {
   try { return JSON.parse(localStorage.getItem('cabinvoice_custom_scripts') || '[]'); }
@@ -532,10 +579,7 @@ function _renderDetailContent(s, lang) {
   const langData = s.langs[lang];
   if (!langData) return;
 
-  // 변수 하이라이트 ([목적지] 등)
-  const highlightedText = (langData.text||'').replace(/\[([^\]]+)\]/g,
-    '<span class="script-var">[$1]</span>');
-  $('detail-script-box').innerHTML = `<div class="script-text-rendered">${highlightedText.replace(/\n/g,'<br>')}</div>`;
+  $('detail-script-box').innerHTML = renderBilingualScript(langData.text || '', lang);
 
   // 체크포인트
   const cpEl = $('detail-checkpoints');
@@ -622,7 +666,7 @@ function updatePrepContent() {
   const lang = s.langs[state.selectedLang];
 
   if ($('prep-title-bar')) $('prep-title-bar').textContent = s.title;
-  $('prep-text').innerHTML = renderScriptText(lang.text);
+  $('prep-text').innerHTML = renderBilingualScript(lang.text, state.selectedLang);
   // 모델 음성 바
   const hasVoice = !!loadModelVoice(s.id);
   $('model-voice-bar').classList.toggle('hidden', !hasVoice);
@@ -672,7 +716,7 @@ async function startRecording() {
   $('record-title').textContent = `${state.currentScript.title} · ${{ ko:'한국어', en:'English', ja:'日本語', ca:'中文' }[state.selectedLang]}`;
   $('record-timer').textContent = '00:00';
   $('live-text').textContent = '말씀해 주세요...';
-  $('script-peek-text').innerHTML = renderScriptText(lang.text);
+  $('script-peek-text').innerHTML = renderBilingualScript(lang.text, state.selectedLang);
   $('script-peek-text').classList.add('hidden');
   showScreen('screen-record');
 
@@ -1261,10 +1305,17 @@ function renderFeedback(result, transcript, lang) {
 }
 
 function renderTranscriptCompare(transcript, lang) {
-  const preview = lang.text.split('\n').slice(0,3).join(' ') + (lang.text.split('\n').length > 3 ? '…' : '');
+  let preview;
+  if (state.selectedLang === 'ja') {
+    // 일본어: 원문(히라가나) 줄만 추출해 미리보기
+    const origLines = lang.text.split('\n').filter(l => /[぀-ヿ一-鿿]/.test(l));
+    preview = origLines.slice(0, 2).join(' ') + (origLines.length > 2 ? '…' : '');
+  } else {
+    preview = lang.text.split('\n').slice(0, 3).join(' ') + (lang.text.split('\n').length > 3 ? '…' : '');
+  }
   $('transcript-compare').innerHTML = `
-    <div class="tc-row"><div class="tc-label">방송 원문</div><div class="tc-text">${preview}</div></div>
-    <div class="tc-row"><div class="tc-label">인식 결과</div><div class="tc-text recognized">${transcript || '(인식 없음 — Chrome + 마이크 허용 필요)'}</div></div>`;
+    <div class="tc-row"><div class="tc-label">방송 원문</div><div class="tc-text">${escHtml(preview)}</div></div>
+    <div class="tc-row"><div class="tc-label">인식 결과</div><div class="tc-text recognized">${transcript ? escHtml(transcript) : '(인식 없음 — Chrome + 마이크 허용 필요)'}</div></div>`;
 }
 
 // ===== TEXT HELPERS =====
