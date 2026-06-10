@@ -383,12 +383,14 @@ function _mapAnnouncementsToScripts(announcements) {
     _chapter: a.chapterName || `${a.chapter}장`,
     _section: a.section || a.id,
     _chapterNum: a.chapter || 0,
+    _evalLang: a.evalLang || ['ko'],
     langs: {
       ...(a.ko ? { ko: buildCustomLang(a.ko, (a.checkpoints||[]).join(','), 'ko') } : {}),
       ...(a.en ? { en: buildCustomLang(a.en, '', 'en') } : {}),
       ...(a.ja ? { ja: buildCustomLang(a.ja, '', 'ja') } : {}),
+      ...(a.ca ? { ca: buildCustomLang(a.ca, '', 'ca') } : {}),
     }
-  })).filter(s => s.langs.ko || s.langs.en);
+  })).filter(s => s.langs.ko || s.langs.en || s.langs.ja || s.langs.ca);
 }
 
 function renderSidebar(scripts) {
@@ -469,7 +471,8 @@ function renderSidebar(scripts) {
 }
 
 function _sidebarItemHtml(s) {
-  const langDots = ['ko','en','ja','ca'].filter(l => s.langs?.[l]?.text)
+  const evalLangs = s._evalLang || ['ko','en','ja','ca'];
+  const langDots = evalLangs.filter(l => s.langs?.[l]?.text)
     .map(l => `<span class="lang-dot lang-dot-${l}"></span>`).join('');
   return `<div class="sidebar-item${_selectedScriptId===s.id?' selected':''}" data-id="${s.id}">
     <span class="sidebar-item-section">${s._section||''}</span>
@@ -514,12 +517,14 @@ function selectScript(id) {
 }
 
 function _renderDetailLangTabs(s) {
+  const evalLangs = s._evalLang || ['ko','en','ja','ca'];
   const tabs = $('detail-lang-tabs');
   tabs.querySelectorAll('.detail-lang-tab').forEach(tab => {
-    const hasLang = s.langs[tab.dataset.lang]?.text;
-    tab.style.opacity = hasLang ? '' : '0.35';
-    tab.style.pointerEvents = hasLang ? '' : 'none';
-    tab.classList.toggle('active', tab.dataset.lang === _detailLang);
+    const lang = tab.dataset.lang;
+    const inEval = evalLangs.includes(lang);
+    const hasLang = s.langs[lang]?.text;
+    tab.style.display = (inEval && hasLang) ? '' : 'none';
+    tab.classList.toggle('active', lang === _detailLang);
   });
 }
 
@@ -597,16 +602,18 @@ function startPrep(script, lang) {
 
 function updatePrepContent() {
   const s = state.currentScript;
+  const evalLangs = s._evalLang || ['ko','en','ja','ca'];
 
-  // 언어 탭: 해당 언어 데이터가 없으면 탭 비활성화
+  // 언어 탭: evalLang에 포함되고 데이터 있는 탭만 표시
   $('lang-tabs').querySelectorAll('.lang-tab').forEach(tab => {
-    const hasLang = s.langs[tab.dataset.lang] && s.langs[tab.dataset.lang].text;
-    tab.style.opacity = hasLang ? '' : '0.35';
-    tab.style.pointerEvents = hasLang ? '' : 'none';
+    const lang = tab.dataset.lang;
+    const inEval = evalLangs.includes(lang);
+    const hasLang = s.langs[lang]?.text;
+    tab.style.display = (inEval && hasLang) ? '' : 'none';
   });
-  // 선택된 언어가 없으면 첫 번째 available 언어로 fallback
-  if (!s.langs[state.selectedLang] || !s.langs[state.selectedLang].text) {
-    state.selectedLang = Object.keys(s.langs).find(l => s.langs[l].text) || 'ko';
+  // 선택된 언어가 evalLang에 없거나 데이터 없으면 fallback
+  if (!evalLangs.includes(state.selectedLang) || !s.langs[state.selectedLang]?.text) {
+    state.selectedLang = evalLangs.find(l => s.langs[l]?.text) || 'ko';
     $('lang-tabs').querySelectorAll('.lang-tab').forEach(t => {
       t.classList.toggle('active', t.dataset.lang === state.selectedLang);
     });
@@ -1072,7 +1079,7 @@ function showResults(result, transcript) {
 
   // AI 채점 (Firebase 초기화된 경우 자동 실행)
   if (firebase.apps.length && transcript && transcript.length > 10) {
-    callGeminiScoring(lang.text, transcript, state.selectedLang).then(aiResult => {
+    callGeminiScoring(lang.text, transcript, state.selectedLang, lang.checkpoints).then(aiResult => {
       if (aiResult) renderAiResult(aiResult);
     }).catch(() => {});
   }
@@ -1674,33 +1681,38 @@ function importSelectedPdfScripts() {
 }
 
 // ===== GEMINI AI SCORING =====
-async function callGeminiScoring(script, transcript, langCode) {
+async function callGeminiScoring(script, transcript, langCode, checkpoints) {
   const model = await getGeminiModel();
   const langName = { ko:'한국어', en:'영어', ja:'일본어', ca:'중국어' }[langCode] || '한국어';
+  const cpText = checkpoints?.length
+    ? `\n핵심 체크포인트 (completeness 평가 시 누락 여부 확인):\n${checkpoints.map(c=>`- ${c}`).join('\n')}\n`
+    : '';
   const prompt = `당신은 항공사 기내방송 전문 평가관입니다.
 원문(script)과 훈련생 발화(transcript)를 비교하여 아래 JSON 형식으로만 반환하세요 (설명 없이).
 
 {
   "totalScore": 0-100,
   "categories": {
-    "completeness": { "score": 0-100, "feedback": "...", "missed": [] },
+    "completeness": { "score": 0-100, "feedback": "...", "missed": ["누락된 핵심표현"] },
     "honorifics":   { "score": 0-100, "feedback": "..." },
     "fluency":      { "score": 0-100, "feedback": "..." },
     "clarity":      { "score": 0-100, "feedback": "..." }
   },
   "diffWords": [
-    { "word": "단어", "status": "correct" }
+    { "word": "단어", "status": "correct|missed|added" }
   ],
-  "improvementExample": "이렇게 말씀해 보세요...",
-  "encouragement": "응원 메시지"
+  "improvementExample": "전체 방송문 중 개선이 필요한 부분만 올바르게 수정한 예시",
+  "encouragement": "훈련생을 격려하는 따뜻한 한 문장"
 }
 
 평가 기준:
-- 안전 관련 단어 누락은 completeness에서 크게 감점
-- '손님 여러분'/'Ladies and gentlemen' 등 호칭 누락 시 honorifics 감점
+- completeness(완성도): 원문 핵심 내용 포함 여부. 안전 관련 단어 누락 시 크게 감점. 체크포인트 항목 누락 시 missed 배열에 기록
+- honorifics(호칭·경어): '손님 여러분'/'Ladies and gentlemen' 등 적절한 호칭과 경어체 사용
+- fluency(유창성): 자연스러운 발화 흐름, 적절한 속도와 리듬
+- clarity(명확성): 발음의 명확성, 핵심 정보 전달력
 - [목적지] [편명] 같은 변수 자리는 어떤 단어든 정답 처리
 - 언어: ${langName}
-
+${cpText}
 원문:
 ${script}
 
@@ -1719,26 +1731,67 @@ function renderAiResult(ai) {
   if (!sec) return;
   sec.classList.remove('hidden');
 
-  // diff words
-  if (ai.diffWords?.length) {
-    $('diff-words-box').innerHTML = `<div class="diff-words-label">📝 단어 분석</div>
+  const catMeta = {
+    completeness: { name:'완성도', icon:'✅', color:'#22c55e' },
+    honorifics:   { name:'호칭·경어', icon:'🙏', color:'#f59e0b' },
+    fluency:      { name:'유창성', icon:'🗣', color:'#3b82f6' },
+    clarity:      { name:'명확성', icon:'🔊', color:'#8b5cf6' }
+  };
+
+  const score = ai.totalScore ?? 0;
+  const scoreColor = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444';
+  const scoreGrade = score >= 90 ? '최우수' : score >= 80 ? '우수' : score >= 70 ? '보통' : '노력 필요';
+
+  const catsHtml = Object.entries(ai.categories || {}).map(([key, cat]) => {
+    const m = catMeta[key] || { name: key, icon: '•', color: '#64748b' };
+    const missedHtml = cat.missed?.length
+      ? `<div class="ai-cat-missed">누락: ${cat.missed.map(v => escHtml(v)).join(', ')}</div>` : '';
+    return `<div class="ai-cat-bar-row">
+      <div class="ai-cat-bar-header">
+        <span class="ai-cat-icon">${m.icon}</span>
+        <span class="ai-cat-name">${m.name}</span>
+        <span class="ai-cat-score" style="color:${m.color}">${cat.score}점</span>
+      </div>
+      <div class="ai-cat-bar-track">
+        <div class="ai-cat-bar-fill" style="width:${cat.score}%;background:${m.color}"></div>
+      </div>
+      <div class="ai-cat-feedback">${escHtml(cat.feedback || '')}</div>
+      ${missedHtml}
+    </div>`;
+  }).join('');
+
+  const diffHtml = ai.diffWords?.length ? `
+    <div class="diff-words-box">
+      <div class="diff-words-label">📝 단어 분석</div>
       <div class="diff-words">${ai.diffWords.map(w => {
         const cls = w.status==='correct'?'dw-correct':w.status==='missed'?'dw-missed':'dw-added';
         return `<span class="diff-word ${cls}">${escHtml(w.word)}</span>`;
-      }).join(' ')}</div>`;
-  }
+      }).join(' ')}</div>
+    </div>` : '';
 
-  // improvement
-  if (ai.improvementExample) {
-    $('improvement-box').classList.remove('hidden');
-    $('improvement-text').textContent = ai.improvementExample;
-  }
+  const improveHtml = ai.improvementExample ? `
+    <div class="improvement-box">
+      <div class="improvement-label">💬 이렇게 말씀해 보세요</div>
+      <div class="improvement-text">${escHtml(ai.improvementExample)}</div>
+    </div>` : '';
 
-  // encouragement
-  if (ai.encouragement) {
-    $('encouragement-box').classList.remove('hidden');
-    $('encouragement-text').textContent = ai.encouragement;
-  }
+  const encourageHtml = ai.encouragement ? `
+    <div class="encouragement-box">
+      <div class="encouragement-text">${escHtml(ai.encouragement)}</div>
+    </div>` : '';
+
+  sec.innerHTML = `
+    <div class="section-heading">🤖 AI 상세 분석</div>
+    <div class="ai-score-header">
+      <div class="ai-score-value" style="color:${scoreColor}">${score}</div>
+      <div class="ai-score-label">AI 평가 점수</div>
+      <div class="ai-score-grade" style="color:${scoreColor}">${scoreGrade}</div>
+    </div>
+    <div class="ai-categories-box">${catsHtml}</div>
+    ${diffHtml}
+    ${improveHtml}
+    ${encourageHtml}
+  `;
 }
 
 // ===== ADMIN =====

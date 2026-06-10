@@ -1402,6 +1402,23 @@ html, body {
 .improvement-text { font-size: 14px; color: #1e40af; line-height: 1.7; }
 .encouragement-box { background: linear-gradient(135deg,#ecfdf5,#f0fdf4); border: 1.5px solid #a7f3d0; border-radius: 12px; padding: 16px 18px; text-align: center; }
 .encouragement-text { font-size: 15px; font-weight: 600; color: #065f46; }
+/* AI score header */
+.ai-score-header { display: flex; flex-direction: column; align-items: center; background: #fff; border: 1.5px solid var(--gray-200); border-radius: 14px; padding: 22px 18px 18px; margin-bottom: 14px; }
+.ai-score-value { font-size: 54px; font-weight: 800; line-height: 1; letter-spacing: -2px; }
+.ai-score-label { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+.ai-score-grade { font-size: 14px; font-weight: 700; margin-top: 6px; }
+/* AI category bars */
+.ai-categories-box { background: #fff; border: 1.5px solid var(--gray-200); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
+.ai-cat-bar-row { margin-bottom: 16px; }
+.ai-cat-bar-row:last-child { margin-bottom: 0; }
+.ai-cat-bar-header { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.ai-cat-icon { font-size: 14px; }
+.ai-cat-name { font-size: 13px; font-weight: 700; color: var(--gray-700); flex: 1; }
+.ai-cat-score { font-size: 14px; font-weight: 800; }
+.ai-cat-bar-track { height: 7px; background: var(--gray-100); border-radius: 99px; margin-bottom: 6px; overflow: hidden; }
+.ai-cat-bar-fill { height: 100%; border-radius: 99px; transition: width .6s ease; }
+.ai-cat-feedback { font-size: 12px; color: var(--gray-500); line-height: 1.5; }
+.ai-cat-missed { font-size: 12px; color: #ef4444; margin-top: 3px; }
 
 .result-bottom-actions {
   display: flex; justify-content: center; gap: 12px; margin-top: 32px; flex-wrap: wrap;
