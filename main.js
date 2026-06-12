@@ -305,9 +305,9 @@ function renderScriptText(text) {
   return `<div class="script-text-rendered">${html}</div>`;
 }
 
-// 일본어 독음(한글) + 원문(히라가나) 쌍 렌더링
+// ja·ca 독음(한글) + 원문 쌍 렌더링
 function renderBilingualScript(text, langCode) {
-  if (langCode !== 'ja') return renderScriptText(text);
+  if (langCode !== 'ja' && langCode !== 'ca') return renderScriptText(text);
 
   const hasJapanese = s => /[぀-ヿ一-鿿]/.test(s);
   const isSectionHeader = s => /^\[[^\]]+\]$/.test(s.trim()) && !hasJapanese(s);
@@ -1069,8 +1069,10 @@ function measureAmpPeaks(samples) {
 function showResults(result, transcript) {
   showScreen('screen-result');
   const lang = state.currentScript.langs[state.selectedLang];
+  const isAdmin = isEditUnlocked();
 
   $('total-score-value').textContent = result.total;
+  $('total-score-value').classList.toggle('hidden', !isAdmin);
   const gradeEl = $('total-grade');
   gradeEl.textContent = result.pass ? 'PASS ✓' : 'FAIL ✗';
   gradeEl.className   = `total-grade ${result.pass ? 'grade-A' : 'grade-D'}`;
@@ -1081,22 +1083,28 @@ function showResults(result, transcript) {
   barsEl.innerHTML = Object.entries(CHECKLIST).map(([key, cat]) => {
     const cr = result.categories[key];
     const pct = Math.round(cr.score / cat.max * 100);
+    const catLevel = pct >= 87 ? '우수' : pct >= 60 ? '보통' : '노력필요';
+    const catLevelCls = pct >= 87 ? 'tier-good' : pct >= 60 ? 'tier-mid' : 'tier-low';
     const itemsHTML = cat.items.map((item, i) => {
       const got = cr.items[i];
-      const tier = got >= item.max ? '우수' : got >= (item.max === 10 ? 6 : 3) ? '보통' : '부족';
+      const tier = got >= item.max ? '우수' : got >= (item.max === 10 ? 6 : 3) ? '보통' : '노력필요';
       const tc   = got >= item.max ? 'tier-good' : got >= (item.max === 10 ? 6 : 3) ? 'tier-mid' : 'tier-low';
       return `<div class="sub-item">
         <div class="sub-item-name">${item.label}</div>
         <div class="sub-item-right">
           <span class="sub-tier ${tc}">${tier}</span>
-          <span class="sub-score">${got}<span class="sub-max">/${item.max}</span></span>
+          ${isAdmin ? `<span class="sub-score">${got}<span class="sub-max">/${item.max}</span></span>` : ''}
         </div>
       </div>`;
     }).join('');
     return `<div class="score-cat-block">
       <div class="score-bar-header">
         <div class="score-bar-name">${cat.icon} ${cat.label}</div>
-        <div class="score-bar-val" style="color:${cat.color}">${cr.score}<span style="font-size:12px;color:#94a3b8">/${cat.max}</span></div>
+        <div class="score-bar-val" style="${isAdmin ? `color:${cat.color}` : ''}">
+          ${isAdmin
+            ? `${cr.score}<span style="font-size:12px;color:#94a3b8">/${cat.max}</span>`
+            : `<span class="sub-tier ${catLevelCls}">${catLevel}</span>`}
+        </div>
       </div>
       <div class="score-bar-track">
         <div class="score-bar-fill" style="width:0%;background:${cat.color}" data-target="${pct}"></div>
@@ -1109,7 +1117,7 @@ function showResults(result, transcript) {
     barsEl.querySelectorAll('.score-bar-fill').forEach(el => { el.style.width = el.dataset.target + '%'; });
   });
 
-  renderFeedback(result, transcript, lang);
+  renderFeedback(result, transcript, lang, isAdmin);
   renderTranscriptCompare(transcript, lang);
 
   // AI 채점 섹션 초기화
@@ -1122,7 +1130,7 @@ function showResults(result, transcript) {
   // AI 채점 (Firebase 초기화된 경우 자동 실행)
   if (firebase.apps.length && transcript && transcript.length > 10) {
     callGeminiScoring(lang.text, transcript, state.selectedLang, lang.checkpoints).then(aiResult => {
-      if (aiResult) renderAiResult(aiResult);
+      if (aiResult) renderAiResult(aiResult, isAdmin);
     }).catch(() => {});
   }
 }
@@ -1171,7 +1179,7 @@ function renderRadar(result) {
   });
 }
 
-function renderFeedback(result, transcript, lang) {
+function renderFeedback(result, transcript, lang, isAdmin) {
   const cats = result.categories;
 
   /* ── 카테고리별 개선 팁 정의 ──
@@ -1236,7 +1244,7 @@ function renderFeedback(result, transcript, lang) {
   const overviewHTML = `
   <div class="fb-overview ${overviewCls}">
     <div class="fb-ov-left">
-      <div class="fb-ov-score">${result.total}</div>
+      ${isAdmin ? `<div class="fb-ov-score">${result.total}</div>` : ''}
       <div class="fb-ov-badge">${overviewIcon} ${overviewLabel}</div>
     </div>
     <div class="fb-ov-right">
@@ -1256,7 +1264,7 @@ function renderFeedback(result, transcript, lang) {
     const cr   = cats[key];
     const pct  = Math.round(cr.score / cat.max * 100);
     const grade = pct >= 87 ? 'good' : pct >= 60 ? 'mid' : 'low';
-    const gradeLabel = pct >= 87 ? '우수' : pct >= 60 ? '보통' : '부족';
+    const gradeLabel = pct >= 87 ? '우수' : pct >= 60 ? '보통' : '노력필요';
     const tips = CAT_TIPS[key];
 
     const subRows = cat.items.map((item, i) => {
@@ -1267,7 +1275,7 @@ function renderFeedback(result, transcript, lang) {
       const rowCls = iGood ? 'sr-good' : iMid ? 'sr-mid' : 'sr-low';
       const tagCls = iGood ? 'tag-good' : iMid ? 'tag-mid' : 'tag-low';
       const icon   = iGood ? '✓' : iMid ? '△' : '✕';
-      const label  = iGood ? '우수' : iMid ? '보통' : '부족';
+      const label  = iGood ? '우수' : iMid ? '보통' : '노력필요';
       const tip    = tips[i]?.(got);
 
       return `
@@ -1275,7 +1283,7 @@ function renderFeedback(result, transcript, lang) {
         <div class="fb-sub-main">
           <span class="fb-sub-icon">${icon}</span>
           <span class="fb-sub-name">${item.label}</span>
-          <span class="fb-sub-score">${got}<span class="fb-sub-max">/${item.max}</span></span>
+          ${isAdmin ? `<span class="fb-sub-score">${got}<span class="fb-sub-max">/${item.max}</span></span>` : ''}
           <span class="fb-sub-tag ${tagCls}">${label}</span>
         </div>
         ${tip ? `<div class="fb-tip ${iMid ? 'tip-mid' : 'tip-low'}"><span class="fb-tip-arrow">↳</span>${tip}</div>` : ''}
@@ -1293,7 +1301,7 @@ function renderFeedback(result, transcript, lang) {
           <div class="fb-gh-bar-wrap">
             <div class="fb-gh-bar" style="width:${pct}%;background:${cat.color}"></div>
           </div>
-          <span class="fb-gh-score">${cr.score}<span class="fb-gh-max">/${cat.max}</span></span>
+          ${isAdmin ? `<span class="fb-gh-score">${cr.score}<span class="fb-gh-max">/${cat.max}</span></span>` : ''}
           <span class="fb-gh-badge badge-${grade}">${gradeLabel}</span>
         </div>
       </div>
@@ -1306,8 +1314,8 @@ function renderFeedback(result, transcript, lang) {
 
 function renderTranscriptCompare(transcript, lang) {
   let preview;
-  if (state.selectedLang === 'ja') {
-    // 일본어: 원문(히라가나) 줄만 추출해 미리보기
+  if (state.selectedLang === 'ja' || state.selectedLang === 'ca') {
+    // ja/ca: 원문(히라가나/한자) 줄만 추출해 미리보기
     const origLines = lang.text.split('\n').filter(l => /[぀-ヿ一-鿿]/.test(l));
     preview = origLines.slice(0, 2).join(' ') + (origLines.length > 2 ? '…' : '');
   } else {
@@ -1741,58 +1749,66 @@ async function callGeminiScoring(script, transcript, langCode, checkpoints) {
   const isJaCa = langCode === 'ja' || langCode === 'ca';
   const maxFluency = isJaCa ? 25 : 30;
   const maxPron    = isJaCa ? 25 : 20;
-  const totalDesc  = isJaCa
-    ? '유창성(25)+분위기/목소리(25)+억양(25)+발음(25)=100점'
-    : '유창성(30)+분위기/목소리(25)+억양(25)+발음(20)=100점';
   const gradeRule = isKoEn
     ? 'score 90이상→grade"A", 75이상→"B", 60이상→"C", 59이하→"미취득"'
     : 'score 85이상→grade"PASS", 84이하→"FAIL"';
 
   const criteriaMap = {
-    ko: `[한국어 채점 기준 (100점)]
-유창성(30): 끊어읽기(5)·속도80-120WPM(5)·핵심단어강조(5)·문안숙지(5)·말하는듯한연출(10)
-분위기/목소리(25): 발성안정충분한음량(10)·따뜻하고신뢰감있는톤(10)·친근함(5)
-억양(25): 조사어미자연스러운처리(10)·전반적억양(10)·고른억양단조롭지않게(5)
-발음(20): 정확성(10)—비ː행기장음/안전(안젼X)/좌석(좌썩X)/있습니다끝자음명확 | 명확성(10)—끝자음탈락없이또렷/모음정확구분`,
-    en: `[English Scoring Criteria (100 points)]
-Fluency(30): chunk reading(5)·speed100-130WPM(5)·content-word stress(5)·script mastery(5)·natural spoken feel(10)
-Atmosphere/Voice(25): projection & volume(10)·warm professional tone(10)·Dear Passengers warmth(5)
-Intonation(25): stress pattern & rhythm(10)·sentence flow(10)·falling/rising final tone(5)
-Pronunciation(20): accuracy(10)—seatbelt(seat·belt✓싯벨트✗) fasten(FAS·n✓패스튼✗) oxygen(OK·si·jn✓악시전✗) emergency(i·MUR·jn·see✓) | clarity(10)—no consonant drops, natural 'and' liaison, accurate th`,
-    ja: `[일본어 채점 기준 (100점)]
-유창성(25): 끊어읽기(5)·문안숙지(5)·속도(5)·자연스러운연출(10)
-분위기/목소리(25): 품격있고따뜻한톤(8)·발성(7)·친절함(5)·과장없이자연스럽게(5)
-억양(25): 평판형두고형일본어고유억양(10)·고른억양(5)·장음정확처리(5)·ます·ください어미(5)
-발음(25): 장음정확(7)·ざずぜぞ/じゃじゅじょ고유발음(6)·ん뒤음변화&촉음っ정지(6)·あいうえお5모음정확-です→デス✓デウス✗(6)`,
-    ca: `[중국어 채점 기준 (100점)]
-유창성(25): 끊어읽기(5)·문안숙지(5)·속도(5)·자연스러운연출(10)
-분위기/목소리(25): 톤(8)·발성(7)·친절함(5)·과장없이(5)
-억양(25): 4성+경성—1성高平·2성上扬·3성曲折·4성下降(10)·고른억양(5)·중국어특유리듬감(5)·어미처리(5)
-발음(25): 성조정확(10)·zh·ch·sh·r권설음-zh혀말아z와구별(6)·ü·ian·uan운모(6)·p·t·k·q·x·ch기식유무(3)`
+    ko: `[한국어 채점 - 100점]
+유창성 30점: 끊어읽기(5) · 속도 연출(5, 적정 80~120 WPM) · 강조 표현(5) · 문안 숙지(5) · 말하는 듯한 연출(10)
+분위기·목소리 25점: 발성(10) · 톤(10) · 친근함(5)
+억양 25점: 조사·어미 처리(10) · 전반적 억양(10) · 고른 억양(5)
+발음 20점 (정밀):
+  정확성(10): 비ː행기 장음 / 끝 자음 탈락 없이 / 있습니다(있씁니다 O) / 모음 정확히
+  명확성(10): 핵심 단어 또렷하게 / 어물거림 없이`,
+    en: `[영어 채점 - 100점]
+유창성 30점: 끊어읽기(5) · 속도(5, 적정 100~130 WPM) · 강조(5) · 문안 숙지(5) · 말하는 듯한 연출(10)
+분위기·목소리 25점: 발성(10) · 톤(10) · 친근함(5)
+억양 25점: 강세 패턴(10) · 전반적 억양(10) · 문장 끝 처리(5)
+발음 20점 (정밀):
+  정확성(10): fasten→파슨O/패스튼X | oxygen→옥시전O/악시전X | seatbelt→시트벨트O | emergency→이머전씨O | passengers→패신저스O | lavatory→래버토리O
+  명확성(10): th 발음 / 자음 연음 / 끝 자음 처리`,
+    ja: `[일본어 채점 - 100점]
+유창성 25점: 끊어읽기(5) · 문안 숙지(5) · 속도(5) · 자연스러운 연출(10)
+분위기·목소리 25점: 톤(8) · 발성(7) · 친절함(5) · 과장 지양(5)
+억양 25점: 일본어 특성 억양(10) · 고른 억양(5) · 장음 처리(5) · 어미 처리(5)
+발음 25점 (정밀):
+  장음 정확히(7): コース·ございます 등 장음 정확히
+  고유 발음(6): ざ·ず·ぜ·ぞ / じゃ·じゅ·じょ 정확히
+  ん·촉음(6): ん→뒤 음에 따라 변화 / 촉음(っ)→자음 앞 짧은 정지
+  모음 정확성(6): 5모음 정확히 / 으 개입 방지 (です→데스O/데으스X)`,
+    ca: `[중국어 채점 - 100점]
+유창성 25점: 끊어읽기(5) · 문안 숙지(5) · 속도(5) · 자연스러운 연출(10)
+분위기·목소리 25점: 톤(8) · 발성(7) · 친절함(5) · 과장 지양(5)
+억양 25점: 성조 정확성(10, 1성高平·2성上扬·3성曲折·4성下降) · 고른 억양(5) · 문장 리듬(5) · 어미 처리(5)
+발음 25점 (정밀):
+  성조 정확성(10)
+  권설음(6): zh·ch·sh·r 정확히 (z와 구별)
+  운모 정확성(6): ü·ian·uan 등 정확히
+  기식음(3): p·t·k·q·x·ch 기식 유무`
   };
   const criteria = criteriaMap[langCode] || criteriaMap.ko;
 
   const prompt = `당신은 항공사 기내방송 전문 평가관입니다.
-언어: ${langName} | 배점: ${totalDesc}
-${gradeRule}
+실제 평가표 기준으로 정확하게 채점하되 훈련 중인 승무원을 격려하는 피드백을 제공하세요.
+언어: ${langName} | ${gradeRule}
+
+[STT 오류 처리 — 채점에서 제외]
+• 쉼표·마침표 없음 / 띄어쓰기 오류 (기내 에→기내에)
+• 조사·어미 미세 변형 (~이니↔~이니까) / 유사 발음 단어 (나고↔나오고)
+• [목적지][편명][공항] 등 변수 자리 단어
+• 선택 문안 중 하나만 말한 경우
+
+[실제 채점 기준]
+• 핵심 안전 키워드 완전 누락 → 감점
+• 문장 중간 멈추고 다시 시작 → 감점
+• 발음 부정확 → 언어별 기준으로 정밀 채점
+• 속도 과도하게 빠르거나 느림 → 감점
+
+[점수 기준]
+60점=핵심 내용 전달되나 개선 여지 많음 / 70점=전반적으로 무난 / 80점=자연스럽고 듣기 좋음 / 90점 이상=승객이 편안하게 들을 수 있는 수준
+
 ${criteria}
-
-[STT 기술 오류 → 감점 없음]
-• 띄어쓰기 오류(기내 에→기내에), 쉼표/마침표 누락
-• 조사/어미 미세 변형(~이니↔~이니까), 유사 발음 단어(나고↔나오고)
-• [목적지][편명][공항] 등 변수 자리는 어떤 단어든 정답
-• 선택 문안 중 하나만 말해도 정답
-
-[실제 감점 항목]
-• 핵심 키워드 완전 누락
-• 중요 안전 정보 순서 바뀜
-• 실제 발음 부정확 (위 언어별 발음 기준)
-
-[피드백 원칙]
-• 잘한 점 반드시 먼저 언급
-• STT 오류로 인한 감점은 피드백에서 제외
-• "이 부분이 승객에게 이렇게 들렸을 거예요" 형태로 구체적 안내
-• 따뜻하고 격려하는 톤
 ${cpText}
 원문:
 ${script}
@@ -1800,21 +1816,21 @@ ${script}
 발화:
 ${transcript}
 
-아래 JSON만 반환하세요 (설명 없이, 주석 없이):
+아래 JSON만 반환하세요 (설명·주석 없이):
 {
   "language": "${langCode}",
   "score": 0-100 정수,
   "grade": ${isKoEn ? '"A" 또는 "B" 또는 "C" 또는 "미취득"' : '"PASS" 또는 "FAIL"'},
   "categories": {
-    "fluency":       { "score": 0-${maxFluency} 정수, "feedback": "잘한 점 먼저, 개선점 포함 1-2문장" },
-    "atmosphere":    { "score": 0-25 정수, "feedback": "1-2문장" },
-    "intonation":    { "score": 0-25 정수, "feedback": "1-2문장" },
-    "pronunciation": { "score": 0-${maxPron} 정수, "feedback": "1-2문장",
+    "fluency":       { "score": 0-${maxFluency} 정수, "level": "우수" 또는 "보통" 또는 "노력필요", "feedback": "잘한 점 먼저, 개선점 포함 1-2문장" },
+    "atmosphere":    { "score": 0-25 정수, "level": "우수" 또는 "보통" 또는 "노력필요", "feedback": "1-2문장" },
+    "intonation":    { "score": 0-25 정수, "level": "우수" 또는 "보통" 또는 "노력필요", "feedback": "1-2문장" },
+    "pronunciation": { "score": 0-${maxPron} 정수, "level": "우수" 또는 "보통" 또는 "노력필요", "feedback": "1-2문장",
                        "details": ["발음 오류 예시: 예) fasten → '패스튼'으로 들렸어요. '파슨'으로 연습해보세요"] }
   },
   "goodPoints": ["잘한 점 첫 번째", "잘한 점 두 번째 (있으면)"],
   "missedKeywords": ["누락된 핵심 키워드 (없으면 빈 배열)"],
-  "improvementTip": "가장 중요한 개선 포인트 1가지 — 이 부분이 승객에게 이렇게 들렸을 거예요 형태로",
+  "improvementTip": "가장 중요한 개선 포인트 1가지",
   "encouragement": "따뜻한 응원 메시지 한 줄"
 }`;
 
@@ -1825,7 +1841,7 @@ ${transcript}
   try { return JSON.parse(m[0]); } catch { return null; }
 }
 
-function renderAiResult(ai) {
+function renderAiResult(ai, isAdmin) {
   const sec = $('ai-result-section');
   if (!sec) return;
   sec.classList.remove('hidden');
@@ -1859,27 +1875,29 @@ function renderAiResult(ai) {
       </div>`
     : '';
 
-  // 점수 + 등급 헤더
+  // 등급 + 점수 헤더
   const gradeHtml = isKoEn
     ? `<span class="ai-grade-badge" style="background:${gradeColor}">${grade}등급</span>
-       <div class="ai-grade-note">A≥90 / B≥75 / C≥60 / 미취득&lt;60</div>`
+       ${isAdmin ? `<div class="ai-grade-note">A≥90 / B≥75 / C≥60 / 미취득&lt;60</div>` : ''}`
     : `<span class="ai-grade-badge" style="background:${gradeColor}">${grade}</span>
-       <div class="ai-grade-note">PASS: 85점 이상</div>`;
+       ${isAdmin ? `<div class="ai-grade-note">PASS: 85점 이상</div>` : ''}`;
 
   const scoreHeaderHtml = `
     <div class="ai-score-header">
-      <div class="ai-score-value" style="color:${gradeColor}">${score}</div>
+      ${isAdmin ? `<div class="ai-score-value" style="color:${gradeColor}">${score}</div>` : ''}
       <div class="ai-score-meta">
-        <div class="ai-score-label">AI 평가 점수 / 100</div>
+        ${isAdmin ? `<div class="ai-score-label">AI 평가 점수 / 100</div>` : ''}
         ${gradeHtml}
       </div>
     </div>`;
 
-  // 카테고리별 점수 바
+  // 카테고리별
   const catsHtml = Object.entries(ai.categories || {}).map(([key, cat]) => {
     const m = catMeta[key];
     if (!m) return '';
     const pct = Math.round((Math.min(cat.score, m.max) / m.max) * 100);
+    const level = cat.level || (pct >= 87 ? '우수' : pct >= 60 ? '보통' : '노력필요');
+    const levelCls = level === '우수' ? 'level-good' : level === '보통' ? 'level-mid' : 'level-low';
     const pronDetailsHtml = (key === 'pronunciation' && cat.details?.length)
       ? `<div class="ai-pron-details">
           ${cat.details.map(d => `<div class="ai-pron-detail-item">💬 ${escHtml(d)}</div>`).join('')}
@@ -1889,11 +1907,10 @@ function renderAiResult(ai) {
       <div class="ai-cat-bar-header">
         <span class="ai-cat-icon">${m.icon}</span>
         <span class="ai-cat-name">${m.name}</span>
-        <span class="ai-cat-score" style="color:${m.color}">${cat.score}<span style="font-size:11px;color:#94a3b8">/${m.max}</span></span>
+        <span class="ai-cat-level ${levelCls}">${level}</span>
+        ${isAdmin ? `<span class="ai-cat-score" style="color:${m.color}">${cat.score}<span style="font-size:11px;color:#94a3b8">/${m.max}</span></span>` : ''}
       </div>
-      <div class="ai-cat-bar-track">
-        <div class="ai-cat-bar-fill" style="width:${pct}%;background:${m.color}"></div>
-      </div>
+      ${isAdmin ? `<div class="ai-cat-bar-track"><div class="ai-cat-bar-fill" style="width:${pct}%;background:${m.color}"></div></div>` : ''}
       <div class="ai-cat-feedback">${escHtml(cat.feedback || '')}</div>
       ${pronDetailsHtml}
     </div>`;
