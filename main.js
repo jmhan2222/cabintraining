@@ -106,7 +106,7 @@ async function firestoreLoadLatest() {
 async function firestoreSaveLatest(data) {
   if (!_db) throw new Error('Firebase 미설정');
   await _db.collection('cabinManual').doc('latest').set(data);
-  await _db.collection('cabinManual').collection('history').doc(data.revVersion).set(data);
+  await _db.collection('cabinManual').doc('history').collection('versions').doc(data.revVersion).set(data);
 }
 async function firestoreLoadHistory() {
   if (!_db) return [];
