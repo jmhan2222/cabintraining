@@ -1428,6 +1428,9 @@ html, body {
 .ai-cat-bar-fill { height: 100%; border-radius: 99px; transition: width .6s ease; }
 .ai-cat-feedback { font-size: 12px; color: var(--gray-500); line-height: 1.6; }
 
+/* 카테고리별 다음 연습 목표 */
+.ai-cat-practice-tip { font-size: 12px; color: #1d4ed8; background: #eff6ff; border-radius: 8px; padding: 7px 10px; margin-top: 7px; line-height: 1.6; border-left: 3px solid #3b82f6; }
+
 /* 발음 오류 예시 */
 .ai-pron-details { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
 .ai-pron-detail-item { font-size: 12px; color: #1e40af; background: #eff6ff; border-radius: 8px; padding: 5px 10px; line-height: 1.5; }
@@ -1438,7 +1441,14 @@ html, body {
 .ai-missed-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .ai-missed-item { background: #fee2e2; color: #991b1b; font-size: 12px; padding: 3px 9px; border-radius: 6px; }
 
-/* 핵심 개선 포인트 */
+/* 다음 연습 핵심 목표 + 연습 방법 (행동 지침 박스) */
+.ai-next-focus-box { background: linear-gradient(135deg,#f0f9ff,#e0f2fe); border: 2px solid #38bdf8; border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
+.ai-next-focus-label { font-size: 13px; font-weight: 800; color: #0369a1; margin-bottom: 8px; }
+.ai-next-focus-content { font-size: 14px; color: #0c4a6e; line-height: 1.7; font-weight: 600; }
+.ai-practice-method { margin-top: 12px; font-size: 13px; color: #075985; line-height: 1.8; border-top: 1px solid #bae6fd; padding-top: 10px; white-space: pre-line; }
+.ai-pm-label { font-weight: 800; display: block; margin-bottom: 5px; color: #0369a1; }
+
+/* 핵심 개선 포인트 (fallback) */
 .ai-improvement-box { background: #fff7ed; border: 2px solid #fb923c; border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
 .ai-improvement-label { font-size: 13px; font-weight: 800; color: #c2410c; margin-bottom: 8px; }
 .ai-improvement-text { font-size: 14px; color: #7c2d12; line-height: 1.7; }

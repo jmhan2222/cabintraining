@@ -868,25 +868,22 @@ function stopRecording() {
   setTimeout(() => analyzeAndShow(duration), 1800);
 }
 
-// ===== 엄격한 3단계 배점 =====
-// ratio=0 → 0점, 이하 선형 증가, 기준: 부족<0.40, 보통<0.78, 우수≥0.78
+// ===== 3단계 배점 (연습 도구 기준) =====
+// ratio=0 → 0점, ratio≥0.72 → 만점 (학습 동기 유지를 위해 관대하게)
 function tierScore(ratio, maxPt) {
   if (!ratio || ratio <= 0) return 0;
   ratio = Math.min(1, Math.max(0, ratio));
-  if (ratio >= 0.82) return maxPt;
-  if (ratio >= 0.55) {
-    // 보통 구간: 10pt→6~9, 5pt→3~4
-    if (maxPt === 10) return Math.round(6 + (ratio - 0.55) / 0.27 * 3);
-    if (maxPt === 5)  return Math.round(3 + (ratio - 0.55) / 0.27);
+  if (ratio >= 0.72) return maxPt;
+  if (ratio >= 0.42) {
+    if (maxPt === 10) return Math.round(6 + (ratio - 0.42) / 0.30 * 4);
+    if (maxPt === 5)  return Math.round(3 + (ratio - 0.42) / 0.30 * 2);
   }
-  if (ratio >= 0.30) {
-    // 부족 구간: 10pt→2~6, 5pt→1~3
-    if (maxPt === 10) return Math.round(2 + (ratio - 0.30) / 0.25 * 4);
-    if (maxPt === 5)  return Math.round(1 + (ratio - 0.30) / 0.25 * 2);
+  if (ratio >= 0.20) {
+    if (maxPt === 10) return Math.round(2 + (ratio - 0.20) / 0.22 * 4);
+    if (maxPt === 5)  return Math.round(1 + (ratio - 0.20) / 0.22 * 2);
   }
-  // 매우 부족: 최소 0~2
-  if (maxPt === 10) return Math.round(ratio / 0.30 * 2);
-  if (maxPt === 5)  return Math.round(ratio / 0.30);
+  if (maxPt === 10) return Math.round(ratio / 0.20 * 2);
+  if (maxPt === 5)  return Math.round(ratio / 0.20);
   return 0;
 }
 
@@ -908,13 +905,15 @@ function analyzeAndShow(duration) {
   // → "아~" 한 마디처럼 내용이 전혀 없을 때 음성 품질만으로 좋은 점수가 나오는
   //   오류를 방지한다.
   const contentQuality = Math.min(1, wordMatch * 0.55 + completeness * 0.45);
-  // 15% 미만이면 신호가 아닌 노이즈로 간주 → 음성 기반 지표 전부 0
-  const cG = contentQuality >= 0.15 ? contentQuality : 0;
+  const cGRaw = contentQuality >= 0.10 ? contentQuality : 0;
+  // 목소리·억양 신호는 STT와 독립적으로 평가 → 최소 0.60 보장
+  // (STT 부정확 → 목소리·억양 전체 0점 되는 연쇄 패널티 방지)
+  const cG = hasAudio && cGRaw > 0 ? Math.max(0.60, cGRaw) : cGRaw;
   // ─────────────────────────────────────────────────────────────────────────
 
   // --- 음성 신호 측정 ---
   const wpm        = hasSpeech && duration > 3 ? (transcript.split(' ').filter(Boolean).length / duration) * 60 : 0;
-  const wpmRatio   = wpm > 0 ? Math.max(0, 1 - Math.abs(wpm - lang.idealWPM) / 70) : 0;
+  const wpmRatio   = wpm > 0 ? Math.max(0, 1 - Math.abs(wpm - lang.idealWPM) / 90) : 0;
   const pitchCV    = hasAudio ? measurePitchCV(state.pitchSamples) : 0;
   const pitchRange = hasAudio ? measurePitchRange(state.pitchSamples) : 0;
   const ampStab    = hasAudio ? measureAmpStability(state.amplitudeSamples) : 0;
@@ -937,11 +936,11 @@ function analyzeAndShow(duration) {
     : 0;
 
   // ── cG 적용: 내용 일치율이 낮으면 음성 신호 지표도 낮아짐 ──────────────
-  const gAmpPeaks    = ampPeaks    * cG;   // 강조: 내용 없이 진폭 피크만으론 안 됨
-  const gAmpStab     = ampStab     * (0.4 + 0.6 * cG); // 발성: 기본 40%는 신호 반영
-  const gPitchWarmth = pitchWarmth * cG;   // 목소리 톤: 내용 없이 판단 불가
-  const gIntonCV     = intonationCV * cG;  // 억양 CV: 내용 없이 판단 불가
-  const gPitchRange  = pitchRange  * cG;   // 억양 범위: 내용 없이 판단 불가
+  const gAmpPeaks    = ampPeaks    * cG;
+  const gAmpStab     = ampStab     * (0.55 + 0.45 * cG); // 발성 안정성: 기본 55% 신호 반영
+  const gPitchWarmth = pitchWarmth * cG;
+  const gIntonCV     = intonationCV * cG;
+  const gPitchRange  = pitchRange  * cG;
   // ─────────────────────────────────────────────────────────────────────────
 
   // ---- 유창성 (30점) ----
@@ -980,7 +979,7 @@ function analyzeAndShow(duration) {
     pronunciationItems.reduce((a,b)=>a+b,0);
 
   const result = {
-    total, pass: total >= 85,
+    total, pass: total >= 75,
     wpm: Math.round(wpm), duration,
     wordMatch, completeness, contentQuality,
     categories: {
@@ -1087,8 +1086,8 @@ function showResults(result, transcript) {
     const catLevelCls = pct >= 87 ? 'tier-good' : pct >= 60 ? 'tier-mid' : 'tier-low';
     const itemsHTML = cat.items.map((item, i) => {
       const got = cr.items[i];
-      const tier = got >= item.max ? '우수' : got >= (item.max === 10 ? 6 : 3) ? '보통' : '노력필요';
-      const tc   = got >= item.max ? 'tier-good' : got >= (item.max === 10 ? 6 : 3) ? 'tier-mid' : 'tier-low';
+      const tier = got/item.max >= 0.87 ? '우수' : got >= (item.max === 10 ? 6 : 3) ? '보통' : '노력필요';
+      const tc   = got/item.max >= 0.87 ? 'tier-good' : got >= (item.max === 10 ? 6 : 3) ? 'tier-mid' : 'tier-low';
       return `<div class="sub-item">
         <div class="sub-item-name">${item.label}</div>
         <div class="sub-item-right">
@@ -1153,8 +1152,8 @@ function renderRadar(result) {
           borderWidth: 2.5, pointBackgroundColor: result.pass ? '#3b82f6' : '#ef4444', pointRadius: 4
         },
         {
-          label: 'PASS 기준(85%)',
-          data: [85,85,85,85],
+          label: 'PASS 기준(75%)',
+          data: [75,75,75,75],
           backgroundColor: 'rgba(16,185,129,.05)',
           borderColor: 'rgba(16,185,129,.55)',
           borderWidth: 1.5, borderDash: [5,4],
@@ -1191,36 +1190,38 @@ function renderFeedback(result, transcript, lang, isAdmin) {
 
   const CAT_TIPS = {
     fluency: [
-      // 끊어 읽기 — 내용이 어느 정도 인식된 경우에만
-      (v) => (v < 4 && cqOk) ? '의미 단위로 자연스럽게 끊어 읽는 연습을 하세요.' : null,
+      // 끊어 읽기
+      (v) => (v < 4 && cqOk) ? '쉼표( , )와 의미 단위에서 0.5~1초 멈추는 연습을 해보세요. 방송문을 슬래시(/)로 끊어 표시하고 5번 반복하면 효과적입니다.' : null,
       // 속도 연출
       (v) => (v < 4 && cqOk) ? (result.wpm > 0
-        ? `현재 ${result.wpm} WPM — 적정 ${lang.idealWPM} WPM. ${result.wpm > lang.idealWPM ? '조금 더 천천히' : '조금 더 빠르게'} 말해보세요.`
-        : '125–140 WPM의 적절한 속도로 연습하세요.') : null,
+        ? `현재 약 ${result.wpm} WPM — 적정 ${lang.idealWPM} WPM. ${result.wpm > lang.idealWPM ? '핵심 단어 앞에서 의도적으로 속도를 줄여보세요.' : '조금 더 자신감 있게 속도를 높여보세요.'}`
+        : '방송문을 먼저 눈으로 3회 읽고 속도를 몸에 익힌 뒤 녹음하세요.') : null,
       // 강조 표현
-      (v) => (v < 3 && cqFull) ? '목적지·편명·시간 등 핵심 정보에서 적절한 강세를 넣어 보세요.' : null,
-      // 문안 숙지 — contentQuality 자체가 낮으면 직접 내용 부족 언급
+      (v) => (v < 3 && cqFull) ? '목적지·편명·시간 같은 핵심 정보 직전에 살짝 속도를 늦추고 또렷하게 읽으면 자연스러운 강조가 됩니다.' : null,
+      // 문안 숙지
       (v) => v < 3 ? (cqOk
-        ? '버벅거림이 감지됐습니다. 방송문을 완전히 숙지한 후 다시 시도하세요.'
-        : '방송문 내용이 충분히 인식되지 않았습니다. 방송문 전체를 또렷하게 읽어 보세요.') : null,
-      // 말하는 듯한 연출 — 충분한 내용이 있어야 억양·강세 패턴을 판단할 수 있음
-      (v) => (v < 7 && cqFull) ? '억양 변화와 강세 패턴이 단조롭습니다. 특정 단어에 강세를 주고 문장 끝 처리를 다양하게 연습하세요.' : null,
+        ? '방송문을 보지 않고 첫 문장부터 외워서 말하는 연습을 먼저 해보세요. 숙지도가 올라가면 자연스러운 연출이 따라옵니다.'
+        : '방송문 전체를 큰 소리로 또렷하게 읽어 보세요. 내용 인식률이 낮으면 다른 항목 점수가 정확하지 않습니다.') : null,
+      // 말하는 듯한 연출
+      (v) => (v < 7 && cqFull) ? '방송문을 "읽는다"고 생각하지 말고 "승객에게 직접 말한다"고 상상하세요. 중요 단어에서 눈을 들고 말하는 듯 처리하면 크게 달라집니다.' : null,
     ],
     voice: [
-      // 안정적인 발성 — 충분한 발화 없이는 판단 불가
-      (v) => (v < 6 && cqOk) ? '복식호흡 후 안정적인 발성으로 시작하세요.' : null,
-      (v) => (v < 4 && cqOk) ? '자신의 목소리에 어울리는 자연스러운 톤을 찾아보세요.' : null,
-      (v) => (v < 6 && cqFull) ? '미소를 지으며 방송하면 목소리에서 따뜻함이 자연스럽게 전달됩니다.' : null,
+      // 안정적인 발성
+      (v) => (v < 6 && cqOk) ? '녹음 전 복식호흡을 2~3회 하고 목을 풀어주세요. 발성이 흔들리면 전체 인상이 흐려집니다.' : null,
+      (v) => (v < 4 && cqOk) ? '지금보다 약간 낮은 톤에서 말하는 연습을 해보세요. 낮고 차분한 톤이 방송에서 더 신뢰감 있게 들립니다.' : null,
+      (v) => (v < 6 && cqFull) ? '입꼬리를 살짝 올린 채로 방송하면 따뜻한 분위기가 목소리에 자연스럽게 실립니다. 거울 앞에서 연습해보세요.' : null,
     ],
     intonation: [
-      // 억양은 충분한 발화가 있어야 의미 있음
-      (v) => (v < 3 && cqOk) ? '"~습니다", "~주시기 바랍니다" 등 문장 끝을 흐리지 않고 명확하게 마무리하세요.' : null,
-      (v) => (v < 6 && cqFull) ? '피치 변화 폭이 좁습니다. 문장마다 자연스러운 굴곡을 넣어 생동감 있게 말하세요.' : null,
-      (v) => (v < 6 && cqFull) ? '억양 기복이 고르지 않습니다. 전체적으로 일정한 흐름을 유지하세요.' : null,
+      // 조사/어미 처리
+      (v) => (v < 3 && cqOk) ? '"~습니다", "~바랍니다" 같은 문장 끝 어미를 흐리지 말고 끝까지 또렷하게 내려 마무리하세요.' : null,
+      // 전반적인 억양
+      (v) => (v < 6 && cqFull) ? '문장 중간에 가장 중요한 단어를 살짝 높게 말하고 끝에서 내려오는 패턴을 연습하세요. 이 흐름만 익혀도 억양이 자연스러워집니다.' : null,
+      // 고른 억양
+      (v) => (v < 6 && cqFull) ? '전반부는 에너지 있게, 후반부는 차분하게 일정한 흐름을 유지하세요. 억양이 갑자기 오르내리면 방송이 불안정해 보입니다.' : null,
     ],
     pronunciation: [
-      (v) => v < 5 ? `핵심 단어(${lang.keyPhrases.slice(0,4).join(', ')})를 입을 크게 벌려 또렷하게 발음하세요.` : null,
-      (v) => v < 5 ? '받침·어미가 흐려지는 경향이 있습니다. 각 음절을 끝까지 분명하게 발음하세요.' : null,
+      (v) => v < 5 ? `핵심 단어(${lang.keyPhrases.slice(0,4).join(', ')})를 한 단어씩 천천히 발음하며 녹음해 들어보세요. 어떤 소리가 뭉개지는지 스스로 확인하는 것이 가장 빠른 교정 방법입니다.` : null,
+      (v) => v < 5 ? '받침과 어미 끝까지 또렷하게 발음하는 연습을 하세요. 특히 문장 끝 "~다", "~요", "~세요"가 흐려지지 않도록 집중하세요.' : null,
     ],
   };
 
@@ -1232,8 +1233,8 @@ function renderFeedback(result, transcript, lang, isAdmin) {
   const overviewMsg = isExcellent
     ? '모든 항목 탁월 — 이 실력을 실전에서도 유지하세요!'
     : result.pass
-    ? '합격 기준(85점) 통과. 아래 개선사항으로 완성도를 더 높여보세요.'
-    : `합격까지 ${85 - result.total}점 부족. 아래 카테고리를 집중 연습하세요.`;
+    ? 'PASS 기준(75점) 통과. 아래 AI 분석으로 완성도를 더 높여보세요.'
+    : `PASS까지 ${75 - result.total}점 부족. 아래 카테고리를 집중 연습하세요.`;
 
   const noSpeech = (!transcript || transcript.length < 5)
     ? `<div class="fb-no-speech">⚠️ 음성이 인식되지 않았습니다 — Chrome 브라우저 + 마이크 허용 필요. 발음·완성도 점수가 0점 처리됩니다.</div>`
@@ -1789,31 +1790,30 @@ async function callGeminiScoring(script, transcript, langCode, checkpoints) {
   };
   const criteria = criteriaMap[langCode] || criteriaMap.ko;
 
-  const prompt = `당신은 항공사 기내방송 전문 평가관입니다.
-실제 평가표 기준으로 정확하게 채점하되 훈련 중인 승무원을 격려하는 피드백을 제공하세요.
+  const prompt = `당신은 항공사 기내방송 전문 교관입니다.
+이 앱은 승무원이 혼자 반복 연습하는 훈련 도구입니다. 채점은 정직하게 하되, 피드백은 반드시 "다음 연습에서 바로 실행할 수 있는 구체적 행동 지침"을 담아야 합니다.
+막연한 평가("발음을 개선하세요") 대신, 어떤 부분을 어떻게 연습하면 나아지는지 알려주세요.
 언어: ${langName} | ${gradeRule}
 
-[STT 오류 처리 — 채점에서 제외]
+[STT 인식 오류 — 채점에서 반드시 제외]
 • 쉼표·마침표 없음 / 띄어쓰기 오류 (기내 에→기내에)
 • 조사·어미 미세 변형 (~이니↔~이니까) / 유사 발음 단어 (나고↔나오고)
 • [목적지][편명][공항] 등 변수 자리 단어
 • 선택 문안 중 하나만 말한 경우
+• 같은 의미를 살짝 다르게 표현한 경우
 
-[실제 채점 기준]
-• 핵심 안전 키워드 완전 누락 → 감점
-• 문장 중간 멈추고 다시 시작 → 감점
-• 발음 부정확 → 언어별 기준으로 정밀 채점
-• 속도 과도하게 빠르거나 느림 → 감점
-
-[점수 기준]
-60점=핵심 내용 전달되나 개선 여지 많음 / 70점=전반적으로 무난 / 80점=자연스럽고 듣기 좋음 / 90점 이상=승객이 편안하게 들을 수 있는 수준
+[채점 기준 — 연습 도구 특성상 관대하게 적용]
+• 방송 내용을 전반적으로 정확히 전달했는가?
+• 승객이 편안하게 들을 수 있는 수준인가?
+• 안전 관련 핵심 키워드가 누락되지 않았는가?
+• 점수 기준: 70점=전반적으로 무난한 방송 수준 / 80점=자연스럽고 듣기 좋음 / 90점=우수한 방송 수준
 
 ${criteria}
 ${cpText}
 원문:
 ${script}
 
-발화:
+발화 (STT 인식 결과 — 인식 오류 포함될 수 있음):
 ${transcript}
 
 아래 JSON만 반환하세요 (설명·주석 없이):
@@ -1822,16 +1822,37 @@ ${transcript}
   "score": 0-100 정수,
   "grade": ${isKoEn ? '"A" 또는 "B" 또는 "C" 또는 "미취득"' : '"PASS" 또는 "FAIL"'},
   "categories": {
-    "fluency":       { "score": 0-${maxFluency} 정수, "level": "우수" 또는 "보통" 또는 "노력필요", "feedback": "잘한 점 먼저, 개선점 포함 1-2문장" },
-    "atmosphere":    { "score": 0-25 정수, "level": "우수" 또는 "보통" 또는 "노력필요", "feedback": "1-2문장" },
-    "intonation":    { "score": 0-25 정수, "level": "우수" 또는 "보통" 또는 "노력필요", "feedback": "1-2문장" },
-    "pronunciation": { "score": 0-${maxPron} 정수, "level": "우수" 또는 "보통" 또는 "노력필요", "feedback": "1-2문장",
-                       "details": ["발음 오류 예시: 예) fasten → '패스튼'으로 들렸어요. '파슨'으로 연습해보세요"] }
+    "fluency": {
+      "score": 0-${maxFluency} 정수,
+      "level": "우수" 또는 "보통" 또는 "노력필요",
+      "feedback": "이 연습에서 잘된 점과 구체적 개선 방향 (2문장)",
+      "practiceTip": "다음 연습에서 바로 해볼 수 있는 구체적 방법 1가지 (예: '○○ 구간을 읽을 때 의도적으로 0.5초 멈춰보세요')"
+    },
+    "atmosphere": {
+      "score": 0-25 정수,
+      "level": "우수" 또는 "보통" 또는 "노력필요",
+      "feedback": "2문장",
+      "practiceTip": "구체적 연습 방법 1가지"
+    },
+    "intonation": {
+      "score": 0-25 정수,
+      "level": "우수" 또는 "보통" 또는 "노력필요",
+      "feedback": "2문장",
+      "practiceTip": "구체적 연습 방법 1가지 (예: '문장 끝 단어를 약간 낮춰 읽는 연습을 5번 반복하세요')"
+    },
+    "pronunciation": {
+      "score": 0-${maxPron} 정수,
+      "level": "우수" 또는 "보통" 또는 "노력필요",
+      "feedback": "2문장",
+      "practiceTip": "구체적 발음 연습 방법 1가지",
+      "details": ["실제 오류 예시만: '○○'를 '△△'처럼 발음했는데, '□□'로 연습하세요 (오류 없으면 빈 배열)"]
+    }
   },
-  "goodPoints": ["잘한 점 첫 번째", "잘한 점 두 번째 (있으면)"],
-  "missedKeywords": ["누락된 핵심 키워드 (없으면 빈 배열)"],
-  "improvementTip": "가장 중요한 개선 포인트 1가지",
-  "encouragement": "따뜻한 응원 메시지 한 줄"
+  "goodPoints": ["잘된 점 1 (구체적으로)", "잘된 점 2 (있으면)"],
+  "missedKeywords": ["누락된 핵심 키워드 (STT 오류 제외, 실제 누락만)"],
+  "nextFocus": "이번 연습에서 가장 먼저 개선할 1가지와 그 이유 (예: '억양 — 문장 끝이 단조롭게 올라가서 승객에게 어색하게 들립니다')",
+  "practiceMethod": "nextFocus를 개선하기 위한 단계별 연습 방법 (3줄 이내, 내일 당장 따라할 수 있도록 구체적으로)",
+  "encouragement": "이 연습 수준에 맞는 구체적이고 따뜻한 응원 메시지 1문장 (막연한 격려 말고, 이 연습에서 보인 노력을 언급)"
 }`;
 
   const result = await model.generateContent(prompt);
@@ -1903,6 +1924,9 @@ function renderAiResult(ai, isAdmin) {
           ${cat.details.map(d => `<div class="ai-pron-detail-item">💬 ${escHtml(d)}</div>`).join('')}
          </div>`
       : '';
+    const practiceTipHtml = cat.practiceTip
+      ? `<div class="ai-cat-practice-tip">📌 다음 연습 목표: ${escHtml(cat.practiceTip)}</div>`
+      : '';
     return `<div class="ai-cat-bar-row">
       <div class="ai-cat-bar-header">
         <span class="ai-cat-icon">${m.icon}</span>
@@ -1913,6 +1937,7 @@ function renderAiResult(ai, isAdmin) {
       ${isAdmin ? `<div class="ai-cat-bar-track"><div class="ai-cat-bar-fill" style="width:${pct}%;background:${m.color}"></div></div>` : ''}
       <div class="ai-cat-feedback">${escHtml(cat.feedback || '')}</div>
       ${pronDetailsHtml}
+      ${practiceTipHtml}
     </div>`;
   }).join('');
 
@@ -1924,13 +1949,24 @@ function renderAiResult(ai, isAdmin) {
       </div>`
     : '';
 
-  // 핵심 개선 포인트 (강조 박스)
-  const improvHtml = ai.improvementTip
-    ? `<div class="ai-improvement-box">
-        <div class="ai-improvement-label">🎯 핵심 개선 포인트</div>
-        <div class="ai-improvement-text">${escHtml(ai.improvementTip)}</div>
+  // 다음 연습 핵심 목표 + 연습 방법 (행동 지침 박스)
+  const nextFocusHtml = ai.nextFocus
+    ? `<div class="ai-next-focus-box">
+        <div class="ai-next-focus-label">🎯 다음 연습 핵심 목표</div>
+        <div class="ai-next-focus-content">${escHtml(ai.nextFocus)}</div>
+        ${ai.practiceMethod
+          ? `<div class="ai-practice-method">
+              <span class="ai-pm-label">💡 이렇게 연습하세요</span>
+              ${escHtml(ai.practiceMethod)}
+            </div>`
+          : ''}
       </div>`
-    : '';
+    : (ai.improvementTip
+      ? `<div class="ai-improvement-box">
+          <div class="ai-improvement-label">🎯 핵심 개선 포인트</div>
+          <div class="ai-improvement-text">${escHtml(ai.improvementTip)}</div>
+        </div>`
+      : '');
 
   // 응원 메시지
   const encourageHtml = ai.encouragement
@@ -1952,7 +1988,7 @@ function renderAiResult(ai, isAdmin) {
     ${scoreHeaderHtml}
     <div class="ai-categories-box">${catsHtml}</div>
     ${missedHtml}
-    ${improvHtml}
+    ${nextFocusHtml}
     ${encourageHtml}
     ${buttonsHtml}
   `;
