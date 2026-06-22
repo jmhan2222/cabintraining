@@ -7,6 +7,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "991357763010",
   appId: "1:991357763010:web:ec0a5d7ee55752b5a1aa5b"
 };
+
 let _db = null;
 let _geminiModel = null;
 function initFirebase() {
@@ -181,6 +182,7 @@ let state = {
   animFrameId: null,
   radarChartInstance: null,
   audioChunks: [],
+  audioBlob: null,
   _sampleInterval: null
 };
 
@@ -859,13 +861,24 @@ function stopRecording() {
   cancelAnimationFrame(state.animFrameId);
   try { state.recognition?.abort(); } catch(e){}
   state.recognition = null;
-  if (state.mediaRecorder?.state !== 'inactive') state.mediaRecorder.stop();
-  state.stream?.getTracks().forEach(t => t.stop());
-  if (state.audioContext) { state.audioContext.close(); state.audioContext = null; }
 
   const duration = (Date.now() - state.recordingStart) / 1000;
   $('loading-overlay').classList.remove('hidden');
-  setTimeout(() => analyzeAndShow(duration), 1800);
+
+  const finish = () => {
+    state.audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
+    analyzeAndShow(duration);
+  };
+
+  if (state.mediaRecorder?.state !== 'inactive') {
+    state.mediaRecorder.onstop = finish;
+    state.mediaRecorder.stop();
+  } else {
+    finish();
+  }
+
+  state.stream?.getTracks().forEach(t => t.stop());
+  if (state.audioContext) { state.audioContext.close(); state.audioContext = null; }
 }
 
 // ===== 3단계 배점 (연습 도구 기준) =====
@@ -1126,10 +1139,13 @@ function showResults(result, transcript) {
     aiSec.innerHTML = '';
   }
 
-  // AI 채점 (Firebase 초기화된 경우 자동 실행)
-  if (firebase.apps.length && transcript && transcript.length > 10) {
-    callGeminiScoring(lang.text, transcript, state.selectedLang, lang.checkpoints).then(aiResult => {
-      if (aiResult) renderAiResult(aiResult, isAdmin);
+  // AI 채점 (Firebase 초기화된 경우 자동 실행 — audioBlob을 직접 Gemini에 전달)
+  if (firebase.apps.length && state.audioBlob) {
+    callGeminiScoring(lang.text, state.audioBlob, state.selectedLang, lang.checkpoints).then(aiResult => {
+      if (aiResult) {
+        renderAiResult(aiResult, isAdmin);
+        if (aiResult.transcript) renderTranscriptCompare(aiResult.transcript, lang);
+      }
     }).catch(() => {});
   }
 }
@@ -1324,7 +1340,7 @@ function renderTranscriptCompare(transcript, lang) {
   }
   $('transcript-compare').innerHTML = `
     <div class="tc-row"><div class="tc-label">방송 원문</div><div class="tc-text">${escHtml(preview)}</div></div>
-    <div class="tc-row"><div class="tc-label">인식 결과</div><div class="tc-text recognized">${transcript ? escHtml(transcript) : '(인식 없음 — Chrome + 마이크 허용 필요)'}</div></div>`;
+    <div class="tc-row"><div class="tc-label">AI 인식</div><div class="tc-text recognized">${transcript ? escHtml(transcript) : '(AI 채점 결과 대기 중...)'}</div></div>`;
 }
 
 // ===== TEXT HELPERS =====
@@ -1739,7 +1755,17 @@ function importSelectedPdfScripts() {
 }
 
 // ===== GEMINI AI SCORING =====
-async function callGeminiScoring(script, transcript, langCode, checkpoints) {
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
+  console.log('audioBlob size:', audioBlob?.size, 'type:', audioBlob?.type);
   const model = await getGeminiModel();
   const langName = { ko:'한국어', en:'영어', ja:'일본어', ca:'중국어' }[langCode] || '한국어';
   const cpText = checkpoints?.length
@@ -1755,69 +1781,172 @@ async function callGeminiScoring(script, transcript, langCode, checkpoints) {
     : 'score 85이상→grade"PASS", 84이하→"FAIL"';
 
   const criteriaMap = {
-    ko: `[한국어 채점 - 100점]
-유창성 30점: 끊어읽기(5) · 속도 연출(5, 적정 80~120 WPM) · 강조 표현(5) · 문안 숙지(5) · 말하는 듯한 연출(10)
-분위기·목소리 25점: 발성(10) · 톤(10) · 친근함(5)
-억양 25점: 조사·어미 처리(10) · 전반적 억양(10) · 고른 억양(5)
-발음 20점 (정밀):
-  정확성(10): 비ː행기 장음 / 끝 자음 탈락 없이 / 있습니다(있씁니다 O) / 모음 정확히
-  명확성(10): 핵심 단어 또렷하게 / 어물거림 없이`,
-    en: `[영어 채점 - 100점]
-유창성 30점: 끊어읽기(5) · 속도(5, 적정 100~130 WPM) · 강조(5) · 문안 숙지(5) · 말하는 듯한 연출(10)
-분위기·목소리 25점: 발성(10) · 톤(10) · 친근함(5)
-억양 25점: 강세 패턴(10) · 전반적 억양(10) · 문장 끝 처리(5)
-발음 20점 (정밀):
-  정확성(10): fasten→파슨O/패스튼X | oxygen→옥시전O/악시전X | seatbelt→시트벨트O | emergency→이머전씨O | passengers→패신저스O | lavatory→래버토리O
-  명확성(10): th 발음 / 자음 연음 / 끝 자음 처리`,
-    ja: `[일본어 채점 - 100점]
-유창성 25점: 끊어읽기(5) · 문안 숙지(5) · 속도(5) · 자연스러운 연출(10)
-분위기·목소리 25점: 톤(8) · 발성(7) · 친절함(5) · 과장 지양(5)
-억양 25점: 일본어 특성 억양(10) · 고른 억양(5) · 장음 처리(5) · 어미 처리(5)
-발음 25점 (정밀):
-  장음 정확히(7): コース·ございます 등 장음 정확히
-  고유 발음(6): ざ·ず·ぜ·ぞ / じゃ·じゅ·じょ 정확히
-  ん·촉음(6): ん→뒤 음에 따라 변화 / 촉음(っ)→자음 앞 짧은 정지
+    ko: `[한국어 채점 기준 - 100점]
+
+유창성 ${maxFluency}점 (음성을 직접 듣고 판단):
+  끊어읽기(5):
+    - 의미 단위(주어부/서술부/부사구)에서 자연스럽게 끊는가
+    - 문법 구조 중간에 끊거나, 끊김이 너무 잦거나 없으면 감점
+    - 예) "손님 여러분 / 저희 비행기는" O, "손님 / 여러분 저희" X
+  속도(5):
+    - 전체 방송이 너무 빠르거나(단어 뭉개짐) 너무 느리면(지루함) 감점
+    - 문안 중간 속도 변화가 급격하면 감점
+    - 자연스러운 대화 속도로 균일하게 유지되는지 확인
+  강조 표현(5):
+    - 편명·목적지·안전 관련 핵심 단어에서 강조(살짝 느리게 또는 음량 높임)가 들어가는가
+    - 전체가 동일한 강도로 읽히면 감점
+  문안 숙지(5):
+    - 버벅거림, 중간 반복, 갑작스러운 멈춤이 있으면 감점
+    - 자연스럽게 이어지는지 확인
+  말하는 듯한 연출(10):
+    - 또박또박 읽는 느낌(낭독체)인가 vs 자연스럽게 말하는 느낌인가
+    - 문장 끝이 매번 동일한 패턴으로 단조롭게 처리되면 감점
+    - 전체 방송에 생동감이 있는가
+
+분위기·목소리 25점 (음성을 직접 듣고 판단 — 반드시 0점 이상 부여):
+  발성(10):
+    - 목소리가 떨리거나 불안정하게 흔들리지 않는가
+    - 음량이 처음부터 끝까지 균일하게 유지되는가
+    - 마이크 거리 문제(너무 작거나 크거나 바람소리)가 없는가
+    - 기본 발성만 해도 최소 6점 이상 부여할 것
+  톤(10):
+    - 기내방송에 어울리는 부드럽고 차분한 톤인가
+    - 너무 딱딱하거나(군대식·아나운서식) 너무 가볍거나 들뜨지 않는가
+    - 미소가 느껴지는 목소리인가 (입꼬리 올린 상태의 밝고 따뜻한 톤)
+    - 무표정한 톤도 방송은 가능하므로 최소 5점 이상 부여할 것
+  친근함(5):
+    - 승객에게 직접 말하는 느낌인가, 원고를 읽는 느낌인가
+    - 기계적이지 않고 사람이 말하는 온기와 배려가 느껴지는가
+    - 방송을 수행했다면 최소 2점 이상 부여할 것
+
+억양 25점:
+  조사·어미 처리(10):
+    - 문장 끝 어미가 올라가는 패턴이 반복되면 감점 (상향 반복)
+    - 조사(은/는/이/가/을/를)가 앞 단어와 자연스럽게 이어지는가
+    - 어미를 흐리거나 끊어먹으면 감점
+  전반적 억양(10):
+    - 전체 방송의 억양 흐름이 자연스러운가
+    - 단조로운 평탄 억양(모노톤)이나 과장된 억양 모두 감점
+  고른 억양(5):
+    - 특정 구간만 억양이 과하거나 약하지 않은가
+    - 전체적으로 균일한 억양 수준 유지
+
+발음 ${maxPron}점 (정밀 분석):
+  정확성(10):
+    - 비행기→비ː행기 장음 처리 확인
+    - 있습니다→있씁니다 연음 처리 확인
+    - 모음(ㅢ, ㅚ, ㅐ/ㅔ 구분) 정확성 확인
+    - 받침 탈락(합니다→하니다) 없는지 확인
+  명확성(10):
+    - 핵심 단어가 또렷하게 들리는가
+    - 어물거림, 뭉개짐, 어미 흐려짐 없는가`,
+
+    en: `[영어 채점 기준 - 100점]
+
+유창성 ${maxFluency}점:
+  끊어읽기(5): 의미 단위(구·절) 경계에서 자연스럽게 끊는가. 단어 중간에 끊으면 감점
+  속도(5): 100~130 WPM 범위 내인가. 뭉개지거나 너무 느리면 감점
+  강조(5): 주요 단어(flight number, destination, safety-related)에 강세 강조가 들어가는가
+  문안 숙지(5): 버벅거림, 반복, 갑작스러운 멈춤 없는가
+  말하는 듯한 연출(10):
+    - 한국식 낭독체(모든 단어 동일 강도)가 아닌 영어 리듬으로 말하는가
+    - 내용어(content word) 강조, 기능어(function word) 약화가 자연스러운가
+
+분위기·목소리 25점 (반드시 0점 이상 부여):
+  발성(10): 안정적 성량, 균일한 음량, 마이크 노이즈 없는가. 최소 6점 이상
+  톤(10): 영어 기내방송에 어울리는 warm하고 professional한 톤인가. 최소 5점 이상
+  친근함(5): 승객에게 직접 말하는 느낌인가. 최소 2점 이상
+
+억양 25점:
+  강세 패턴(10): 영어 단어 강세 위치가 정확한가 (fasten→FAS-ten, emergency→e-MER-gen-cy)
+  전반적 억양(10): 문장 단위 억양 흐름이 영어답게 자연스러운가
+  문장 끝 처리(5): 평서문 끝이 자연스럽게 내려가는가. 모두 올라가면 감점
+
+발음 ${maxPron}점:
+  정확성(10):
+    - fasten→파슨O/패스튼X
+    - oxygen→옥시전O/악시전X
+    - passengers→패신저스O
+    - lavatory→래버토리O
+    - emergency→이머전씨O
+  명확성(10): th발음, 끝자음 처리, 연음 자연스러운가`,
+
+    ja: `[일본어 채점 기준 - 100점]
+
+유창성 ${maxFluency}점:
+  끊어읽기(5): 일본어 문절 단위로 자연스럽게 끊는가
+  문안 숙지(5): 버벅거림, 반복 없는가
+  속도(5): 일본어 기내방송에 적합한 속도인가 (너무 빠르면 장음 뭉개짐)
+  자연스러운 연출(10): 일본어로 말하는 듯한 자연스러운 리듬인가, 한국어 억양이 섞이지 않는가
+
+분위기·목소리 25점 (반드시 0점 이상 부여):
+  톤(8): 일본 항공사 방송 특유의 부드럽고 정중한 톤인가. 최소 4점 이상
+  발성(7): 안정적 발성, 균일한 음량. 최소 4점 이상
+  친절함(5): 따뜻하고 배려 있는 느낌인가. 최소 2점 이상
+  과장 지양(5): 과도하게 높은 피치나 작위적인 연출 없는가
+
+억양 25점:
+  일본어 특성 억양(10): 일본어 고저 악센트가 자연스러운가. 한국어식 강세 억양 개입 없는가
+  고른 억양(5): 특정 구간만 억양이 튀지 않는가
+  장음 처리(5): コース·ございます 등 장음이 충분히 늘어나는가
+  어미 처리(5): ます·です 어미가 자연스럽게 처리되는가. 끊어먹거나 올라가면 감점
+
+발음 ${maxPron}점:
+  장음 처리(7): 장음 기호(ー) 위치에서 확실하게 늘어나는가
+  고유 발음(6): ざ/ず/ぜ/ぞ, じゃ/じゅ/じょ 정확한가
+  ん·촉음(6): ん이 뒤 음에 따라 변화하는가 / 촉음(っ) 앞 짧은 정지 있는가
   모음 정확성(6): 5모음 정확히 / 으 개입 방지 (です→데스O/데으스X)`,
-    ca: `[중국어 채점 - 100점]
-유창성 25점: 끊어읽기(5) · 문안 숙지(5) · 속도(5) · 자연스러운 연출(10)
-분위기·목소리 25점: 톤(8) · 발성(7) · 친절함(5) · 과장 지양(5)
-억양 25점: 성조 정확성(10, 1성高平·2성上扬·3성曲折·4성下降) · 고른 억양(5) · 문장 리듬(5) · 어미 처리(5)
-발음 25점 (정밀):
-  성조 정확성(10)
-  권설음(6): zh·ch·sh·r 정확히 (z와 구별)
-  운모 정확성(6): ü·ian·uan 등 정확히
-  기식음(3): p·t·k·q·x·ch 기식 유무`
+
+    ca: `[중국어 채점 기준 - 100점]
+
+유창성 ${maxFluency}점:
+  끊어읽기(5): 중국어 의미 단위로 자연스럽게 끊는가
+  말하는 듯한 연출(10): 스타카토식(단어 단위로 끊어 읽는 방식) 지양. 자연스럽게 이어지는가
+  강조(5): 중요 단어에서 강조가 들어가는가
+  속도(5): 너무 빠르거나 느리지 않은가. 성조가 뭉개질 정도로 빠르면 감점
+  문안 숙지(5): 버벅거림, 반복 없는가
+
+분위기·목소리 25점 (반드시 0점 이상 부여):
+  친근함(10): 승객에게 직접 말하는 따뜻한 느낌인가. 최소 5점 이상
+  발성(5): 적절한 음량, 안정적 발성. 최소 3점 이상
+  톤(10): 중국어 기내방송에 어울리는 부드럽고 자연스러운 톤인가. 최소 5점 이상
+
+성조·억양 25점:
+  1성·4성(5): 1성(高平) 충분히 높게 유지, 4성(下降) 확실하게 내려가는가
+  2성·3성(5): 2성(上扬) 올라가는 흐름, 3성(曲折) 내렸다 올라가는 흐름 확인
+  성조 변화 규칙(5): 변조 규칙(不·一 등) 준수하는가
+  중국어 특성 억양(10): 전체 문장 리듬이 중국어답게 자연스러운가
+
+발음 ${maxPron}점:
+  권설음(5): zh·ch·sh·r과 z·c·s 구별되는가
+  단운모(5): ü·e·o 정확한가
+  복운모(5): ian·uan·üan 등 정확한가
+  오발음(5): 빈번한 오류 단어 체크`
   };
   const criteria = criteriaMap[langCode] || criteriaMap.ko;
 
-  const prompt = `당신은 항공사 기내방송 전문 교관입니다.
-이 앱은 승무원이 혼자 반복 연습하는 훈련 도구입니다. 채점은 정직하게 하되, 피드백은 반드시 "다음 연습에서 바로 실행할 수 있는 구체적 행동 지침"을 담아야 합니다.
-막연한 평가("발음을 개선하세요") 대신, 어떤 부분을 어떻게 연습하면 나아지는지 알려주세요.
-언어: ${langName} | ${gradeRule}
+  const base64Audio = await blobToBase64(audioBlob);
 
-[STT 인식 오류 — 채점에서 반드시 제외]
-• 쉼표·마침표 없음 / 띄어쓰기 오류 (기내 에→기내에)
-• 조사·어미 미세 변형 (~이니↔~이니까) / 유사 발음 단어 (나고↔나오고)
+  const sharedRules = `언어: ${langName} | ${gradeRule}
+
+[채점 시 관대하게 처리할 항목]
 • [목적지][편명][공항] 등 변수 자리 단어
 • 선택 문안 중 하나만 말한 경우
 • 같은 의미를 살짝 다르게 표현한 경우
 
-[채점 기준 — 연습 도구 특성상 관대하게 적용]
-• 방송 내용을 전반적으로 정확히 전달했는가?
-• 승객이 편안하게 들을 수 있는 수준인가?
-• 안전 관련 핵심 키워드가 누락되지 않았는가?
-• 점수 기준: 70점=전반적으로 무난한 방송 수준 / 80점=자연스럽고 듣기 좋음 / 90점=우수한 방송 수준
+[점수 기준]
+• 70점 = 전반적으로 무난한 방송 수준
+• 80점 = 자연스럽고 듣기 좋음
+• 90점 = 우수한 방송 수준
 
 ${criteria}
 ${cpText}
 원문:
-${script}
+${script}`;
 
-발화 (STT 인식 결과 — 인식 오류 포함될 수 있음):
-${transcript}
-
-아래 JSON만 반환하세요 (설명·주석 없이):
+  const sharedJson = `아래 JSON만 반환하세요 (설명·주석 없이):
 {
+  "transcript": "음성에서 실제 발화된 내용 (직접 청취해 전사)",
   "language": "${langCode}",
   "score": 0-100 정수,
   "grade": ${isKoEn ? '"A" 또는 "B" 또는 "C" 또는 "미취득"' : '"PASS" 또는 "FAIL"'},
@@ -1825,37 +1954,100 @@ ${transcript}
     "fluency": {
       "score": 0-${maxFluency} 정수,
       "level": "우수" 또는 "보통" 또는 "노력필요",
-      "feedback": "이 연습에서 잘된 점과 구체적 개선 방향 (2문장)",
+      "feedback": "이 음성에서 들은 구체적 근거를 포함한 잘된 점과 개선 방향 (2문장)",
       "practiceTip": "다음 연습에서 바로 해볼 수 있는 구체적 방법 1가지 (예: '○○ 구간을 읽을 때 의도적으로 0.5초 멈춰보세요')"
     },
     "atmosphere": {
-      "score": 0-25 정수,
+      "score": 1-25 정수 (음성이 존재하는 한 반드시 1 이상),
       "level": "우수" 또는 "보통" 또는 "노력필요",
-      "feedback": "2문장",
+      "feedback": "이 음성의 목소리·톤·분위기에 대한 구체적 관찰 (2문장)",
       "practiceTip": "구체적 연습 방법 1가지"
     },
     "intonation": {
       "score": 0-25 정수,
       "level": "우수" 또는 "보통" 또는 "노력필요",
-      "feedback": "2문장",
+      "feedback": "이 음성에서 들은 억양 특성에 대한 구체적 관찰 (2문장)",
       "practiceTip": "구체적 연습 방법 1가지 (예: '문장 끝 단어를 약간 낮춰 읽는 연습을 5번 반복하세요')"
     },
     "pronunciation": {
       "score": 0-${maxPron} 정수,
       "level": "우수" 또는 "보통" 또는 "노력필요",
-      "feedback": "2문장",
+      "feedback": "이 음성에서 들은 발음 특성에 대한 구체적 관찰 (2문장)",
       "practiceTip": "구체적 발음 연습 방법 1가지",
       "details": ["실제 오류 예시만: '○○'를 '△△'처럼 발음했는데, '□□'로 연습하세요 (오류 없으면 빈 배열)"]
     }
   },
-  "goodPoints": ["잘된 점 1 (구체적으로)", "잘된 점 2 (있으면)"],
-  "missedKeywords": ["누락된 핵심 키워드 (STT 오류 제외, 실제 누락만)"],
+  "goodPoints": ["이 음성에서 실제로 잘된 점 1 (구체적으로)", "잘된 점 2 (있으면)"],
+  "missedKeywords": ["누락된 핵심 키워드 (실제 누락만)"],
   "nextFocus": "이번 연습에서 가장 먼저 개선할 1가지와 그 이유 (예: '억양 — 문장 끝이 단조롭게 올라가서 승객에게 어색하게 들립니다')",
   "practiceMethod": "nextFocus를 개선하기 위한 단계별 연습 방법 (3줄 이내, 내일 당장 따라할 수 있도록 구체적으로)",
   "encouragement": "이 연습 수준에 맞는 구체적이고 따뜻한 응원 메시지 1문장 (막연한 격려 말고, 이 연습에서 보인 노력을 언급)"
-}`;
+}
 
-  const result = await model.generateContent(prompt);
+중요: atmosphere(분위기·목소리) score는 반드시 1 이상의 정수를 반환하세요.
+음성이 존재하는 한 0점은 절대 불가합니다.
+발성·톤·친근함 각 항목에 최소 점수 기준을 적용하세요.`;
+
+  // ── 1차 시도: /api/gemini 프록시 경유로 audio inlineData 전달 ──
+  const audioPrompt = `당신은 항공사 기내방송 전문 교관입니다.
+첨부된 음성 파일을 반드시 직접 들으세요. STT 텍스트 변환 없이 실제 음성을 기반으로 평가합니다.
+채점 전 아래 순서로 음성을 분석하세요:
+1. 전체 음성을 한 번 들으며 전반적인 분위기와 완성도 파악
+2. 구간별로 끊어읽기·속도·강조 위치 확인
+3. 각 항목 기준에 따라 점수 결정
+
+점수를 줄 때는 반드시 "이 음성에서 들은 구체적 근거"를 피드백에 포함하세요.
+"전반적으로 좋습니다" 같은 막연한 피드백은 절대 금지입니다.
+${sharedRules}
+
+${sharedJson}`;
+
+  try {
+    const res = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gemini-2.5-flash',
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: 'audio/webm', data: base64Audio } },
+            { text: audioPrompt }
+          ]
+        }]
+      })
+    });
+    if (res.status === 501) {
+      console.warn('로컬 환경: 배포 후 테스트 필요');
+      return null;
+    }
+    console.log('Gemini audio 응답 status:', res.status);
+    const text = await res.text();
+    console.log('Gemini audio 응답 앞 200자:', text.slice(0, 200));
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 120)}`);
+    const data = JSON.parse(text);
+    const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error('응답 JSON 파싱 실패');
+  } catch (e) {
+    console.error('audio 채점 실패, STT 텍스트 방식으로 전환:', e);
+  }
+
+  // ── 2차 fallback: Web Speech API STT 텍스트로 채점 ──
+  const transcript = state.transcript?.trim() || '';
+  if (!transcript) return null;
+
+  const textPrompt = `당신은 항공사 기내방송 전문 교관입니다.
+아래 STT 인식 텍스트를 기반으로 채점하세요 (음성 파일 전달 실패로 텍스트 방식 전환).
+막연한 평가 대신 어떤 부분을 어떻게 연습하면 나아지는지 구체적으로 알려주세요.
+${sharedRules}
+
+발화 (STT 인식 결과 — 인식 오류 포함될 수 있음):
+${transcript}
+
+${sharedJson}`;
+
+  const result = await model.generateContent(textPrompt);
   const raw = result.response.text().trim();
   const m = raw.match(/\{[\s\S]*\}/);
   if (!m) return null;

@@ -25,12 +25,15 @@ export async function onRequestPost(context) {
     return Response.json({ error: 'contents 필드가 필요합니다.' }, { status: 400 });
   }
 
+  const geminiBody = { contents };
+  if (body.generationConfig) geminiBody.generationConfig = body.generationConfig;
+
   const geminiRes = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents })
+      body: JSON.stringify(geminiBody)
     }
   );
 
