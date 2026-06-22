@@ -377,11 +377,16 @@ function extractKeyPhrases(text, lang) {
 }
 function buildCustomLang(text, cpStr, langCode) {
   const sttMap = { ko:'ko-KR', en:'en-US', ja:'ja-JP', ca:'zh-CN' };
-  const wpmMap = { ko:130, en:140, ja:110, ca:118 };
+  // en은 WPM, 나머지는 음절/분
+  const speedMap      = { ko:350, en:115, ja:325, ca:240 };
+  const speedUnitMap  = { ko:'음절/분', en:'WPM', ja:'음절/분', ca:'음절/분' };
+  const speedTolMap   = { ko:100, en:90, ja:75, ca:80 };
   const checkpoints = cpStr ? cpStr.split(',').map(s=>s.trim()).filter(Boolean) : [];
   return {
-    sttLang: sttMap[langCode] || 'ko-KR',
-    idealWPM: wpmMap[langCode] || 130,
+    sttLang:       sttMap[langCode] || 'ko-KR',
+    idealSpeed:    speedMap[langCode] || 115,
+    speedUnit:     speedUnitMap[langCode] || 'WPM',
+    speedTolerance: speedTolMap[langCode] || 90,
     text: text.trim(),
     checkpoints: checkpoints.length ? checkpoints : ['방송 내용'],
     keyPhrases: extractKeyPhrases(text, langCode),
@@ -925,8 +930,17 @@ function analyzeAndShow(duration) {
   // ─────────────────────────────────────────────────────────────────────────
 
   // --- 음성 신호 측정 ---
-  const wpm        = hasSpeech && duration > 3 ? (transcript.split(' ').filter(Boolean).length / duration) * 60 : 0;
-  const wpmRatio   = wpm > 0 ? Math.max(0, 1 - Math.abs(wpm - lang.idealWPM) / 90) : 0;
+  // 영어는 단어 수(WPM), 한·일·중은 음절 수(음절/분)
+  const speedRaw = hasSpeech && duration > 3
+    ? (state.selectedLang === 'en'
+        ? transcript.split(' ').filter(Boolean).length
+        : transcript.replace(/\s/g, '').length)
+      / duration * 60
+    : 0;
+  const wpm      = speedRaw; // 하위 호환 (wpmRatio 계산에 사용)
+  const wpmRatio = speedRaw > 0
+    ? Math.max(0, 1 - Math.abs(speedRaw - lang.idealSpeed) / lang.speedTolerance)
+    : 0;
   const pitchCV    = hasAudio ? measurePitchCV(state.pitchSamples) : 0;
   const pitchRange = hasAudio ? measurePitchRange(state.pitchSamples) : 0;
   const ampStab    = hasAudio ? measureAmpStability(state.amplitudeSamples) : 0;
@@ -993,7 +1007,7 @@ function analyzeAndShow(duration) {
 
   const result = {
     total, pass: total >= 75,
-    wpm: Math.round(wpm), duration,
+    wpm: Math.round(speedRaw), speedUnit: lang.speedUnit, duration,
     wordMatch, completeness, contentQuality,
     categories: {
       fluency:       { score: fluencyItems.reduce((a,b)=>a+b,0),       max: 30, items: fluencyItems },
@@ -1210,7 +1224,7 @@ function renderFeedback(result, transcript, lang, isAdmin) {
       (v) => (v < 4 && cqOk) ? '쉼표( , )와 의미 단위에서 0.5~1초 멈추는 연습을 해보세요. 방송문을 슬래시(/)로 끊어 표시하고 5번 반복하면 효과적입니다.' : null,
       // 속도 연출
       (v) => (v < 4 && cqOk) ? (result.wpm > 0
-        ? `현재 약 ${result.wpm} WPM — 적정 ${lang.idealWPM} WPM. ${result.wpm > lang.idealWPM ? '핵심 단어 앞에서 의도적으로 속도를 줄여보세요.' : '조금 더 자신감 있게 속도를 높여보세요.'}`
+        ? `현재 약 ${result.wpm} ${result.speedUnit} — 적정 ${lang.idealSpeed} ${lang.speedUnit}. ${result.wpm > lang.idealSpeed ? '핵심 단어 앞에서 의도적으로 속도를 줄여보세요.' : '조금 더 자신감 있게 속도를 높여보세요.'}`
         : '방송문을 먼저 눈으로 3회 읽고 속도를 몸에 익힌 뒤 녹음하세요.') : null,
       // 강조 표현
       (v) => (v < 3 && cqFull) ? '목적지·편명·시간 같은 핵심 정보 직전에 살짝 속도를 늦추고 또렷하게 읽으면 자연스러운 강조가 됩니다.' : null,
@@ -1268,7 +1282,7 @@ function renderFeedback(result, transcript, lang, isAdmin) {
       <div class="fb-ov-msg">${overviewMsg}</div>
       <div class="fb-ov-stats">
         <span class="fb-stat">⏱ ${Math.round(result.duration)}초</span>
-        <span class="fb-stat">💬 ${result.wpm} WPM</span>
+        <span class="fb-stat">💬 ${result.wpm} ${result.speedUnit}</span>
         <span class="fb-stat">🔑 키워드 ${Math.round(result.completeness * 100)}%</span>
         <span class="fb-stat">📝 단어일치 ${Math.round(result.wordMatch * 100)}%</span>
       </div>
@@ -1789,9 +1803,10 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
     - 문법 구조 중간에 끊거나, 끊김이 너무 잦거나 없으면 감점
     - 예) "손님 여러분 / 저희 비행기는" O, "손님 / 여러분 저희" X
   속도(5):
-    - 전체 방송이 너무 빠르거나(단어 뭉개짐) 너무 느리면(지루함) 감점
-    - 문안 중간 속도 변화가 급격하면 감점
-    - 자연스러운 대화 속도로 균일하게 유지되는지 확인
+    - 300~400 음절/분 범위가 적정
+    - 너무 빠르면(400음절 이상) 단어 뭉개짐, 너무 느리면(250음절 이하) 지루함
+    - 실제 음성을 듣고 체감 속도로 판단할 것
+    - WPM 수치가 아닌 실제 들리는 속도감을 기준으로 평가
   강조 표현(5):
     - 편명·목적지·안전 관련 핵심 단어에서 강조(살짝 느리게 또는 음량 높임)가 들어가는가
     - 전체가 동일한 강도로 읽히면 감점
