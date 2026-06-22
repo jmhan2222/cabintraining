@@ -243,7 +243,9 @@ function _confirmAuth() {
 }
 
 // ===== MODEL VOICE (localStorage) =====
-let _mvAudioUrl = null; // revocable object URL for current playback
+let _mvAudioUrl = null;
+let _modalMvLang = 'ko'; // 모달에서 현재 선택된 언어 탭
+
 function base64ToBlob(base64) {
   const parts = base64.split(',');
   const mime = (parts[0].match(/:(.*?);/)||['','audio/mpeg'])[1];
@@ -252,25 +254,112 @@ function base64ToBlob(base64) {
   for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
   return new Blob([arr],{type:mime});
 }
-function loadModelVoice(scriptId) {
+
+// 언어별 로드: lang 지정 시 lang 키 우선, 없으면 레거시 단일 키 폴백
+function loadModelVoice(scriptId, lang) {
+  if (lang) {
+    const v = localStorage.getItem(`cabinvoice_voice_${scriptId}_${lang}`);
+    if (v) return v;
+  }
   return localStorage.getItem(`cabinvoice_voice_${scriptId}`) || null;
 }
-function saveModelVoice(scriptId, base64) {
-  localStorage.setItem(`cabinvoice_voice_${scriptId}`, base64);
+function saveModelVoiceLang(scriptId, lang, base64, name) {
+  localStorage.setItem(`cabinvoice_voice_${scriptId}_${lang}`, base64);
+  if (name) localStorage.setItem(`cabinvoice_voice_${scriptId}_${lang}_name`, name);
 }
-function deleteModelVoice(scriptId) {
-  localStorage.removeItem(`cabinvoice_voice_${scriptId}`);
+function deleteModelVoiceLang(scriptId, lang) {
+  localStorage.removeItem(`cabinvoice_voice_${scriptId}_${lang}`);
+  localStorage.removeItem(`cabinvoice_voice_${scriptId}_${lang}_name`);
 }
-function getModelVoiceKey() {
-  // During edit: use existing id. During add: use pending key resolved at save time.
-  return _modalState.mode === 'edit' ? `cabinvoice_voice_${_modalState.editId}` : 'cabinvoice_voice__pending';
+function getModelVoiceKey(lang) {
+  const id = _modalState.mode === 'edit' ? _modalState.editId : '_pending';
+  return `cabinvoice_voice_${id}_${lang}`;
 }
 function _refreshMvUI() {
-  const key = getModelVoiceKey();
-  const stored = localStorage.getItem(key);
-  const hasMv = !!stored;
-  $('mv-current').classList.toggle('hidden', !hasMv);
-  $('mv-name').textContent = hasMv ? (localStorage.getItem(key + '_name') || '모델 음성 등록됨') : '';
+  ['ko','en','ja','ca'].forEach(lang => {
+    const key = getModelVoiceKey(lang);
+    const stored = localStorage.getItem(key);
+    const el = document.getElementById(`mv-current-${lang}`);
+    const nameEl = document.getElementById(`mv-name-${lang}`);
+    if (el) el.classList.toggle('hidden', !stored);
+    if (nameEl) nameEl.textContent = stored ? (localStorage.getItem(key + '_name') || '등록됨') : '';
+  });
+}
+
+// ===== PRACTICE COUNT =====
+function getPracticeCount(scriptId) {
+  return parseInt(localStorage.getItem(`practiceCount_${scriptId}`) || '0', 10);
+}
+function incPracticeCount(scriptId) {
+  const count = getPracticeCount(scriptId) + 1;
+  localStorage.setItem(`practiceCount_${scriptId}`, count);
+  console.log(`[연습카운터] ${scriptId} → ${count}회`);
+  return count;
+}
+
+// ===== TOAST =====
+let _toastTimer = null;
+function showToast(msg, duration = 2200) {
+  let el = document.getElementById('app-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'app-toast';
+    el.className = 'app-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('visible'), duration);
+}
+
+// ===== SENTENCE SPLIT & CLICKABLE RENDER =====
+function splitSentences(text) {
+  const parts = [];
+  let cur = '';
+  for (const ch of text) {
+    cur += ch;
+    if ('.!?,。！？、，\n'.includes(ch)) {
+      const t = cur.trim();
+      if (t.length > 1) parts.push(t);
+      cur = '';
+    }
+  }
+  if (cur.trim().length > 1) parts.push(cur.trim());
+  return parts;
+}
+
+function renderClickableScript(text, langCode) {
+  // 테이블 포함 스크립트는 기존 방식 유지
+  if (text.includes('|')) return renderBilingualScript(text, langCode);
+  const sentences = splitSentences(text);
+  if (!sentences.length) return renderBilingualScript(text, langCode);
+  return sentences.map((s, i) => {
+    const inner = (langCode === 'ja' || langCode === 'ca')
+      ? renderBilingualScript(s, langCode)
+      : escHtml(s);
+    return `<span class="script-sentence" data-idx="${i}">${inner}</span>`;
+  }).join(' ');
+}
+
+// 모델 음성 구간 재생 (준비 화면 문장 클릭 시)
+function _playModelVoiceSegment(idx) {
+  const s = state.currentScript;
+  if (!s) return;
+  const base64 = loadModelVoice(s.id, state.selectedLang);
+  if (!base64) { showToast('모델 음성을 먼저 등록해주세요'); return; }
+  const lang = s.langs[state.selectedLang];
+  const numSentences = Math.max(1, splitSentences(lang.text).length);
+  const audio = new Audio(base64);
+  audio.addEventListener('loadedmetadata', () => {
+    const seg = audio.duration / numSentences;
+    audio.currentTime = seg * idx;
+    audio.play().catch(() => {});
+    showToast('이 구간 모델 음성 재생 🔊');
+    const stop = setTimeout(() => audio.pause(), (seg + 0.15) * 1000);
+    audio.onended = () => clearTimeout(stop);
+  });
+  audio.onerror = () => showToast('음성 재생 오류');
 }
 
 // ===== HTML ESCAPING & SCRIPT TEXT RENDERING =====
@@ -528,10 +617,18 @@ function _sidebarItemHtml(s) {
   const evalLangs = s._evalLang || ['ko','en','ja','ca'];
   const langDots = evalLangs.filter(l => s.langs?.[l]?.text)
     .map(l => `<span class="lang-dot lang-dot-${l}"></span>`).join('');
+  const cnt = getPracticeCount(s.id);
+  const badge = cnt >= 10
+    ? `<span class="practice-badge pb-hot">${cnt}회 🔥</span>`
+    : cnt >= 5
+      ? `<span class="practice-badge pb-blue">${cnt}회 연습</span>`
+      : cnt >= 1
+        ? `<span class="practice-badge pb-gray">${cnt}회 연습</span>`
+        : '';
   return `<div class="sidebar-item${_selectedScriptId===s.id?' selected':''}" data-id="${s.id}">
     <span class="sidebar-item-section">${s._section||''}</span>
     <span class="sidebar-item-title">${escHtml(s.title)}</span>
-    <span class="sidebar-item-langs">${langDots}</span>
+    <span class="sidebar-item-langs">${langDots}${badge}</span>
   </div>`;
 }
 
@@ -598,10 +695,19 @@ function _renderDetailContent(s, lang) {
     cpEl.classList.add('hidden');
   }
 
-  // 모델 음성
+  // 모델 음성 (언어별)
   const voiceBtn = $('detail-voice-btn');
-  const hasVoice = !!loadModelVoice(s.id);
+  const hasVoice = !!loadModelVoice(s.id, lang);
   voiceBtn.classList.toggle('hidden', !hasVoice);
+
+  // 연습 횟수
+  const practiceEl = $('detail-practice-info');
+  if (practiceEl) {
+    const cnt = getPracticeCount(s.id);
+    practiceEl.innerHTML = cnt > 0
+      ? `<div class="practice-count-info">총 <strong>${cnt}</strong>회 연습 <span class="practice-count-device">(이 기기 기준)</span></div>`
+      : '';
+  }
 
   // 연습 시작 버튼
   $('detail-start-btn').dataset.id = s.id;
@@ -673,10 +779,30 @@ function updatePrepContent() {
   const lang = s.langs[state.selectedLang];
 
   if ($('prep-title-bar')) $('prep-title-bar').textContent = s.title;
-  $('prep-text').innerHTML = renderBilingualScript(lang.text, state.selectedLang);
-  // 모델 음성 바
-  const hasVoice = !!loadModelVoice(s.id);
-  $('model-voice-bar').classList.toggle('hidden', !hasVoice);
+  $('prep-text').innerHTML = renderClickableScript(lang.text, state.selectedLang);
+
+  // 문장 클릭 핸들러 등록
+  document.querySelectorAll('#prep-text .script-sentence').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('#prep-text .script-sentence').forEach(s => s.classList.remove('sentence-active'));
+      el.classList.add('sentence-active');
+      _playModelVoiceSegment(parseInt(el.dataset.idx, 10));
+    });
+  });
+
+  // 모델 음성 바 (항상 표시, 음성 없으면 비활성)
+  const hasVoice = !!loadModelVoice(s.id, state.selectedLang);
+  const mvBtn = $('btn-model-voice');
+  mvBtn.disabled = !hasVoice;
+  mvBtn.textContent = hasVoice ? '🎵 모델 음성 듣기' : '🎵 모델 음성 미등록';
+  mvBtn.classList.toggle('mv-btn-disabled', !hasVoice);
+
+  // 드릴 모드 버튼
+  const drillBtn = $('btn-drill-mode');
+  if (drillBtn) {
+    drillBtn.disabled = !hasVoice;
+    drillBtn.title = hasVoice ? '' : '모델 음성 등록 후 사용 가능';
+  }
 
   $('prep-checkpoints').innerHTML = lang.checkpoints.map(c =>
     `<span class="checkpoint-item">✓ ${c}</span>`).join('');
@@ -867,6 +993,12 @@ function stopRecording() {
   try { state.recognition?.abort(); } catch(e){}
   state.recognition = null;
 
+  // 연습 횟수 카운터
+  if (state.currentScript?.id) {
+    incPracticeCount(state.currentScript.id);
+    renderSidebar(_allScripts); // 사이드바 뱃지 갱신
+  }
+
   const duration = (Date.now() - state.recordingStart) / 1000;
   $('loading-overlay').classList.remove('hidden');
 
@@ -905,6 +1037,151 @@ function tierScore(ratio, maxPt) {
   return 0;
 }
 
+// ===== DRILL MODE =====
+let _drill = { sentences: [], idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
+
+function startDrillMode() {
+  const s = state.currentScript;
+  const lang = s?.langs[state.selectedLang];
+  if (!lang) return;
+  const base64 = loadModelVoice(s.id, state.selectedLang);
+  if (!base64) { showToast('모델 음성을 먼저 등록해주세요'); return; }
+  const sentences = splitSentences(lang.text).filter(s => s.length > 2);
+  if (!sentences.length) { showToast('방송문이 없습니다'); return; }
+  _drill = { sentences, idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
+  showScreen('screen-drill');
+  _drillRender();
+}
+
+function _drillRender() {
+  const { sentences, idx } = _drill;
+  $('drill-progress-text').textContent = `${idx + 1} / ${sentences.length}`;
+  $('drill-progress-fill').style.width = `${((idx + 1) / sentences.length) * 100}%`;
+  $('drill-sentence-box').textContent = sentences[idx];
+  $('drill-actions').classList.remove('hidden');
+  $('drill-compare').classList.add('hidden');
+  $('drill-complete').classList.add('hidden');
+  const recBtn = $('btn-drill-record');
+  recBtn.textContent = '🎤 따라읽기 시작';
+  recBtn.onclick = _drillStartRec;
+  console.log(`[드릴모드] 문장 ${idx + 1}/${sentences.length} 시작`);
+}
+
+function _drillPlayModel(btn) {
+  const s = state.currentScript;
+  const base64 = loadModelVoice(s.id, state.selectedLang);
+  if (!base64) return;
+  const numS = _drill.sentences.length;
+  const audio = new Audio(base64);
+  if (btn) { btn.disabled = true; btn.textContent = '🔊 재생 중...'; }
+  audio.addEventListener('loadedmetadata', () => {
+    const seg = audio.duration / numS;
+    audio.currentTime = seg * _drill.idx;
+    audio.play().catch(() => {});
+    const stop = setTimeout(() => { audio.pause(); if (btn) { btn.disabled = false; btn.textContent = btn.id === 'btn-drill-play-model' ? '▶ 모델 음성 듣기' : '▶ 모델'; } }, (seg + 0.15) * 1000);
+    audio.onended = () => { clearTimeout(stop); if (btn) { btn.disabled = false; btn.textContent = btn.id === 'btn-drill-play-model' ? '▶ 모델 음성 듣기' : '▶ 모델'; } };
+  });
+  _drill.modelAudio = audio;
+}
+
+async function _drillStartRec() {
+  try {
+    _drill.chunks = [];
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    _drill.stream = stream;
+    const mr = new MediaRecorder(stream);
+    _drill.mr = mr;
+    mr.ondataavailable = e => { if (e.data.size > 0) _drill.chunks.push(e.data); };
+    mr.onstop = () => {
+      _drill.myBlob = new Blob(_drill.chunks, { type: 'audio/webm' });
+      if (_drill.myAudioUrl) URL.revokeObjectURL(_drill.myAudioUrl);
+      _drill.myAudioUrl = URL.createObjectURL(_drill.myBlob);
+      $('drill-actions').classList.add('hidden');
+      $('drill-compare').classList.remove('hidden');
+      console.log(`[드릴모드] 문장 ${_drill.idx + 1} 녹음 완료`);
+    };
+    mr.start();
+    _drill.recording = true;
+    const btn = $('btn-drill-record');
+    btn.textContent = '⏹ 녹음 중지';
+    btn.onclick = _drillStopRec;
+  } catch (e) { alert('마이크 접근이 필요합니다: ' + e.message); }
+}
+
+function _drillStopRec() {
+  _drill.stream?.getTracks().forEach(t => t.stop());
+  if (_drill.mr?.state !== 'inactive') _drill.mr.stop();
+  _drill.recording = false;
+}
+
+function _drillNext() {
+  if (_drill.myAudioUrl) { URL.revokeObjectURL(_drill.myAudioUrl); _drill.myAudioUrl = null; }
+  _drill.myBlob = null;
+  _drill.idx++;
+  if (_drill.idx >= _drill.sentences.length) {
+    $('drill-actions').classList.add('hidden');
+    $('drill-compare').classList.add('hidden');
+    $('drill-complete').classList.remove('hidden');
+    console.log('[드릴모드] 드릴 완료!');
+  } else {
+    _drillRender();
+  }
+}
+
+// ===== RESULT MODEL VOICE COMPARISON =====
+let _cmp = { active: false, audio: null, timeout: null };
+
+function startModelComparison() {
+  const s = state.currentScript;
+  if (!s) return;
+  const base64 = loadModelVoice(s.id, state.selectedLang);
+  if (!base64) return;
+  if (!state.audioBlob) { showToast('내 녹음이 없습니다'); return; }
+  _cmp.active = true;
+  $('compare-status-text').classList.remove('hidden');
+  $('btn-compare-stop').classList.remove('hidden');
+  $('btn-compare-voice').classList.add('hidden');
+  console.log('[비교모드] 모델 vs 내 음성 비교 시작');
+  _cmpCycle();
+}
+
+function stopModelComparison() {
+  _cmp.active = false;
+  _cmp.audio?.pause(); _cmp.audio = null;
+  clearTimeout(_cmp.timeout); _cmp.timeout = null;
+  $('compare-status-text').classList.add('hidden');
+  $('compare-status-text').textContent = '';
+  $('btn-compare-stop').classList.add('hidden');
+  $('btn-compare-voice').classList.remove('hidden');
+}
+
+function _cmpCycle() {
+  if (!_cmp.active) return;
+  const base64 = loadModelVoice(state.currentScript.id, state.selectedLang);
+  $('compare-status-text').textContent = '🎵 모델 음성 재생 중...';
+  const a = new Audio(base64);
+  _cmp.audio = a;
+  a.play().catch(() => {});
+  a.onended = () => {
+    if (!_cmp.active) return;
+    $('compare-status-text').textContent = '⏸ 잠시 대기 중...';
+    _cmp.timeout = setTimeout(() => {
+      if (!_cmp.active) return;
+      $('compare-status-text').textContent = '🎤 내 음성 재생 중...';
+      const url = URL.createObjectURL(state.audioBlob);
+      const b = new Audio(url);
+      _cmp.audio = b;
+      b.play().catch(() => {});
+      b.onended = () => {
+        URL.revokeObjectURL(url);
+        if (!_cmp.active) return;
+        $('compare-status-text').textContent = '⏸ 잠시 대기 중...';
+        _cmp.timeout = setTimeout(_cmpCycle, 2000);
+      };
+    }, 2000);
+  };
+}
+
 // ===== ANALYSIS =====
 function analyzeAndShow(duration) {
   const s = state.currentScript;
@@ -937,7 +1214,6 @@ function analyzeAndShow(duration) {
         : transcript.replace(/\s/g, '').length)
       / duration * 60
     : 0;
-  const wpm      = speedRaw; // 하위 호환 (wpmRatio 계산에 사용)
   const wpmRatio = speedRaw > 0
     ? Math.max(0, 1 - Math.abs(speedRaw - lang.idealSpeed) / lang.speedTolerance)
     : 0;
@@ -1094,6 +1370,11 @@ function measureAmpPeaks(samples) {
 // ===== RESULTS =====
 function showResults(result, transcript) {
   showScreen('screen-result');
+  // 비교 버튼 (모델 음성 있는 경우만 표시, 이전 비교 상태 초기화)
+  stopModelComparison();
+  const hasModelVoice = !!loadModelVoice(state.currentScript?.id, state.selectedLang);
+  $('result-compare-section').classList.toggle('hidden', !hasModelVoice);
+
   const lang = state.currentScript.langs[state.selectedLang];
   const isAdmin = isEditUnlocked();
 
@@ -1390,10 +1671,21 @@ function _resetModal() {
   // table builder
   $('table-builder').classList.add('hidden');
   $('btn-table-toggle').classList.remove('active');
-  // model voice
-  $('mv-current').classList.add('hidden');
-  $('mv-name').textContent = '';
-  document.getElementById('mv-file-input').value = '';
+  // model voice (언어별 초기화)
+  ['ko','en','ja','ca'].forEach(lang => {
+    const el = document.getElementById(`mv-current-${lang}`);
+    const nameEl = document.getElementById(`mv-name-${lang}`);
+    const fileEl = document.getElementById(`mv-file-${lang}`);
+    if (el) el.classList.add('hidden');
+    if (nameEl) nameEl.textContent = '';
+    if (fileEl) fileEl.value = '';
+  });
+  // MV 탭 초기화
+  document.querySelectorAll('#mv-lang-tabs .mv-lang-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('#mv-lang-tabs .mv-lang-tab[data-lang="ko"]')?.classList.add('active');
+  document.querySelectorAll('.mv-lang-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('mv-panel-ko')?.classList.add('active');
+  _modalMvLang = 'ko';
 }
 
 function openAddModal() {
@@ -1437,12 +1729,16 @@ function openEditModal(id, source) {
   if (koLang?.checkpoints) {
     document.getElementById('custom-checkpoints-ko').value = koLang.checkpoints.join(', ');
   }
-  // model voice
-  const voiceStored = loadModelVoice(id);
-  if (voiceStored) {
-    $('mv-current').classList.remove('hidden');
-    $('mv-name').textContent = localStorage.getItem(`cabinvoice_voice_${id}_name`) || '모델 음성 등록됨';
-  }
+  // model voice (언어별)
+  ['ko','en','ja','ca'].forEach(lang => {
+    const stored = localStorage.getItem(`cabinvoice_voice_${id}_${lang}`);
+    if (stored) {
+      const el = document.getElementById(`mv-current-${lang}`);
+      const nameEl = document.getElementById(`mv-name-${lang}`);
+      if (el) el.classList.remove('hidden');
+      if (nameEl) nameEl.textContent = localStorage.getItem(`cabinvoice_voice_${id}_${lang}_name`) || '등록됨';
+    }
+  });
   $('modal-save').textContent = '수정 저장';
   $('custom-modal').classList.remove('hidden');
 }
@@ -1504,12 +1800,22 @@ function saveScriptFromModal() {
       if (text) langs[l] = buildCustomLang(text, '', l);
     });
     const id = 'custom_' + Date.now();
-    // pending 모델 음성 → 실제 id로 이동
+    // pending 모델 음성 → 실제 id로 이동 (언어별)
+    ['ko','en','ja','ca'].forEach(lang => {
+      const pv = localStorage.getItem(`cabinvoice_voice__pending_${lang}`);
+      const pn = localStorage.getItem(`cabinvoice_voice__pending_${lang}_name`);
+      if (pv) {
+        localStorage.setItem(`cabinvoice_voice_${id}_${lang}`, pv);
+        localStorage.setItem(`cabinvoice_voice_${id}_${lang}_name`, pn || '모델 음성');
+        localStorage.removeItem(`cabinvoice_voice__pending_${lang}`);
+        localStorage.removeItem(`cabinvoice_voice__pending_${lang}_name`);
+      }
+    });
+    // 레거시 단일 pending 폴백
     const pendingVoice = localStorage.getItem('cabinvoice_voice__pending');
-    const pendingName  = localStorage.getItem('cabinvoice_voice__pending_name');
     if (pendingVoice) {
-      localStorage.setItem(`cabinvoice_voice_${id}`, pendingVoice);
-      localStorage.setItem(`cabinvoice_voice_${id}_name`, pendingName || '모델 음성');
+      localStorage.setItem(`cabinvoice_voice_${id}_ko`, pendingVoice);
+      localStorage.setItem(`cabinvoice_voice_${id}_ko_name`, localStorage.getItem('cabinvoice_voice__pending_name') || '모델 음성');
       localStorage.removeItem('cabinvoice_voice__pending');
       localStorage.removeItem('cabinvoice_voice__pending_name');
     }
@@ -2209,7 +2515,69 @@ function openAdminScreen() {
     initFirebase();
     _refreshAdminVersion();
     _refreshAdminVersionList();
+    _setupAdminMvSection();
     showScreen('screen-admin');
+  });
+}
+
+// ===== ADMIN MODEL VOICE MANAGEMENT =====
+let _adminMvLang = 'ko';
+
+function _setupAdminMvSection() {
+  const select = $('admin-mv-script');
+  if (!select) return;
+  select.innerHTML = '<option value="">-- 방송문 선택 --</option>' +
+    _allScripts.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.title)}</option>`).join('');
+  select.onchange = () => {
+    const id = select.value;
+    $('admin-mv-panel').classList.toggle('hidden', !id);
+    if (id) _renderAdminMvBody(id, _adminMvLang);
+  };
+  document.querySelectorAll('#admin-mv-lang-tabs .mv-lang-tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('#admin-mv-lang-tabs .mv-lang-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      _adminMvLang = tab.dataset.lang;
+      const id = $('admin-mv-script').value;
+      if (id) _renderAdminMvBody(id, _adminMvLang);
+    };
+  });
+}
+
+function _renderAdminMvBody(scriptId, lang) {
+  const body = $('admin-mv-body');
+  if (!body) return;
+  const stored = localStorage.getItem(`cabinvoice_voice_${scriptId}_${lang}`);
+  const name = localStorage.getItem(`cabinvoice_voice_${scriptId}_${lang}_name`) || '등록됨';
+  body.innerHTML = (stored
+    ? `<div class="mv-current" style="margin-bottom:10px">
+        <span class="mv-icon">🎵</span>
+        <span class="mv-name" style="flex:1">${escHtml(name)}</span>
+        <button type="button" class="btn-icon sm" id="admin-mv-play">▶ 재생</button>
+        <button type="button" class="btn-icon sm mv-del-btn" id="admin-mv-del">✕ 삭제</button>
+       </div>` : '')
+    + `<label class="mv-upload-btn">📁 음성 파일 업로드 (MP3/WAV)
+        <input type="file" id="admin-mv-file" accept="audio/*" style="display:none">
+       </label>`;
+  document.getElementById('admin-mv-file')?.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      saveModelVoiceLang(scriptId, lang, ev.target.result, file.name);
+      _renderAdminMvBody(scriptId, lang);
+      console.log(`[어드민] ${scriptId}/${lang} 모델 음성 저장: ${file.name}`);
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('admin-mv-play')?.addEventListener('click', () => {
+    const b = loadModelVoice(scriptId, lang);
+    if (b) new Audio(b).play();
+  });
+  document.getElementById('admin-mv-del')?.addEventListener('click', () => {
+    deleteModelVoiceLang(scriptId, lang);
+    _renderAdminMvBody(scriptId, lang);
+    console.log(`[어드민] ${scriptId}/${lang} 모델 음성 삭제`);
   });
 }
 
@@ -2590,55 +2958,92 @@ document.addEventListener('DOMContentLoaded', () => {
     ta.focus();
   });
 
-  // ===== MODEL VOICE 이벤트 =====
-  document.getElementById('mv-file-input').addEventListener('change', async e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      alert('파일 크기가 너무 큽니다. 10MB 이하의 파일을 선택해 주세요.');
-      e.target.value = '';
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const base64 = ev.target.result;
-      const key = getModelVoiceKey();
-      localStorage.setItem(key, base64);
-      localStorage.setItem(key + '_name', file.name);
-      $('mv-current').classList.remove('hidden');
-      $('mv-name').textContent = file.name;
-    };
-    reader.readAsDataURL(file);
+  // ===== MODEL VOICE 이벤트 (언어별) =====
+  ['ko','en','ja','ca'].forEach(lang => {
+    document.getElementById(`mv-file-${lang}`)?.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) { alert('파일 크기 10MB 초과'); e.target.value = ''; return; }
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const key = getModelVoiceKey(lang);
+        localStorage.setItem(key, ev.target.result);
+        localStorage.setItem(key + '_name', file.name);
+        const el = document.getElementById(`mv-current-${lang}`);
+        const nameEl = document.getElementById(`mv-name-${lang}`);
+        if (el) el.classList.remove('hidden');
+        if (nameEl) nameEl.textContent = file.name;
+        console.log(`[모달] ${lang} 모델 음성 저장: ${file.name}`);
+      };
+      reader.readAsDataURL(file);
+    });
+    document.getElementById(`mv-play-${lang}`)?.addEventListener('click', () => {
+      const base64 = localStorage.getItem(getModelVoiceKey(lang));
+      if (base64) new Audio(base64).play();
+    });
+    document.getElementById(`mv-del-${lang}`)?.addEventListener('click', () => {
+      const key = getModelVoiceKey(lang);
+      localStorage.removeItem(key); localStorage.removeItem(key + '_name');
+      const el = document.getElementById(`mv-current-${lang}`);
+      if (el) el.classList.add('hidden');
+      const nameEl = document.getElementById(`mv-name-${lang}`);
+      if (nameEl) nameEl.textContent = '';
+      const fileEl = document.getElementById(`mv-file-${lang}`);
+      if (fileEl) fileEl.value = '';
+    });
   });
-  $('mv-play').addEventListener('click', () => {
-    const key = getModelVoiceKey();
-    const base64 = localStorage.getItem(key);
-    if (!base64) return;
-    if (_mvAudioUrl) URL.revokeObjectURL(_mvAudioUrl);
-    const audio = new Audio(base64);
-    audio.play();
-  });
-  $('mv-del').addEventListener('click', () => {
-    const key = getModelVoiceKey();
-    localStorage.removeItem(key);
-    localStorage.removeItem(key + '_name');
-    $('mv-current').classList.add('hidden');
-    $('mv-name').textContent = '';
-    document.getElementById('mv-file-input').value = '';
+  // MV 모달 언어 탭 전환
+  document.querySelectorAll('#mv-lang-tabs .mv-lang-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('#mv-lang-tabs .mv-lang-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.mv-lang-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(`mv-panel-${tab.dataset.lang}`)?.classList.add('active');
+      _modalMvLang = tab.dataset.lang;
+    });
   });
 
   // ===== 모델 음성 듣기 버튼 (prep screen) =====
   $('btn-model-voice').addEventListener('click', () => {
     const s = state.currentScript;
     if (!s) return;
-    const base64 = loadModelVoice(s.id);
+    const base64 = loadModelVoice(s.id, state.selectedLang);
     if (!base64) return;
+    const btn = $('btn-model-voice');
     const audio = new Audio(base64);
-    audio.play();
-    $('btn-model-voice').textContent = '🔊 재생 중...';
-    audio.onended = () => { $('btn-model-voice').textContent = '🎙 모델 음성 듣기'; };
-    audio.onerror = () => { $('btn-model-voice').textContent = '🎙 모델 음성 듣기'; alert('음성 파일을 재생할 수 없습니다.'); };
+    audio.play().catch(() => {});
+    btn.textContent = '🔊 재생 중...';
+    audio.onended = () => { btn.textContent = '🎵 모델 음성 듣기'; };
+    audio.onerror = () => { btn.textContent = '🎵 모델 음성 듣기'; };
   });
+
+  // ===== 드릴 모드 =====
+  $('btn-drill-mode').addEventListener('click', startDrillMode);
+  $('btn-back-drill').addEventListener('click', () => {
+    _drill.stream?.getTracks().forEach(t => t.stop());
+    if (state.currentScript) showScreen('screen-prep');
+    else showScreen('screen-home');
+  });
+  $('btn-drill-play-model').addEventListener('click', () => _drillPlayModel($('btn-drill-play-model')));
+  $('btn-drill-record').addEventListener('click', _drillStartRec);
+  $('btn-drill-play-model2').addEventListener('click', () => _drillPlayModel($('btn-drill-play-model2')));
+  $('btn-drill-play-my').addEventListener('click', () => {
+    if (_drill.myAudioUrl) new Audio(_drill.myAudioUrl).play().catch(() => {});
+  });
+  $('btn-drill-redo').addEventListener('click', () => {
+    if (_drill.myAudioUrl) { URL.revokeObjectURL(_drill.myAudioUrl); _drill.myAudioUrl = null; }
+    _drill.myBlob = null;
+    _drillRender();
+  });
+  $('btn-drill-next').addEventListener('click', _drillNext);
+  $('btn-drill-done').addEventListener('click', () => {
+    if (state.currentScript) startPrep(state.currentScript);
+    else showScreen('screen-home');
+  });
+
+  // ===== 결과 화면 모델 음성 비교 =====
+  $('btn-compare-voice').addEventListener('click', startModelComparison);
+  $('btn-compare-stop').addEventListener('click', stopModelComparison);
 
   // ===== 관리자 패널 =====
   $('btn-open-admin').addEventListener('click', openAdminScreen);
@@ -2689,7 +3094,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!_selectedScriptId) return;
     const s = _allScripts.find(x => x.id === _selectedScriptId);
     if (!s) return;
-    const base64 = loadModelVoice(s.id);
+    const base64 = loadModelVoice(s.id, _detailLang);
     if (!base64) return;
     if (_mvAudioUrl) { URL.revokeObjectURL(_mvAudioUrl); _mvAudioUrl = null; }
     const blob = base64ToBlob(base64);
@@ -2703,6 +3108,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // 결과 화면 버튼
-  document.getElementById('btn-result-select')?.addEventListener('click', () => showScreen('screen-home'));
-  document.getElementById('btn-result-retry-2')?.addEventListener('click', () => { if (state.currentScript) startPrep(state.currentScript); });
+  document.getElementById('btn-result-select')?.addEventListener('click', () => { stopModelComparison(); showScreen('screen-home'); });
+  document.getElementById('btn-result-retry-2')?.addEventListener('click', () => { stopModelComparison(); if (state.currentScript) startPrep(state.currentScript); });
+  $('btn-retry')?.addEventListener('click', () => { stopModelComparison(); });
 });

@@ -1482,3 +1482,109 @@ html, body {
 .result-bottom-actions {
   display: flex; justify-content: center; gap: 12px; margin-top: 32px; flex-wrap: wrap;
 }
+
+/* ===== MV LANG TABS (modal + admin) ===== */
+.mv-lang-tabs {
+  display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap;
+}
+.mv-lang-tab {
+  padding: 5px 12px; border-radius: 6px; border: 1.5px solid var(--gray-300);
+  background: #fff; font-size: 12px; font-weight: 600; cursor: pointer;
+  color: var(--gray-500); transition: all .15s;
+}
+.mv-lang-tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.mv-lang-panel { display: none; }
+.mv-lang-panel.active { display: block; }
+
+/* ===== PRACTICE COUNT BADGE ===== */
+.practice-badge {
+  display: inline-flex; align-items: center;
+  font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9px;
+  margin-left: 5px; line-height: 1.4;
+}
+.pb-gray  { background: var(--gray-200); color: var(--gray-600); }
+.pb-blue  { background: #dbeafe; color: #1d4ed8; }
+.pb-hot   { background: #ffedd5; color: #c2410c; }
+.detail-practice-info { margin: 4px 0 10px; }
+.practice-count-info { font-size: 13px; color: var(--gray-600); }
+.practice-count-device { font-size: 11px; color: var(--gray-400); }
+
+/* ===== DRILL MODE BUTTON ===== */
+.btn-drill {
+  background: #fff; color: var(--blue); border: 2px solid var(--blue);
+  font-size: 15px; font-weight: 700; padding: 14px 28px; border-radius: 50px;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+  display: flex; align-items: center; gap: 8px;
+}
+.btn-drill:hover:not(:disabled) { background: var(--blue); color: #fff; box-shadow: 0 4px 16px rgba(59,130,246,.4); }
+.btn-drill:disabled { opacity: .45; cursor: not-allowed; border-color: var(--gray-300); color: var(--gray-400); }
+
+/* ===== MODEL VOICE BUTTON DISABLED ===== */
+.btn-model-voice:disabled,
+.btn-model-voice.mv-btn-disabled {
+  background: var(--gray-200); color: var(--gray-400); cursor: default; box-shadow: none;
+}
+
+/* ===== SCRIPT SENTENCE (clickable) ===== */
+.script-sentence {
+  cursor: pointer; border-radius: 4px; padding: 1px 2px;
+  transition: background .12s; display: inline;
+}
+.script-sentence:hover { background: rgba(59,130,246,.12); }
+.sentence-active { background: rgba(59,130,246,.22) !important; outline: 1.5px solid var(--blue); }
+
+/* ===== SCREEN DRILL ===== */
+#screen-drill { display: flex; flex-direction: column; }
+.drill-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; background: #fff; border-bottom: 1px solid var(--gray-200); flex-shrink: 0;
+}
+.drill-topbar-title { font-size: 15px; font-weight: 700; color: var(--gray-800); }
+.drill-progress-text { font-size: 14px; font-weight: 700; color: var(--blue); min-width: 50px; text-align: right; }
+.drill-progress-bar-wrap {
+  height: 5px; background: var(--gray-200); flex-shrink: 0;
+}
+.drill-progress-fill {
+  height: 100%; background: var(--blue); transition: width .3s ease;
+}
+.drill-body {
+  flex: 1; overflow-y: auto; padding: 24px 20px 32px;
+  max-width: 720px; width: 100%; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 20px; align-items: center;
+}
+.drill-sentence-box {
+  background: #fff; border: 2px solid var(--blue); border-radius: 14px;
+  padding: 24px 28px; font-size: 18px; font-weight: 600; color: var(--gray-800);
+  line-height: 1.7; text-align: center; width: 100%; box-sizing: border-box;
+}
+.drill-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.drill-compare { display: flex; gap: 10px; flex-direction: column; align-items: center; width: 100%; }
+.drill-compare.hidden { display: none; }
+.drill-nav-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.drill-complete { text-align: center; width: 100%; }
+.drill-complete.hidden { display: none; }
+.drill-complete-icon { font-size: 52px; margin-bottom: 12px; }
+.drill-complete-msg { font-size: 22px; font-weight: 700; color: var(--gray-800); margin-bottom: 20px; }
+
+/* ===== RESULT COMPARE SECTION ===== */
+.result-compare-section {
+  margin: 20px 0 0; padding: 16px;
+  background: var(--gray-50); border: 1.5px solid var(--gray-200); border-radius: 12px;
+}
+.result-compare-section.hidden { display: none; }
+.compare-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.compare-status { font-size: 14px; font-weight: 600; color: var(--blue); }
+.compare-status.hidden { display: none; }
+
+/* ===== TOAST ===== */
+.app-toast {
+  position: fixed; bottom: 88px; left: 50%; transform: translateX(-50%) translateY(12px);
+  background: rgba(30,30,30,.85); color: #fff;
+  padding: 9px 22px; border-radius: 24px; font-size: 14px; font-weight: 500;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 9999;
+  white-space: nowrap;
+}
+.app-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ===== PREP READY BAR (multiple buttons) ===== */
+.prep-ready-bar { flex-wrap: wrap; gap: 10px; }

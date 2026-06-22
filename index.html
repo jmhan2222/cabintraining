@@ -70,6 +70,7 @@
           </div>
           <div class="detail-script-box" id="detail-script-box"></div>
           <div class="detail-checkpoints hidden" id="detail-checkpoints"></div>
+          <div class="detail-practice-info" id="detail-practice-info"></div>
           <div class="detail-actions">
             <button class="btn-model-voice detail-voice-btn hidden" id="detail-voice-btn">🎵 모델 음성 듣기</button>
             <button class="btn-primary detail-start-btn" id="detail-start-btn">✈ 연습 시작 →</button>
@@ -92,6 +93,9 @@
       <button class="lang-tab" data-lang="ja">🇯🇵 日本語</button>
       <button class="lang-tab" data-lang="ca">🇨🇳 中文</button>
     </div>
+    <div class="model-voice-bar" id="model-voice-bar">
+      <button class="btn-model-voice" id="btn-model-voice">🎵 모델 음성 듣기</button>
+    </div>
     <div class="prep-body">
       <div class="prep-read-hint">방송문을 충분히 읽으신 후 아래 버튼을 눌러 주세요</div>
       <div class="script-card" id="prep-text"></div>
@@ -100,11 +104,9 @@
         <div class="checkpoints-list" id="prep-checkpoints"></div>
       </div>
       <div class="tips-box" id="tips-box"></div>
-      <div class="model-voice-bar hidden" id="model-voice-bar">
-        <button class="btn-model-voice" id="btn-model-voice">🎙 모델 음성 듣기</button>
-      </div>
     </div>
     <div class="prep-ready-bar">
+      <button class="btn-drill" id="btn-drill-mode" disabled title="모델 음성 등록 후 사용 가능">🔁 드릴 모드</button>
       <button class="btn-ready-record pulse" id="btn-start-record">
         <span>🎤</span> 준비됐어요 — 녹음 시작
       </button>
@@ -174,9 +176,52 @@
 
       <div class="ai-result-section hidden" id="ai-result-section"></div>
 
+      <div class="result-compare-section hidden" id="result-compare-section">
+        <div class="section-heading">🎵 모델 음성 비교</div>
+        <div class="compare-controls">
+          <button class="btn-icon" id="btn-compare-voice">🎵 모델 음성과 비교하기</button>
+          <div class="compare-status hidden" id="compare-status-text"></div>
+          <button class="btn-icon hidden" id="btn-compare-stop">⏹ 비교 중지</button>
+        </div>
+      </div>
+
       <div class="result-bottom-actions">
         <button class="btn-icon" id="btn-result-select">다른 방송문 선택</button>
         <button class="btn-primary" id="btn-result-retry-2">↺ 다시 연습</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 5: DRILL MODE ===== -->
+  <div id="screen-drill" class="screen">
+    <div class="drill-topbar">
+      <button class="btn-icon" id="btn-back-drill">← 뒤로</button>
+      <div class="drill-topbar-title">🔁 드릴 모드</div>
+      <div class="drill-progress-text" id="drill-progress-text">1 / 1</div>
+    </div>
+    <div class="drill-progress-bar-wrap">
+      <div class="drill-progress-fill" id="drill-progress-fill" style="width:0%"></div>
+    </div>
+    <div class="drill-body">
+      <div class="drill-sentence-box" id="drill-sentence-box"></div>
+      <div class="drill-actions" id="drill-actions">
+        <button class="btn-icon" id="btn-drill-play-model">▶ 모델 음성 듣기</button>
+        <button class="btn-primary" id="btn-drill-record">🎤 따라읽기 시작</button>
+      </div>
+      <div class="drill-compare hidden" id="drill-compare">
+        <div class="drill-nav-row">
+          <button class="btn-icon" id="btn-drill-play-model2">▶ 모델</button>
+          <button class="btn-icon" id="btn-drill-play-my">▶ 내 음성</button>
+        </div>
+        <div class="drill-nav-row">
+          <button class="btn-icon" id="btn-drill-redo">↺ 다시 연습</button>
+          <button class="btn-primary" id="btn-drill-next">다음 문장 →</button>
+        </div>
+      </div>
+      <div class="drill-complete hidden" id="drill-complete">
+        <div class="drill-complete-icon">🎉</div>
+        <div class="drill-complete-msg">드릴 완료!</div>
+        <button class="btn-primary" id="btn-drill-done">준비 화면으로</button>
       </div>
     </div>
   </div>
@@ -263,19 +308,47 @@
           </div>
         </div>
 
-        <!-- 모델 음성 섹션 -->
+        <!-- 모델 음성 섹션 (언어별) -->
         <div class="model-voice-section" id="model-voice-section">
-          <div class="mv-section-title">🎙 모델 음성</div>
-          <div class="mv-current hidden" id="mv-current">
-            <span class="mv-icon">🎵</span>
-            <span class="mv-name" id="mv-name">모델 음성 등록됨</span>
-            <button type="button" class="btn-icon sm" id="mv-play">▶ 재생</button>
-            <button type="button" class="btn-icon sm mv-del-btn" id="mv-del">✕ 삭제</button>
+          <div class="mv-section-title">🎙 모델 음성 (언어별)</div>
+          <div class="mv-lang-tabs" id="mv-lang-tabs">
+            <button type="button" class="mv-lang-tab active" data-lang="ko">🇰🇷 한국어</button>
+            <button type="button" class="mv-lang-tab" data-lang="en">🇺🇸 English</button>
+            <button type="button" class="mv-lang-tab" data-lang="ja">🇯🇵 日本語</button>
+            <button type="button" class="mv-lang-tab" data-lang="ca">🇨🇳 中文</button>
           </div>
-          <label class="mv-upload-btn">
-            📁 음성 파일 업로드 (MP3 / WAV)
-            <input type="file" id="mv-file-input" accept="audio/mp3,audio/wav,audio/mpeg,audio/*" style="display:none">
-          </label>
+          <div id="mv-panel-ko" class="mv-lang-panel active">
+            <div class="mv-current hidden" id="mv-current-ko">
+              <span class="mv-icon">🎵</span><span class="mv-name" id="mv-name-ko">등록됨</span>
+              <button type="button" class="btn-icon sm" id="mv-play-ko">▶ 재생</button>
+              <button type="button" class="btn-icon sm mv-del-btn" id="mv-del-ko">✕ 삭제</button>
+            </div>
+            <label class="mv-upload-btn">📁 한국어 음성 파일 업로드<input type="file" id="mv-file-ko" accept="audio/*" style="display:none"></label>
+          </div>
+          <div id="mv-panel-en" class="mv-lang-panel">
+            <div class="mv-current hidden" id="mv-current-en">
+              <span class="mv-icon">🎵</span><span class="mv-name" id="mv-name-en">등록됨</span>
+              <button type="button" class="btn-icon sm" id="mv-play-en">▶ 재생</button>
+              <button type="button" class="btn-icon sm mv-del-btn" id="mv-del-en">✕ 삭제</button>
+            </div>
+            <label class="mv-upload-btn">📁 English voice file upload<input type="file" id="mv-file-en" accept="audio/*" style="display:none"></label>
+          </div>
+          <div id="mv-panel-ja" class="mv-lang-panel">
+            <div class="mv-current hidden" id="mv-current-ja">
+              <span class="mv-icon">🎵</span><span class="mv-name" id="mv-name-ja">등록됨</span>
+              <button type="button" class="btn-icon sm" id="mv-play-ja">▶ 재생</button>
+              <button type="button" class="btn-icon sm mv-del-btn" id="mv-del-ja">✕ 삭제</button>
+            </div>
+            <label class="mv-upload-btn">📁 日本語音声アップロード<input type="file" id="mv-file-ja" accept="audio/*" style="display:none"></label>
+          </div>
+          <div id="mv-panel-ca" class="mv-lang-panel">
+            <div class="mv-current hidden" id="mv-current-ca">
+              <span class="mv-icon">🎵</span><span class="mv-name" id="mv-name-ca">등록됨</span>
+              <button type="button" class="btn-icon sm" id="mv-play-ca">▶ 재생</button>
+              <button type="button" class="btn-icon sm mv-del-btn" id="mv-del-ca">✕ 삭제</button>
+            </div>
+            <label class="mv-upload-btn">📁 上传中文语音文件<input type="file" id="mv-file-ca" accept="audio/*" style="display:none"></label>
+          </div>
           <div class="mv-hint">훈련생이 연습 준비 화면에서 모델 음성을 들을 수 있습니다</div>
         </div>
 
@@ -432,6 +505,26 @@
         <div class="admin-section-title">📋 버전 관리</div>
         <div id="admin-version-list" class="admin-version-list">
           <div style="color:var(--gray-400);font-size:13px">Firebase 연결 후 버전 목록이 표시됩니다.</div>
+        </div>
+      </section>
+
+      <!-- 모델 음성 관리 섹션 -->
+      <section class="admin-section">
+        <div class="admin-section-title">🎙 모델 음성 관리</div>
+        <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">방송문을 선택하고 언어별 모델 음성을 업로드하세요.</div>
+        <div class="admin-row-btns">
+          <select id="admin-mv-script" class="admin-input" style="flex:1;max-width:360px">
+            <option value="">-- 방송문 선택 --</option>
+          </select>
+        </div>
+        <div id="admin-mv-panel" class="hidden" style="margin-top:12px">
+          <div class="mv-lang-tabs" id="admin-mv-lang-tabs">
+            <button type="button" class="mv-lang-tab active" data-lang="ko">🇰🇷 한국어</button>
+            <button type="button" class="mv-lang-tab" data-lang="en">🇺🇸 English</button>
+            <button type="button" class="mv-lang-tab" data-lang="ja">🇯🇵 日本語</button>
+            <button type="button" class="mv-lang-tab" data-lang="ca">🇨🇳 中文</button>
+          </div>
+          <div id="admin-mv-body" style="margin-top:8px"></div>
         </div>
       </section>
 
