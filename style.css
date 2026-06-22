@@ -1350,21 +1350,7 @@ html, body {
 .prep-title-bar { font-size: 15px; font-weight: 700; color: var(--gray-800); flex: 1; text-align: center; margin: 0 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prep-read-hint { text-align: center; font-size: 14px; color: var(--gray-500); padding: 16px 20px 0; font-style: italic; }
 
-.prep-ready-bar {
-  padding: 20px 24px; background: #fff; border-top: 1px solid var(--gray-200);
-  display: flex; justify-content: center; flex-shrink: 0;
-}
-.btn-ready-record {
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: #fff; border: none; font-size: 17px; font-weight: 700;
-  padding: 16px 40px; border-radius: 50px; cursor: pointer;
-  display: flex; align-items: center; gap: 10px;
-  box-shadow: 0 4px 20px rgba(16,185,129,.4);
-  transition: transform .15s, box-shadow .15s; font-family: inherit;
-}
-.btn-ready-record:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(16,185,129,.5); }
-.btn-ready-record:active { transform: translateY(0); }
-.btn-ready-record.pulse { animation: readyPulse 2s ease-in-out infinite; }
+/* btn-choice-full.pulse 에서 사용 */
 @keyframes readyPulse {
   0%,100% { box-shadow: 0 4px 20px rgba(16,185,129,.4); }
   50% { box-shadow: 0 4px 32px rgba(16,185,129,.7); }
