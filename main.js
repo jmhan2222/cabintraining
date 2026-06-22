@@ -293,8 +293,17 @@ function getPracticeCount(scriptId) {
 function incPracticeCount(scriptId) {
   const count = getPracticeCount(scriptId) + 1;
   localStorage.setItem(`practiceCount_${scriptId}`, count);
+  localStorage.setItem(`practiceLastDate_${scriptId}`, new Date().toISOString().slice(0, 10));
   console.log(`[연습카운터] ${scriptId} → ${count}회`);
   return count;
+}
+function getLastPracticeLabel(scriptId) {
+  const stored = localStorage.getItem(`practiceLastDate_${scriptId}`);
+  if (!stored) return null;
+  const diffDays = Math.floor((Date.now() - new Date(stored).getTime()) / 86400000);
+  if (diffDays === 0) return '오늘';
+  if (diffDays === 1) return '어제';
+  return `${diffDays}일 전`;
 }
 
 // ===== TOAST =====
@@ -618,13 +627,15 @@ function _sidebarItemHtml(s) {
   const langDots = evalLangs.filter(l => s.langs?.[l]?.text)
     .map(l => `<span class="lang-dot lang-dot-${l}"></span>`).join('');
   const cnt = getPracticeCount(s.id);
-  const badge = cnt >= 10
-    ? `<span class="practice-badge pb-hot">${cnt}회 🔥</span>`
-    : cnt >= 5
-      ? `<span class="practice-badge pb-blue">${cnt}회 연습</span>`
-      : cnt >= 1
-        ? `<span class="practice-badge pb-gray">${cnt}회 연습</span>`
-        : '';
+  const badge = cnt >= 20
+    ? `<span class="practice-badge pb-gold">👑 ${cnt}회</span>`
+    : cnt >= 10
+      ? `<span class="practice-badge pb-hot">⭐ ${cnt}회</span>`
+      : cnt >= 5
+        ? `<span class="practice-badge pb-blue">🔥 ${cnt}회</span>`
+        : cnt >= 1
+          ? `<span class="practice-badge pb-gray">🌱 ${cnt}회</span>`
+          : '';
   return `<div class="sidebar-item${_selectedScriptId===s.id?' selected':''}" data-id="${s.id}">
     <span class="sidebar-item-section">${s._section||''}</span>
     <span class="sidebar-item-title">${escHtml(s.title)}</span>
@@ -700,12 +711,14 @@ function _renderDetailContent(s, lang) {
   const hasVoice = !!loadModelVoice(s.id, lang);
   voiceBtn.classList.toggle('hidden', !hasVoice);
 
-  // 연습 횟수
+  // 연습 횟수 + 마지막 날짜
   const practiceEl = $('detail-practice-info');
   if (practiceEl) {
     const cnt = getPracticeCount(s.id);
+    const lastLabel = getLastPracticeLabel(s.id);
+    const emoji = cnt >= 20 ? '👑' : cnt >= 10 ? '⭐' : cnt >= 5 ? '🔥' : cnt >= 1 ? '🌱' : '';
     practiceEl.innerHTML = cnt > 0
-      ? `<div class="practice-count-info">총 <strong>${cnt}</strong>회 연습 <span class="practice-count-device">(이 기기 기준)</span></div>`
+      ? `<span class="practice-count-info">${emoji} <strong>${cnt}회</strong> 연습 · 마지막: ${lastLabel} <span class="practice-count-device">(이 기기)</span></span>`
       : '';
   }
 
@@ -993,10 +1006,15 @@ function stopRecording() {
   try { state.recognition?.abort(); } catch(e){}
   state.recognition = null;
 
-  // 연습 횟수 카운터
+  // 연습 횟수 카운터 + 축하 토스트
   if (state.currentScript?.id) {
-    incPracticeCount(state.currentScript.id);
-    renderSidebar(_allScripts); // 사이드바 뱃지 갱신
+    const count = incPracticeCount(state.currentScript.id);
+    renderSidebar(_allScripts);
+    if      (count === 1)  showToast('첫 번째 연습 완료! 🌱', 3000);
+    else if (count === 5)  showToast('5회 달성! 🔥 꾸준히 하고 있어요', 3000);
+    else if (count === 10) showToast('10회 달성! ⭐ 정말 열심히 하시네요', 3000);
+    else if (count === 20) showToast('20회 달성! 👑 당신은 방송 마스터', 3000);
+    else                   showToast(`${count}회째 연습 완료! 잘하고 있어요 ✈`, 2500);
   }
 
   const duration = (Date.now() - state.recordingStart) / 1000;

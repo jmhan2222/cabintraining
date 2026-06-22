@@ -1502,22 +1502,62 @@ html, body {
   font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9px;
   margin-left: 5px; line-height: 1.4;
 }
-.pb-gray  { background: var(--gray-200); color: var(--gray-600); }
-.pb-blue  { background: #dbeafe; color: #1d4ed8; }
-.pb-hot   { background: #ffedd5; color: #c2410c; }
-.detail-practice-info { margin: 4px 0 10px; }
-.practice-count-info { font-size: 13px; color: var(--gray-600); }
-.practice-count-device { font-size: 11px; color: var(--gray-400); }
-
-/* ===== DRILL MODE BUTTON ===== */
-.btn-drill {
-  background: #fff; color: var(--blue); border: 2px solid var(--blue);
-  font-size: 15px; font-weight: 700; padding: 14px 28px; border-radius: 50px;
-  cursor: pointer; transition: all .15s; font-family: inherit;
-  display: flex; align-items: center; gap: 8px;
+.pb-gray { background: #f0fdf4; color: #15803d; }
+.pb-blue { background: #eff6ff; color: #1d4ed8; }
+.pb-hot  { background: #fff7ed; color: #c2410c; }
+.pb-gold { background: #fefce8; color: #a16207; }
+.detail-practice-info { margin: 0 0 14px; }
+.practice-count-info {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--gray-700);
+  background: var(--gray-50); border: 1px solid var(--gray-200);
+  border-radius: 20px; padding: 4px 12px;
 }
-.btn-drill:hover:not(:disabled) { background: var(--blue); color: #fff; box-shadow: 0 4px 16px rgba(59,130,246,.4); }
-.btn-drill:disabled { opacity: .45; cursor: not-allowed; border-color: var(--gray-300); color: var(--gray-400); }
+.practice-count-device { font-size: 11px; color: var(--gray-400); font-weight: 400; }
+
+/* ===== PRACTICE CHOICE CARD ===== */
+.practice-choice-card {
+  margin-top: 20px;
+  background: #fff;
+  border: 1.5px solid var(--gray-200);
+  border-radius: 14px;
+  padding: 20px 16px;
+  box-shadow: var(--shadow);
+}
+.practice-choice-title {
+  font-size: 13px; font-weight: 700; color: var(--gray-500);
+  text-align: center; margin-bottom: 14px; letter-spacing: .2px;
+}
+.practice-choice-btns {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.btn-choice {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; padding: 16px 10px; border-radius: 12px; border: 2px solid transparent;
+  cursor: pointer; font-family: inherit; transition: all .15s; text-align: center;
+}
+.btn-choice-full {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff; border-color: transparent;
+  box-shadow: 0 4px 16px rgba(16,185,129,.35);
+}
+.btn-choice-full:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16,185,129,.5); }
+.btn-choice-full.pulse { animation: readyPulse 2s ease-in-out infinite; }
+.btn-choice-drill {
+  background: #fff; color: var(--blue);
+  border-color: var(--blue);
+}
+.btn-choice-drill:hover:not(:disabled) {
+  background: var(--blue); color: #fff;
+  box-shadow: 0 4px 16px rgba(59,130,246,.35);
+}
+.btn-choice-drill:disabled {
+  opacity: .4; cursor: not-allowed;
+  border-color: var(--gray-300); color: var(--gray-400);
+}
+.choice-icon { font-size: 22px; line-height: 1; }
+.choice-label { font-size: 14px; font-weight: 700; line-height: 1.3; }
+.choice-desc  { font-size: 11px; opacity: .8; line-height: 1.2; }
 
 /* ===== MODEL VOICE BUTTON DISABLED ===== */
 .btn-model-voice:disabled,
@@ -1586,5 +1626,3 @@ html, body {
 }
 .app-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* ===== PREP READY BAR (multiple buttons) ===== */
-.prep-ready-bar { flex-wrap: wrap; gap: 10px; }

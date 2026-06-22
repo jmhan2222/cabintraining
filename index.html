@@ -104,12 +104,21 @@
         <div class="checkpoints-list" id="prep-checkpoints"></div>
       </div>
       <div class="tips-box" id="tips-box"></div>
-    </div>
-    <div class="prep-ready-bar">
-      <button class="btn-drill" id="btn-drill-mode" disabled title="모델 음성 등록 후 사용 가능">🔁 드릴 모드</button>
-      <button class="btn-ready-record pulse" id="btn-start-record">
-        <span>🎤</span> 준비됐어요 — 녹음 시작
-      </button>
+      <div class="practice-choice-card">
+        <div class="practice-choice-title">어떻게 연습할까요?</div>
+        <div class="practice-choice-btns">
+          <button class="btn-choice btn-choice-full pulse" id="btn-start-record">
+            <span class="choice-icon">✈</span>
+            <span class="choice-label">전체 연습 →</span>
+            <span class="choice-desc">AI 채점 포함</span>
+          </button>
+          <button class="btn-choice btn-choice-drill" id="btn-drill-mode" disabled title="모델 음성 등록 후 사용 가능">
+            <span class="choice-icon">🔁</span>
+            <span class="choice-label">드릴 모드 →</span>
+            <span class="choice-desc">문장별 따라읽기</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- 3-2-1 카운트다운 오버레이 -->
