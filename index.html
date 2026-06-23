@@ -93,13 +93,6 @@
       <button class="lang-tab" data-lang="ja">🇯🇵 日本語</button>
       <button class="lang-tab" data-lang="ca">🇨🇳 中文</button>
     </div>
-    <div class="model-voice-bar" id="model-voice-bar">
-      <button class="btn-model-voice" id="btn-model-voice">🎵 모델 음성 듣기</button>
-      <div class="gender-toggle">
-        <button class="btn-gender active" id="btn-gender-m" data-gender="M">남</button>
-        <button class="btn-gender" id="btn-gender-f" data-gender="F">여</button>
-      </div>
-    </div>
     <div class="prep-body">
       <div class="prep-read-hint">방송문을 충분히 읽으신 후 아래 버튼을 눌러 주세요</div>
       <div class="script-card" id="prep-text"></div>
@@ -109,19 +102,26 @@
       </div>
       <div class="tips-box" id="tips-box"></div>
       <div class="practice-choice-card">
-        <div class="practice-choice-title">어떻게 연습할까요?</div>
+        <div class="practice-choice-header">
+          <div class="practice-choice-title">어떻게 연습할까요?</div>
+          <div class="gender-toggle">
+            <button class="btn-gender active" id="btn-gender-m" data-gender="M">남</button>
+            <button class="btn-gender" id="btn-gender-f" data-gender="F">여</button>
+          </div>
+        </div>
         <div class="practice-choice-btns">
+          <button class="btn-model-voice" id="btn-model-voice">🎵 모델 음성 듣기</button>
           <button class="btn-choice btn-choice-full pulse" id="btn-start-record">
             <span class="choice-icon">✈</span>
-            <span class="choice-label">전체 연습 →</span>
+            <span class="choice-label">연습 시작 →</span>
             <span class="choice-desc">AI 채점 포함</span>
           </button>
-          <button class="btn-choice btn-choice-drill" id="btn-drill-mode" disabled title="모델 음성 등록 후 사용 가능">
-            <span class="choice-icon">🔁</span>
-            <span class="choice-label">드릴 모드 →</span>
-            <span class="choice-desc">문장별 따라읽기</span>
-          </button>
         </div>
+        <button class="btn-choice btn-choice-drill prep-drill-btn" id="btn-drill-mode" disabled title="모델 음성 등록 후 사용 가능">
+          <span class="choice-icon">🔁</span>
+          <span class="choice-label">드릴 모드 →</span>
+          <span class="choice-desc">문장별 따라읽기</span>
+        </button>
       </div>
     </div>
 

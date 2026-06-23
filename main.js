@@ -90,18 +90,20 @@ async function _resolveModelVoiceUrl(scriptId, lang, gender = _currentGender) {
   const cacheKey = `${scriptId}_${lang}_${gender}`;
   if (_mvUrlCache[cacheKey]) return _mvUrlCache[cacheKey];
 
-  // 3. Firestore scripts/{scriptId}.modelFiles — M: lang, F: lang_F
+  // 3. Firestore scripts/{num}.modelFiles — M: lang, F: lang_F
   if (_db) {
     try {
-      const doc = await _db.collection('scripts').doc(scriptId).get();
+      const numMatch = scriptId.match(/^(\d+(?:\.\d+)*)/);
+      const num = numMatch ? numMatch[1] : scriptId;
+      const doc = await _db.collection('scripts').doc(num).get();
       if (doc.exists) {
         const fsKey = gender === 'F' ? `${lang}_F` : lang;
         const fileName = doc.data().modelFiles?.[fsKey];
+        console.log('[모델음성] num:', num, '파일:', fileName);
         if (fileName) {
           const url = _buildLocalModelVoiceUrl(fileName, lang, gender);
           if (url) {
             _mvUrlCache[cacheKey] = url;
-            console.log(`[모델음성] ${scriptId}/${lang}/${gender} → 로컬 파일: ${fileName}`);
             return url;
           }
         }
@@ -491,16 +493,17 @@ function _playModelVoiceSegment(idx) {
   if (!url) return;
   const lang = s.langs[state.selectedLang];
   const numSentences = Math.max(1, splitSentences(lang.text).length);
-  const audio = new Audio(url);
-  audio.addEventListener('loadedmetadata', () => {
-    const seg = audio.duration / numSentences;
-    audio.currentTime = seg * idx;
-    audio.play().catch(() => {});
+  if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
+  _currentModelAudio = new Audio(url);
+  _currentModelAudio.addEventListener('loadedmetadata', () => {
+    const seg = _currentModelAudio.duration / numSentences;
+    _currentModelAudio.currentTime = seg * idx;
+    _currentModelAudio.play().catch(() => {});
     showToast('이 구간 모델 음성 재생 🔊');
-    const stop = setTimeout(() => audio.pause(), (seg + 0.15) * 1000);
-    audio.onended = () => clearTimeout(stop);
+    const stop = setTimeout(() => _currentModelAudio?.pause(), (seg + 0.15) * 1000);
+    _currentModelAudio.onended = () => clearTimeout(stop);
   });
-  audio.onerror = () => {};
+  _currentModelAudio.onerror = () => {};
 }
 
 // ===== HTML ESCAPING & SCRIPT TEXT RENDERING =====
@@ -1222,6 +1225,7 @@ function tierScore(ratio, maxPt) {
 
 // ===== DRILL MODE =====
 let _prepSetMvState = null; // showPrepScreen에서 할당, 성별 토글 핸들러에서 호출
+let _currentModelAudio = null;
 let _drill = { sentences: [], idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
 
 async function startDrillMode() {
@@ -1255,17 +1259,17 @@ function _drillPlayModel(btn) {
   const s = state.currentScript;
   const url = _getCachedModelVoiceUrl(s.id, state.selectedLang);
   if (!url) return;
-  const numS = _drill.sentences.length;
-  const audio = new Audio(url);
+  if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
+  _currentModelAudio = new Audio(url);
+  _drill.modelAudio = _currentModelAudio;
   if (btn) { btn.disabled = true; btn.textContent = '🔊 재생 중...'; }
-  audio.addEventListener('loadedmetadata', () => {
-    const seg = audio.duration / numS;
-    audio.currentTime = seg * _drill.idx;
-    audio.play().catch(() => {});
-    const stop = setTimeout(() => { audio.pause(); if (btn) { btn.disabled = false; btn.textContent = btn.id === 'btn-drill-play-model' ? '▶ 모델 음성 듣기' : '▶ 모델'; } }, (seg + 0.15) * 1000);
-    audio.onended = () => { clearTimeout(stop); if (btn) { btn.disabled = false; btn.textContent = btn.id === 'btn-drill-play-model' ? '▶ 모델 음성 듣기' : '▶ 모델'; } };
-  });
-  _drill.modelAudio = audio;
+  showToast(`현재 ${_drill.idx + 1}번째 문장 연습 중 — 전체 음성을 들으며 해당 구간을 집중해서 들으세요`, 4000);
+  _currentModelAudio.play().catch(() => {});
+  const onEnd = () => {
+    if (btn) { btn.disabled = false; btn.textContent = btn.id === 'btn-drill-play-model' ? '▶ 모델 음성 듣기' : '▶ 모델'; }
+  };
+  _currentModelAudio.onended = onEnd;
+  _currentModelAudio.onerror = onEnd;
 }
 
 async function _drillStartRec() {
@@ -3250,11 +3254,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
     if (!url) return;
     const btn = $('btn-model-voice');
-    const audio = new Audio(url);
-    audio.play().catch(() => {});
+    if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
+    _currentModelAudio = new Audio(url);
+    _currentModelAudio.play().catch(() => {});
     btn.textContent = '🔊 재생 중...';
-    audio.onended = () => { btn.textContent = '🎵 모델 음성 듣기'; };
-    audio.onerror = () => { btn.textContent = '🎵 모델 음성 듣기'; };
+    _currentModelAudio.onended = () => { btn.textContent = '🎵 모델 음성 듣기'; };
+    _currentModelAudio.onerror = () => { btn.textContent = '🎵 모델 음성 듣기'; };
   });
 
   // ===== 드릴 모드 =====
@@ -3340,12 +3345,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (_mvAudioUrl) { URL.revokeObjectURL(_mvAudioUrl); _mvAudioUrl = null; }
       const blob = base64ToBlob(base64);
       _mvAudioUrl = URL.createObjectURL(blob);
-      new Audio(_mvAudioUrl).play().catch(()=>{});
+      if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
+      _currentModelAudio = new Audio(_mvAudioUrl);
+      _currentModelAudio.play().catch(()=>{});
       return;
     }
     // 로컬 정적 파일 URL (Firestore modelFiles 기반)
     const url = await _resolveModelVoiceUrl(s.id, _detailLang);
-    if (url) new Audio(url).play().catch(()=>{});
+    if (url) {
+      if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
+      _currentModelAudio = new Audio(url);
+      _currentModelAudio.play().catch(()=>{});
+    }
   });
   $('detail-edit-btn').addEventListener('click', () => {
     if (!_selectedScriptId) return;
