@@ -9,14 +9,129 @@ const FIREBASE_CONFIG = {
 };
 
 let _db = null;
+let _storage = null;
 let _geminiModel = null;
+const _mvUrlCache = {}; // { "scriptId_lang": url }
+
 function initFirebase() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     _db = firebase.firestore();
+    _storage = firebase.storage();
     return true;
   } catch { return false; }
 }
+
+// 언어 코드 → 로컬 정적 폴더명 (남성 기준)
+const _MV_LOCAL_FOLDERS = {
+  ko: '한국어(남)',
+  en: '영어(남)',
+  ja: '일본어(남)',
+  ca: '중국어(남)',
+};
+
+// [DISABLED] 언어 코드 → Firebase Storage 폴더명 (남성 우선, 없으면 여성)
+// const _MV_FOLDERS = {
+//   ko: ['한국어(남)', '한국어(여)'],
+//   en: ['영어(남)',   '영어(여)'],
+//   ja: ['일본어(남)', '일본어(여)'],
+//   ca: ['중국어(남)', '중국어(여)'],
+// };
+
+// 로컬 정적 파일 URL 생성 (한글/공백 encodeURIComponent 처리)
+function _buildLocalModelVoiceUrl(fileName, lang) {
+  const folder = _MV_LOCAL_FOLDERS[lang];
+  if (!folder || !fileName) return null;
+  return './' +
+    encodeURIComponent('cabinvoice pro') + '/' +
+    encodeURIComponent(folder) + '/' +
+    encodeURIComponent(fileName);
+}
+
+// 방송문 ID에서 섹션 번호 추출 (예: "2.1.1", "[별표 3]")
+function _extractScriptNum(script) {
+  const id = script.id || '';
+  // 숫자 패턴 (예: "2.1.1")
+  const numMatch = id.match(/^(\d+(?:\.\d+)*)/);
+  if (numMatch) return numMatch[1];
+  // [별표 N] 패턴
+  const byeolMatch = id.match(/^(\[별표[^\]]*\])/);
+  if (byeolMatch) return byeolMatch[1];
+  // 제목에서 추출 시도
+  const titleNum = (script.title || '').match(/^(\d+(?:\.\d+)*)/);
+  if (titleNum) return titleNum[1];
+  return null;
+}
+
+// 로컬 정적 파일 → 모델 음성 URL 조회
+// 우선순위: 1) localStorage base64  2) 메모리 캐시  3) Firestore modelFiles → 로컬 URL
+async function _resolveModelVoiceUrl(scriptId, lang) {
+  // 1. 직접 업로드된 base64 (localStorage)
+  const local = loadModelVoice(scriptId, lang);
+  if (local) return local;
+
+  // 2. 메모리 캐시
+  const cacheKey = `${scriptId}_${lang}`;
+  if (_mvUrlCache[cacheKey]) return _mvUrlCache[cacheKey];
+
+  // 3. Firestore scripts/{scriptId}.modelFiles.{lang} → 로컬 파일 URL
+  if (_db) {
+    try {
+      const doc = await _db.collection('scripts').doc(scriptId).get();
+      if (doc.exists) {
+        const fileName = doc.data().modelFiles?.[lang];
+        if (fileName) {
+          const url = _buildLocalModelVoiceUrl(fileName, lang);
+          if (url) {
+            _mvUrlCache[cacheKey] = url;
+            console.log(`[모델음성] ${scriptId}/${lang} → 로컬 파일: ${fileName}`);
+            return url;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  /*
+  // [DISABLED] Firebase Storage listAll 방식 (필요 시 주석 해제)
+  if (!_db || !_storage) return null;
+  // Firestore modelVoices 캐시 확인
+  try {
+    const doc = await _db.collection('modelVoices').doc(scriptId).get();
+    if (doc.exists) {
+      const url = doc.data()[lang];
+      if (url) { _mvUrlCache[cacheKey] = url; return url; }
+    }
+  } catch {}
+  // Firebase Storage 폴더 탐색 (남 → 여 순서)
+  const folders = _MV_FOLDERS[lang];
+  if (!folders) return null;
+  for (const folder of folders) {
+    try {
+      const listResult = await _storage.ref(`cabinvoice pro/${folder}`).listAll();
+      const match = listResult.items.find(item =>
+        item.name.startsWith(scriptId) && /\.(wav|mp3)$/i.test(item.name)
+      );
+      if (match) {
+        const url = await match.getDownloadURL();
+        _mvUrlCache[cacheKey] = url;
+        try {
+          await _db.collection('modelVoices').doc(scriptId).set({ [lang]: url }, { merge: true });
+        } catch {}
+        console.log(`[모델음성] ${scriptId} ${lang} → Storage 연결 완료 (${folder}/${match.name})`);
+        return url;
+      }
+    } catch {}
+  }
+  */
+
+  return null;
+}
+
+function _getCachedModelVoiceUrl(scriptId, lang) {
+  return loadModelVoice(scriptId, lang) || _mvUrlCache[`${scriptId}_${lang}`] || null;
+}
+
 // ===== GEMINI (Cloudflare Pages Function 프록시 경유) =====
 function _showRetryToast(msg) {
   let el = document.getElementById('_gemini-retry-toast');
@@ -355,11 +470,11 @@ function renderClickableScript(text, langCode) {
 function _playModelVoiceSegment(idx) {
   const s = state.currentScript;
   if (!s) return;
-  const base64 = loadModelVoice(s.id, state.selectedLang);
-  if (!base64) { showToast('모델 음성을 먼저 등록해주세요'); return; }
+  const url = _getCachedModelVoiceUrl(s.id, state.selectedLang);
+  if (!url) return;
   const lang = s.langs[state.selectedLang];
   const numSentences = Math.max(1, splitSentences(lang.text).length);
-  const audio = new Audio(base64);
+  const audio = new Audio(url);
   audio.addEventListener('loadedmetadata', () => {
     const seg = audio.duration / numSentences;
     audio.currentTime = seg * idx;
@@ -368,7 +483,7 @@ function _playModelVoiceSegment(idx) {
     const stop = setTimeout(() => audio.pause(), (seg + 0.15) * 1000);
     audio.onended = () => clearTimeout(stop);
   });
-  audio.onerror = () => showToast('음성 재생 오류');
+  audio.onerror = () => {};
 }
 
 // ===== HTML ESCAPING & SCRIPT TEXT RENDERING =====
@@ -706,10 +821,18 @@ function _renderDetailContent(s, lang) {
     cpEl.classList.add('hidden');
   }
 
-  // 모델 음성 (언어별)
+  // 모델 음성 (언어별): localStorage base64 또는 메모리 캐시에 URL이 있으면 표시
   const voiceBtn = $('detail-voice-btn');
-  const hasVoice = !!loadModelVoice(s.id, lang);
+  const hasVoice = !!loadModelVoice(s.id, lang) || !!_mvUrlCache[`${s.id}_${lang}`];
   voiceBtn.classList.toggle('hidden', !hasVoice);
+  if (!hasVoice) {
+    // 비동기로 Firestore modelFiles 확인 후 버튼 갱신
+    _resolveModelVoiceUrl(s.id, lang).then(url => {
+      if (_selectedScriptId === s.id && _detailLang === lang) {
+        voiceBtn.classList.toggle('hidden', !url);
+      }
+    });
+  }
 
   // 연습 횟수 + 마지막 날짜
   const practiceEl = $('detail-practice-info');
@@ -803,18 +926,24 @@ function updatePrepContent() {
     });
   });
 
-  // 모델 음성 바 (항상 표시, 음성 없으면 비활성)
-  const hasVoice = !!loadModelVoice(s.id, state.selectedLang);
+  // 모델 음성 바 - 로컬 우선, 없으면 Storage 비동기 탐색
   const mvBtn = $('btn-model-voice');
-  mvBtn.disabled = !hasVoice;
-  mvBtn.textContent = hasVoice ? '🎵 모델 음성 듣기' : '🎵 모델 음성 미등록';
-  mvBtn.classList.toggle('mv-btn-disabled', !hasVoice);
-
-  // 드릴 모드 버튼
   const drillBtn = $('btn-drill-mode');
-  if (drillBtn) {
-    drillBtn.disabled = !hasVoice;
-    drillBtn.title = hasVoice ? '' : '모델 음성 등록 후 사용 가능';
+  const _setMvState = (enabled) => {
+    mvBtn.disabled = !enabled;
+    mvBtn.textContent = enabled ? '🎵 모델 음성 듣기' : '🎵 모델 음성 미등록';
+    mvBtn.classList.toggle('mv-btn-disabled', !enabled);
+    if (drillBtn) { drillBtn.disabled = !enabled; drillBtn.title = enabled ? '' : '모델 음성 등록 후 사용 가능'; }
+  };
+  const localVoice = !!loadModelVoice(s.id, state.selectedLang);
+  const cachedUrl = _mvUrlCache[`${s.id}_${state.selectedLang}`];
+  _setMvState(localVoice || !!cachedUrl);
+  if (!localVoice && !cachedUrl) {
+    const _sid = s.id, _slang = state.selectedLang;
+    _resolveModelVoiceUrl(_sid, _slang).then(url => {
+      if (state.currentScript?.id !== _sid || state.selectedLang !== _slang) return;
+      _setMvState(!!url);
+    });
   }
 
   $('prep-checkpoints').innerHTML = lang.checkpoints.map(c =>
@@ -1058,12 +1187,12 @@ function tierScore(ratio, maxPt) {
 // ===== DRILL MODE =====
 let _drill = { sentences: [], idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
 
-function startDrillMode() {
+async function startDrillMode() {
   const s = state.currentScript;
   const lang = s?.langs[state.selectedLang];
   if (!lang) return;
-  const base64 = loadModelVoice(s.id, state.selectedLang);
-  if (!base64) { showToast('모델 음성을 먼저 등록해주세요'); return; }
+  const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
+  if (!url) return;
   const sentences = splitSentences(lang.text).filter(s => s.length > 2);
   if (!sentences.length) { showToast('방송문이 없습니다'); return; }
   _drill = { sentences, idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
@@ -1087,10 +1216,10 @@ function _drillRender() {
 
 function _drillPlayModel(btn) {
   const s = state.currentScript;
-  const base64 = loadModelVoice(s.id, state.selectedLang);
-  if (!base64) return;
+  const url = _getCachedModelVoiceUrl(s.id, state.selectedLang);
+  if (!url) return;
   const numS = _drill.sentences.length;
-  const audio = new Audio(base64);
+  const audio = new Audio(url);
   if (btn) { btn.disabled = true; btn.textContent = '🔊 재생 중...'; }
   audio.addEventListener('loadedmetadata', () => {
     const seg = audio.duration / numS;
@@ -1152,7 +1281,7 @@ let _cmp = { active: false, audio: null, timeout: null };
 function startModelComparison() {
   const s = state.currentScript;
   if (!s) return;
-  const base64 = loadModelVoice(s.id, state.selectedLang);
+  const base64 = _getCachedModelVoiceUrl(s.id, state.selectedLang);
   if (!base64) return;
   if (!state.audioBlob) { showToast('내 녹음이 없습니다'); return; }
   _cmp.active = true;
@@ -1175,7 +1304,7 @@ function stopModelComparison() {
 
 function _cmpCycle() {
   if (!_cmp.active) return;
-  const base64 = loadModelVoice(state.currentScript.id, state.selectedLang);
+  const base64 = _getCachedModelVoiceUrl(state.currentScript.id, state.selectedLang);
   $('compare-status-text').textContent = '🎵 모델 음성 재생 중...';
   const a = new Audio(base64);
   _cmp.audio = a;
@@ -1390,7 +1519,7 @@ function showResults(result, transcript) {
   showScreen('screen-result');
   // 비교 버튼 (모델 음성 있는 경우만 표시, 이전 비교 상태 초기화)
   stopModelComparison();
-  const hasModelVoice = !!loadModelVoice(state.currentScript?.id, state.selectedLang);
+  const hasModelVoice = !!_getCachedModelVoiceUrl(state.currentScript?.id, state.selectedLang);
   $('result-compare-section').classList.toggle('hidden', !hasModelVoice);
 
   const lang = state.currentScript.langs[state.selectedLang];
@@ -2562,6 +2691,54 @@ function _setupAdminMvSection() {
   });
 }
 
+// 로컬 모델 음성 자동 스캔 → Firestore scripts/{id}.modelFiles 저장
+async function _scanLocalModelVoices() {
+  const btn = $('btn-admin-scan-mv');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 스캔 중...'; }
+  try {
+    const res = await fetch('./cabinvoice%20pro/manifest.json');
+    if (!res.ok) throw new Error(`manifest.json 로드 실패 (${res.status})`);
+    const manifest = await res.json();
+
+    if (!_db) throw new Error('Firebase 연결이 필요합니다');
+
+    let matched = 0;
+    const batch = _db.batch();
+
+    for (const script of _allScripts) {
+      const num = _extractScriptNum(script);
+      if (!num) continue;
+
+      // 섹션 번호를 정규식으로 이스케이프 후 파일명 앞부분 매칭
+      const escaped = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const prefixRe = new RegExp('^' + escaped + '[ ._]');
+
+      const modelFiles = {};
+      for (const [lang, folder] of Object.entries(_MV_LOCAL_FOLDERS)) {
+        const files = manifest[folder] || [];
+        const file = files.find(f => prefixRe.test(f));
+        if (file) modelFiles[lang] = file;
+      }
+
+      if (Object.keys(modelFiles).length > 0) {
+        batch.set(_db.collection('scripts').doc(script.id), { modelFiles }, { merge: true });
+        matched++;
+      }
+    }
+
+    await batch.commit();
+    // 메모리 캐시 초기화 (새 매핑 즉시 반영)
+    Object.keys(_mvUrlCache).forEach(k => delete _mvUrlCache[k]);
+    showToast(`✅ ${matched}개 방송문 매핑 완료`);
+    console.log(`[스캔] ${matched}개 방송문 modelFiles 저장 완료`);
+  } catch (e) {
+    showToast(`스캔 실패: ${e.message}`);
+    console.error('[스캔] 오류:', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📂 로컬 모델 음성 스캔'; }
+  }
+}
+
 function _renderAdminMvBody(scriptId, lang) {
   const body = $('admin-mv-body');
   if (!body) return;
@@ -3022,13 +3199,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ===== 모델 음성 듣기 버튼 (prep screen) =====
-  $('btn-model-voice').addEventListener('click', () => {
+  $('btn-model-voice').addEventListener('click', async () => {
     const s = state.currentScript;
     if (!s) return;
-    const base64 = loadModelVoice(s.id, state.selectedLang);
-    if (!base64) return;
+    const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
+    if (!url) return;
     const btn = $('btn-model-voice');
-    const audio = new Audio(base64);
+    const audio = new Audio(url);
     audio.play().catch(() => {});
     btn.textContent = '🔊 재생 중...';
     audio.onended = () => { btn.textContent = '🎵 모델 음성 듣기'; };
@@ -3066,6 +3243,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===== 관리자 패널 =====
   $('btn-open-admin').addEventListener('click', openAdminScreen);
   $('btn-admin-back').addEventListener('click', () => { showScreen('screen-home'); loadAndRenderHome(); });
+  if ($('btn-admin-scan-mv')) $('btn-admin-scan-mv').addEventListener('click', _scanLocalModelVoices);
   if ($('btn-save-firebase-cfg')) $('btn-save-firebase-cfg').addEventListener('click', () => {
     const ok = initFirebase();
     const el = $('admin-firebase-status');
@@ -3108,16 +3286,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const s = _allScripts.find(x => x.id === _selectedScriptId);
     if (s) { state.selectedLang = _detailLang; startPrep(s, _detailLang); }
   });
-  $('detail-voice-btn').addEventListener('click', () => {
+  $('detail-voice-btn').addEventListener('click', async () => {
     if (!_selectedScriptId) return;
     const s = _allScripts.find(x => x.id === _selectedScriptId);
     if (!s) return;
     const base64 = loadModelVoice(s.id, _detailLang);
-    if (!base64) return;
-    if (_mvAudioUrl) { URL.revokeObjectURL(_mvAudioUrl); _mvAudioUrl = null; }
-    const blob = base64ToBlob(base64);
-    _mvAudioUrl = URL.createObjectURL(blob);
-    new Audio(_mvAudioUrl).play().catch(()=>{});
+    if (base64) {
+      if (_mvAudioUrl) { URL.revokeObjectURL(_mvAudioUrl); _mvAudioUrl = null; }
+      const blob = base64ToBlob(base64);
+      _mvAudioUrl = URL.createObjectURL(blob);
+      new Audio(_mvAudioUrl).play().catch(()=>{});
+      return;
+    }
+    // 로컬 정적 파일 URL (Firestore modelFiles 기반)
+    const url = await _resolveModelVoiceUrl(s.id, _detailLang);
+    if (url) new Audio(url).play().catch(()=>{});
   });
   $('detail-edit-btn').addEventListener('click', () => {
     if (!_selectedScriptId) return;

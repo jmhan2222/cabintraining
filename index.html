@@ -520,7 +520,11 @@
       <!-- 모델 음성 관리 섹션 -->
       <section class="admin-section">
         <div class="admin-section-title">🎙 모델 음성 관리</div>
-        <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">방송문을 선택하고 언어별 모델 음성을 업로드하세요.</div>
+        <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">방송문을 선택하고 언어별 모델 음성을 업로드하거나, 로컬 폴더를 자동 스캔하세요.</div>
+        <div class="admin-row-btns" style="margin-bottom:10px">
+          <button class="btn-primary" id="btn-admin-scan-mv" style="background:#6366f1">📂 로컬 모델 음성 스캔</button>
+          <span style="color:var(--gray-400);font-size:12px;align-self:center">cabinvoice pro/ 폴더 → Firestore 자동 매핑</span>
+        </div>
         <div class="admin-row-btns">
           <select id="admin-mv-script" class="admin-input" style="flex:1;max-width:360px">
             <option value="">-- 방송문 선택 --</option>
@@ -577,6 +581,7 @@
   <!-- Firebase SDK (compat) v11 -->
   <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-storage-compat.js"></script>
   <script defer type="text/javascript" src="/main.js"></script>
 </body>
 </html>
