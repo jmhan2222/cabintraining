@@ -21,6 +21,7 @@ function initFirebase() {
     _storage = firebase.storage();
     auth = firebase.auth();
     auth.onAuthStateChanged(user => {
+      console.log('[Auth 상태변경]', user ? user.email : '미로그인');
       const el = $('admin-auth-status');
       if (!el) return;
       el.textContent = user
@@ -2729,7 +2730,9 @@ function _setupAdminMvSection() {
 
 // 로컬 모델 음성 자동 스캔 → Firestore scripts/{id}.modelFiles 저장
 async function _scanLocalModelVoices() {
-  console.log('[스캔] 현재 사용자:', auth?.currentUser?.email, auth?.currentUser?.uid);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const user = auth.currentUser;
+  console.log('[스캔] 현재 사용자:', user?.email, user?.uid);
   const btn = $('btn-admin-scan-mv');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 스캔 중...'; }
   try {
