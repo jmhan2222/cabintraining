@@ -1,6 +1,5 @@
-# 모델 음성 파일 (용량 큼 — Cloudflare Pages에는 직접 업로드)
+# 원본 WAV/M4A는 제외 (MP3로 변환된 파일만 커밋)
 cabinvoice pro/**/*.wav
-cabinvoice pro/**/*.mp3
 cabinvoice pro/**/*.m4a
 !cabinvoice pro/manifest.json
 
