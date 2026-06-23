@@ -11,6 +11,7 @@ const FIREBASE_CONFIG = {
 let _db = null;
 let _storage = null;
 let _geminiModel = null;
+let auth = null;
 const _mvUrlCache = {}; // { "scriptId_lang": url }
 
 function initFirebase() {
@@ -18,6 +19,15 @@ function initFirebase() {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     _db = firebase.firestore();
     _storage = firebase.storage();
+    auth = firebase.auth();
+    auth.onAuthStateChanged(user => {
+      const el = $('admin-auth-status');
+      if (!el) return;
+      el.textContent = user
+        ? `✅ 관리자: ${user.email || '익명 (' + user.uid.slice(0, 8) + ')'}`
+        : '❌ 로그인 필요';
+      el.style.color = user ? 'var(--color-success, #16a34a)' : 'var(--color-error, #dc2626)';
+    });
     return true;
   } catch { return false; }
 }
@@ -2719,6 +2729,7 @@ function _setupAdminMvSection() {
 
 // 로컬 모델 음성 자동 스캔 → Firestore scripts/{id}.modelFiles 저장
 async function _scanLocalModelVoices() {
+  console.log('[스캔] 현재 사용자:', auth?.currentUser?.email, auth?.currentUser?.uid);
   const btn = $('btn-admin-scan-mv');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 스캔 중...'; }
   try {

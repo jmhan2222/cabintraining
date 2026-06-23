@@ -451,6 +451,9 @@
           <button class="btn-primary" id="btn-save-firebase-cfg">연결 확인</button>
           <span class="admin-firebase-status" id="admin-firebase-status"></span>
         </div>
+        <div style="margin-top:8px;font-size:13px;color:var(--gray-600)">
+          Auth 상태: <span id="admin-auth-status" style="font-weight:600">확인 중...</span>
+        </div>
       </section>
 
       <!-- JSON 직접 업로드 섹션 -->
@@ -586,6 +589,7 @@
   <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-auth-compat.js"></script>
   <script defer type="text/javascript" src="/main.js"></script>
 </body>
 </html>
