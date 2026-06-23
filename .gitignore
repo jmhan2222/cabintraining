@@ -1,0 +1,12 @@
+# 모델 음성 파일 (용량 큼 — Cloudflare Pages에는 직접 업로드)
+cabinvoice pro/**/*.wav
+cabinvoice pro/**/*.mp3
+cabinvoice pro/**/*.m4a
+!cabinvoice pro/manifest.json
+
+# 빌드/배포 산출물
+project.zip
+
+# 시스템
+.DS_Store
+**/.DS_Store

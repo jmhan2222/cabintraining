@@ -22,12 +22,12 @@ function initFirebase() {
   } catch { return false; }
 }
 
-// 언어 코드 → 로컬 정적 폴더명 (남성 기준)
+// 언어 코드 → 로컬 정적 폴더명
 const _MV_LOCAL_FOLDERS = {
-  ko: '한국어(남)',
-  en: '영어(남)',
-  ja: '일본어(남)',
-  ca: '중국어(남)',
+  ko: '한국어(남)', en: '영어(남)', ja: '일본어(남)', ca: '중국어(남)',
+};
+const _MV_LOCAL_FOLDERS_F = {
+  ko: '한국어(여)', en: '영어(여)', ja: '일본어(여)', ca: '중국어(여)',
 };
 
 // [DISABLED] 언어 코드 → Firebase Storage 폴더명 (남성 우선, 없으면 여성)
@@ -38,9 +38,13 @@ const _MV_LOCAL_FOLDERS = {
 //   ca: ['중국어(남)', '중국어(여)'],
 // };
 
+// 현재 선택된 성별 ('M' | 'F')
+let _currentGender = 'M';
+
 // 로컬 정적 파일 URL 생성 (한글/공백 encodeURIComponent 처리)
-function _buildLocalModelVoiceUrl(fileName, lang) {
-  const folder = _MV_LOCAL_FOLDERS[lang];
+function _buildLocalModelVoiceUrl(fileName, lang, gender = 'M') {
+  const folderMap = gender === 'F' ? _MV_LOCAL_FOLDERS_F : _MV_LOCAL_FOLDERS;
+  const folder = folderMap[lang];
   if (!folder || !fileName) return null;
   return './' +
     encodeURIComponent('cabinvoice pro') + '/' +
@@ -65,26 +69,28 @@ function _extractScriptNum(script) {
 
 // 로컬 정적 파일 → 모델 음성 URL 조회
 // 우선순위: 1) localStorage base64  2) 메모리 캐시  3) Firestore modelFiles → 로컬 URL
-async function _resolveModelVoiceUrl(scriptId, lang) {
-  // 1. 직접 업로드된 base64 (localStorage)
+// gender: 'M'(남) | 'F'(여) — 기본값은 현재 선택 성별
+async function _resolveModelVoiceUrl(scriptId, lang, gender = _currentGender) {
+  // 1. 직접 업로드된 base64 (localStorage, gender 무관)
   const local = loadModelVoice(scriptId, lang);
   if (local) return local;
 
-  // 2. 메모리 캐시
-  const cacheKey = `${scriptId}_${lang}`;
+  // 2. 메모리 캐시 (gender 포함 키)
+  const cacheKey = `${scriptId}_${lang}_${gender}`;
   if (_mvUrlCache[cacheKey]) return _mvUrlCache[cacheKey];
 
-  // 3. Firestore scripts/{scriptId}.modelFiles.{lang} → 로컬 파일 URL
+  // 3. Firestore scripts/{scriptId}.modelFiles — M: lang, F: lang_F
   if (_db) {
     try {
       const doc = await _db.collection('scripts').doc(scriptId).get();
       if (doc.exists) {
-        const fileName = doc.data().modelFiles?.[lang];
+        const fsKey = gender === 'F' ? `${lang}_F` : lang;
+        const fileName = doc.data().modelFiles?.[fsKey];
         if (fileName) {
-          const url = _buildLocalModelVoiceUrl(fileName, lang);
+          const url = _buildLocalModelVoiceUrl(fileName, lang, gender);
           if (url) {
             _mvUrlCache[cacheKey] = url;
-            console.log(`[모델음성] ${scriptId}/${lang} → 로컬 파일: ${fileName}`);
+            console.log(`[모델음성] ${scriptId}/${lang}/${gender} → 로컬 파일: ${fileName}`);
             return url;
           }
         }
@@ -128,8 +134,8 @@ async function _resolveModelVoiceUrl(scriptId, lang) {
   return null;
 }
 
-function _getCachedModelVoiceUrl(scriptId, lang) {
-  return loadModelVoice(scriptId, lang) || _mvUrlCache[`${scriptId}_${lang}`] || null;
+function _getCachedModelVoiceUrl(scriptId, lang, gender = _currentGender) {
+  return loadModelVoice(scriptId, lang) || _mvUrlCache[`${scriptId}_${lang}_${gender}`] || null;
 }
 
 // ===== GEMINI (Cloudflare Pages Function 프록시 경유) =====
@@ -823,7 +829,7 @@ function _renderDetailContent(s, lang) {
 
   // 모델 음성 (언어별): localStorage base64 또는 메모리 캐시에 URL이 있으면 표시
   const voiceBtn = $('detail-voice-btn');
-  const hasVoice = !!loadModelVoice(s.id, lang) || !!_mvUrlCache[`${s.id}_${lang}`];
+  const hasVoice = !!loadModelVoice(s.id, lang) || !!_getCachedModelVoiceUrl(s.id, lang);
   voiceBtn.classList.toggle('hidden', !hasVoice);
   if (!hasVoice) {
     // 비동기로 Firestore modelFiles 확인 후 버튼 갱신
@@ -926,7 +932,7 @@ function updatePrepContent() {
     });
   });
 
-  // 모델 음성 바 - 로컬 우선, 없으면 Storage 비동기 탐색
+  // 모델 음성 바 (남/여 성별 토글 포함)
   const mvBtn = $('btn-model-voice');
   const drillBtn = $('btn-drill-mode');
   const _setMvState = (enabled) => {
@@ -935,14 +941,33 @@ function updatePrepContent() {
     mvBtn.classList.toggle('mv-btn-disabled', !enabled);
     if (drillBtn) { drillBtn.disabled = !enabled; drillBtn.title = enabled ? '' : '모델 음성 등록 후 사용 가능'; }
   };
+  // 현재 스크립트+언어+성별로 음성 버튼 상태 갱신하는 함수 (gender toggle에서도 호출)
+  _prepSetMvState = _setMvState;
+
+  // 성별 버튼 초기화 (일단 비활성 → 비동기 확인 후 개별 활성)
+  const gBtns = { M: $('btn-gender-m'), F: $('btn-gender-f') };
+  Object.values(gBtns).forEach(b => { if (b) b.disabled = true; });
+  ['M', 'F'].forEach(g => {
+    if (gBtns[g]) gBtns[g].classList.toggle('active', g === _currentGender);
+  });
+
+  // localStorage base64 있으면 즉시 활성 (gender 무관)
   const localVoice = !!loadModelVoice(s.id, state.selectedLang);
-  const cachedUrl = _mvUrlCache[`${s.id}_${state.selectedLang}`];
-  _setMvState(localVoice || !!cachedUrl);
-  if (!localVoice && !cachedUrl) {
+  if (localVoice) {
+    _setMvState(true);
+    Object.values(gBtns).forEach(b => { if (b) b.disabled = false; });
+  } else {
+    // 캐시 확인 후 즉시 상태 설정
+    const cached = _getCachedModelVoiceUrl(s.id, state.selectedLang);
+    _setMvState(!!cached);
+    // 남/여 각각 비동기 확인
     const _sid = s.id, _slang = state.selectedLang;
-    _resolveModelVoiceUrl(_sid, _slang).then(url => {
-      if (state.currentScript?.id !== _sid || state.selectedLang !== _slang) return;
-      _setMvState(!!url);
+    ['M', 'F'].forEach(g => {
+      _resolveModelVoiceUrl(_sid, _slang, g).then(url => {
+        if (state.currentScript?.id !== _sid || state.selectedLang !== _slang) return;
+        if (gBtns[g]) gBtns[g].disabled = !url;
+        if (g === _currentGender) _setMvState(!!url);
+      });
     });
   }
 
@@ -1185,6 +1210,7 @@ function tierScore(ratio, maxPt) {
 }
 
 // ===== DRILL MODE =====
+let _prepSetMvState = null; // showPrepScreen에서 할당, 성별 토글 핸들러에서 호출
 let _drill = { sentences: [], idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
 
 async function startDrillMode() {
@@ -2714,10 +2740,15 @@ async function _scanLocalModelVoices() {
       const prefixRe = new RegExp('^' + escaped + '[ ._]');
 
       const modelFiles = {};
+      // 남성(M) 매핑
       for (const [lang, folder] of Object.entries(_MV_LOCAL_FOLDERS)) {
-        const files = manifest[folder] || [];
-        const file = files.find(f => prefixRe.test(f));
+        const file = (manifest[folder] || []).find(f => prefixRe.test(f));
         if (file) modelFiles[lang] = file;
+      }
+      // 여성(F) 매핑 — lang_F 키 사용
+      for (const [lang, folder] of Object.entries(_MV_LOCAL_FOLDERS_F)) {
+        const file = (manifest[folder] || []).find(f => prefixRe.test(f));
+        if (file) modelFiles[`${lang}_F`] = file;
       }
 
       if (Object.keys(modelFiles).length > 0) {
@@ -3306,6 +3337,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!_selectedScriptId) return;
     const btn = $('detail-edit-btn');
     requireEditAuth(() => openEditModal(btn.dataset.id, btn.dataset.source));
+  });
+
+  // ===== 성별 토글 버튼 (prep screen) =====
+  document.querySelectorAll('.btn-gender').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const g = btn.dataset.gender;
+      if (!g || _currentGender === g) return;
+      _currentGender = g;
+      document.querySelectorAll('.btn-gender').forEach(b =>
+        b.classList.toggle('active', b.dataset.gender === g));
+      const s = state.currentScript;
+      if (!s) return;
+      const lang = state.selectedLang;
+      // 캐시 우선 확인
+      const cached = _getCachedModelVoiceUrl(s.id, lang, g);
+      if (_prepSetMvState) _prepSetMvState(!!cached || !!loadModelVoice(s.id, lang));
+      if (!cached && !loadModelVoice(s.id, lang)) {
+        const url = await _resolveModelVoiceUrl(s.id, lang, g);
+        if (_prepSetMvState) _prepSetMvState(!!url);
+      }
+    });
   });
 
   // 결과 화면 버튼
