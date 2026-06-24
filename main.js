@@ -712,6 +712,18 @@ function renderScriptText(text) {
 function renderBilingualScript(text, langCode) {
   if (langCode !== 'ja' && langCode !== 'ca') return renderScriptText(text);
 
+  // 중국어: 독음은 _autoLoadChineseReadings가 처리 → 여기선 원문만 표시
+  if (langCode === 'ca') {
+    const hv = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
+    const html = text.split('\n').map(rawLine => {
+      const line = rawLine.trim();
+      if (!line) return '<div class="bilingual-sep"></div>';
+      return `<div class="bilingual-pair"><div class="bilingual-original">${hv(line)}</div></div>`;
+    }).join('');
+    console.log('[완료] 중국어 원문 초기 렌더 (독음은 별도 로드)');
+    return `<div class="script-text-rendered">${html}</div>`;
+  }
+
   console.log('[이중언어] 입력 텍스트 첫 200자:', text?.substring(0, 200));
   console.log('[이중언어] 총 줄 수:', text?.split('\n').length);
   console.log('[이중언어] 각 줄 판단:', text?.split('\n').map(l => ({
@@ -721,7 +733,12 @@ function renderBilingualScript(text, langCode) {
   })));
 
   const hasJapanese  = s => /[぀-ヿ一-鿿]/.test(s);
-  const hasKorean    = s => /[가-힣]/.test(s);
+  // 한글 수가 히라가나 수보다 많고, 한글이 2자 초과여야 독음 줄로 판단
+  const hasKorean    = s => {
+    const korCnt = (s.match(/[가-힣]/g) || []).length;
+    const jpCnt  = (s.match(/[぀-ヿ]/g) || []).length;
+    return korCnt > jpCnt && korCnt > 2;
+  };
   const hasChinese   = s => /[一-鿿]/.test(s);
   const isSectionHeader = s => /^\[[^\]]+\]$/.test(s.trim()) && !hasJapanese(s);
   const hv = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
@@ -1575,8 +1592,11 @@ async function startStudyMode() {
   $('study-title-bar').textContent = s.title;
   _renderStudyScriptText(lang.text, state.selectedLang);
 
+  console.log('[study진입] langCode:', state.selectedLang, 'ca여부:', state.selectedLang === 'ca');
+
   // 중국어: 가이드 생성과 무관하게 즉시 독음 자동 로드
   if (state.selectedLang === 'ca') {
+    console.log('[중국어독음] 자동 로드 시작');
     _autoLoadChineseReadings(lang.text, s.id);
   }
 

@@ -2156,15 +2156,33 @@ html, body {
   font-size: 15px; line-height: 1.8; margin-bottom: 8px; padding: 0;
 }
 .study-script-sep { height: 8px; margin-bottom: 0; }
-/* 이중 언어(ja/ca) 학습 화면 전용 오버라이드 — 다른 화면의 bilingual 스타일과 독립 */
+/* 이중 언어(ja/ca) 학습 화면 전용 오버라이드 — !important로 전역 스타일 완전 차단 */
+#study-script-text { line-height: 1.6 !important; }
+#study-script-text .bilingual-reading {
+  font-size: 12px !important;
+  color: #AEAEB2 !important;
+  line-height: 1.4 !important;
+  margin-bottom: 1px !important;
+  margin-top: 0 !important;
+}
+#study-script-text .bilingual-original {
+  font-size: 15px !important;
+  color: #1D1D1F !important;
+  line-height: 1.6 !important;
+  margin-bottom: 10px !important;
+  margin-top: 0 !important;
+}
+#study-script-text .bilingual-pair { margin-bottom: 0 !important; }
+#study-script-text .bilingual-sep  { height: 6px !important; margin: 0 !important; }
+/* 클래스 선택자 fallback (id 없는 경우 대비) */
 .study-script-text .bilingual-reading {
-  font-size: 12px; color: #AEAEB2; line-height: 1.4; margin-bottom: 2px; margin-top: 0;
+  font-size: 12px; color: #AEAEB2; line-height: 1.4; margin-bottom: 1px; margin-top: 0;
 }
 .study-script-text .bilingual-original {
-  font-size: 15px; color: #1D1D1F; line-height: 1.6; margin-bottom: 0; margin-top: 0;
+  font-size: 15px; color: #1D1D1F; line-height: 1.6; margin-bottom: 10px; margin-top: 0;
 }
-.study-script-text .bilingual-pair { margin-bottom: 12px; }
-.study-script-text .bilingual-sep  { height: 8px; }
+.study-script-text .bilingual-pair { margin-bottom: 0; }
+.study-script-text .bilingual-sep  { height: 6px; }
 /* 중국어 독음 로딩 인디케이터 */
 .cn-reading-loading {
   font-size: 12px; color: #8E8E93; text-align: center;
