@@ -162,46 +162,48 @@
       <button class="btn-primary sm" id="btn-retry">↺ 다시 연습</button>
     </div>
     <div class="result-body">
-      <div class="result-overview">
-        <div class="total-score-box">
-          <div class="total-score-value" id="total-score-value">—</div>
-          <div class="total-score-label">종합 점수</div>
-          <div class="total-grade" id="total-grade"></div>
-        </div>
-      </div>
 
-      <div class="score-bars" id="score-bars"></div>
+      <!-- ① AI 상세 분석 (skeleton → real) -->
+      <div class="ai-result-section" id="ai-result-section"></div>
 
-      <div class="transcript-section">
-        <div class="section-heading">📝 인식된 발화 내용</div>
+      <!-- ② 발화 내용 + 음성 비교 통합 카드 -->
+      <div class="result-voice-card" id="result-voice-card">
+        <div class="rvc-title">📋 발화 내용 &amp; 음성 비교</div>
         <div class="transcript-compare" id="transcript-compare"></div>
-      </div>
-
-      <div class="ai-result-section hidden" id="ai-result-section"></div>
-
-      <div class="result-compare-section hidden" id="result-compare-section">
-        <div class="section-heading">🎵 모델 음성 비교</div>
-        <div class="compare-controls">
-          <div class="compare-row">
-            <span class="compare-label">🎵 모델 음성</span>
-            <button class="btn-icon sm" id="btn-play-model">▶ 재생</button>
+        <div class="rvc-divider"></div>
+        <div class="rvc-audio-row">
+          <div class="rvc-audio-label">🎵 모델 음성</div>
+          <div class="rvc-player">
+            <button class="btn-icon sm rvc-play-btn" id="btn-play-model">▶ 재생</button>
+            <div class="rvc-scrub-wrap">
+              <input type="range" class="rvc-scrub" id="rvc-model-scrub" min="0" max="100" value="0" step="0.1" disabled>
+              <span class="rvc-time" id="rvc-model-time">0:00 / 0:00</span>
+            </div>
           </div>
-          <div class="compare-row">
-            <span class="compare-label">🎤 내 녹음</span>
-            <button class="btn-icon sm" id="btn-play-my">▶ 재생</button>
+        </div>
+        <div class="rvc-audio-row">
+          <div class="rvc-audio-label">🎤 내 녹음</div>
+          <div class="rvc-player">
+            <button class="btn-icon sm rvc-play-btn" id="btn-play-my">▶ 재생</button>
+            <div class="rvc-scrub-wrap">
+              <input type="range" class="rvc-scrub" id="rvc-my-scrub" min="0" max="100" value="0" step="0.1" disabled>
+              <span class="rvc-time" id="rvc-my-time">0:00 / 0:00</span>
+            </div>
           </div>
-          <div class="compare-row compare-row-alt">
-            <button class="btn-icon" id="btn-compare-voice">🔄 번갈아 비교 재생</button>
-            <button class="btn-icon hidden" id="btn-compare-stop">■ 중지</button>
-          </div>
+        </div>
+        <div class="rvc-compare-row">
+          <button class="btn-icon" id="btn-compare-voice">🔄 번갈아 비교 재생</button>
+          <button class="btn-icon hidden" id="btn-compare-stop">⏹ 중지</button>
           <div class="compare-status hidden" id="compare-status-text"></div>
         </div>
       </div>
 
-      <div class="result-bottom-actions">
-        <button class="btn-icon" id="btn-result-select">다른 방송문 선택</button>
-        <button class="btn-primary" id="btn-result-retry-2">↺ 다시 연습</button>
+      <!-- ③ 하단 버튼 -->
+      <div class="result-actions">
+        <button class="result-action-btn btn-icon" id="btn-result-retry-2">🔄 다시 연습</button>
+        <button class="result-action-btn btn-primary" id="btn-result-select">📚 다른 방송문 선택</button>
       </div>
+
     </div>
   </div>
 
@@ -592,16 +594,15 @@
   <!-- ===== LOADING ===== -->
   <div id="loading-overlay" class="loading-overlay hidden">
     <div class="loading-box">
-      <div class="loading-plane">✈</div>
-      <div class="loading-title">음성 분석 중...</div>
-      <div class="loading-bars">
-        <div class="loading-bar" style="animation-delay:0s"></div>
-        <div class="loading-bar" style="animation-delay:.15s"></div>
-        <div class="loading-bar" style="animation-delay:.3s"></div>
-        <div class="loading-bar" style="animation-delay:.45s"></div>
-        <div class="loading-bar" style="animation-delay:.6s"></div>
+      <div class="loading-plane" id="loading-plane-icon">✈️</div>
+      <div class="loading-step-msg" id="loading-step-msg">🎤 음성을 업로드하고 있습니다...</div>
+      <div class="loading-progress-track">
+        <div class="loading-progress-bar" id="loading-progress-bar"></div>
       </div>
-      <div class="loading-sub">발음 · 억양 · 유창성 · 다정함 · 완성도 평가 중</div>
+      <div class="loading-tip-wrap">
+        <div class="loading-tip-label">💡 잠깐, 알고 계셨나요?</div>
+        <div class="loading-tip-text" id="loading-tip-text">끊어읽기는 승객의 이해도를 높이는 핵심 기술입니다</div>
+      </div>
     </div>
   </div>
 

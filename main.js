@@ -1307,6 +1307,7 @@ function stopRecording() {
 
   const duration = (Date.now() - state.recordingStart) / 1000;
   $('loading-overlay').classList.remove('hidden');
+  _startOverlayTimers();
 
   const finish = () => {
     state.audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
@@ -1741,58 +1742,163 @@ function _drillNext() {
   }
 }
 
+// ===== LOADING OVERLAY =====
+const _LOADING_STEPS = [
+  { from: 0,  msg: '🎤 음성을 업로드하고 있습니다...' },
+  { from: 3,  msg: '🔍 발음과 억양을 분석하고 있습니다...' },
+  { from: 6,  msg: '📊 채점 기준에 맞게 평가하고 있습니다...' },
+  { from: 10, msg: '📝 맞춤 피드백을 작성하고 있습니다...' },
+];
+const _LOADING_TIPS = [
+  '끊어읽기는 승객의 이해도를 높이는 핵심 기술입니다',
+  '미소 띤 목소리는 승객에게 편안함을 줍니다',
+  '문장 끝을 내려읽으면 더 안정적으로 들립니다',
+  '강조할 단어 앞에서 살짝 멈춰보세요',
+  '천천히 읽는 것이 빠르게 읽는 것보다 전달력이 높습니다',
+];
+let _overlayTimers = [];
+let _overlayTipIdx = 0;
+let _overlayStepStart = 0;
+
+function _startOverlayTimers() {
+  _overlayTimers.forEach(clearTimeout);
+  _overlayTimers = [];
+  _overlayTipIdx = 0;
+  _overlayStepStart = Date.now();
+
+  // 단계별 메시지
+  _LOADING_STEPS.forEach(step => {
+    const t = setTimeout(() => {
+      const el = $('loading-step-msg');
+      if (el) el.textContent = step.msg;
+    }, step.from * 1000);
+    _overlayTimers.push(t);
+  });
+
+  // 팁 순환 (3.8초마다)
+  const cycleTip = () => {
+    const el = $('loading-tip-text');
+    if (!el) return;
+    el.style.opacity = '0';
+    setTimeout(() => {
+      _overlayTipIdx = (_overlayTipIdx + 1) % _LOADING_TIPS.length;
+      el.textContent = _LOADING_TIPS[_overlayTipIdx];
+      el.style.opacity = '1';
+    }, 300);
+    _overlayTimers.push(setTimeout(cycleTip, 3800));
+  };
+  _overlayTimers.push(setTimeout(cycleTip, 3800));
+
+  // 진행바 애니메이션 재시작
+  const bar = $('loading-progress-bar');
+  if (bar) {
+    bar.style.transition = 'none';
+    bar.style.width = '0%';
+    requestAnimationFrame(() => {
+      bar.style.transition = 'width 12s ease-out';
+      bar.style.width = '85%';
+    });
+  }
+}
+
+function _completeOverlay() {
+  _overlayTimers.forEach(clearTimeout);
+  _overlayTimers = [];
+  const bar = $('loading-progress-bar');
+  if (bar) { bar.style.transition = 'width 0.3s ease'; bar.style.width = '100%'; }
+  setTimeout(() => {
+    const overlay = $('loading-overlay');
+    if (!overlay) return;
+    overlay.style.transition = 'opacity 0.35s';
+    overlay.style.opacity = '0';
+    setTimeout(() => {
+      overlay.classList.add('hidden');
+      overlay.style.opacity = '';
+      overlay.style.transition = '';
+    }, 350);
+  }, 300);
+  console.log('[완료] 분석 오버레이 종료');
+}
+
 // ===== RESULT MODEL VOICE COMPARISON =====
 let _lastRecordingBlob = null;
 let _cmp = { active: false, audio: null, timeout: null, myUrl: null };
+let _rvcModelAudio = null;   // 결과 화면 모델 음성 Audio 객체
+let _rvcMyAudio    = null;   // 결과 화면 내 녹음 Audio 객체
+
+function _rvcFmt(s) { const m = Math.floor(s/60); return `${m}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
+
+function _rvcAttachScrub(audio, scrubId, timeId, btnId) {
+  const scrub = $(scrubId), timeEl = $(timeId), btn = $(btnId);
+  if (!scrub || !timeEl || !btn) return;
+  scrub.disabled = false;
+  audio.ontimeupdate = () => {
+    const dur = audio.duration || 0, cur = audio.currentTime || 0;
+    if (dur > 0) { scrub.max = dur; scrub.value = cur; }
+    timeEl.textContent = `${_rvcFmt(cur)} / ${_rvcFmt(dur)}`;
+  };
+  audio.onended = () => {
+    btn.textContent = '▶ 재생';
+    scrub.value = 0; timeEl.textContent = `0:00 / ${_rvcFmt(audio.duration || 0)}`;
+  };
+  scrub.oninput = () => { if (!audio.paused || audio.readyState >= 2) audio.currentTime = parseFloat(scrub.value); };
+}
 
 function _cmpStop() {
   _cmp.active = false;
   _cmp.audio?.pause(); _cmp.audio = null;
   clearTimeout(_cmp.timeout); _cmp.timeout = null;
   if (_cmp.myUrl) { URL.revokeObjectURL(_cmp.myUrl); _cmp.myUrl = null; }
-  $('compare-status-text').classList.add('hidden');
-  $('compare-status-text').textContent = '';
-  $('btn-compare-stop').classList.add('hidden');
-  $('btn-compare-voice').classList.remove('hidden');
+  const statusEl = $('compare-status-text');
+  if (statusEl) { statusEl.classList.add('hidden'); statusEl.textContent = ''; }
+  $('btn-compare-stop')?.classList.add('hidden');
+  $('btn-compare-voice')?.classList.remove('hidden');
 }
 
 function stopModelComparison() { _cmpStop(); }
 
 async function playModelVoice() {
   _cmpStop();
+  const btn = $('btn-play-model');
+  // 토글
+  if (_rvcModelAudio && !_rvcModelAudio.paused) {
+    _rvcModelAudio.pause(); if (btn) btn.textContent = '▶ 재생'; return;
+  }
+  if (_rvcModelAudio && _rvcModelAudio.paused) {
+    _rvcModelAudio.play().catch(()=>{}); if (btn) btn.textContent = '⏸ 일시정지'; return;
+  }
   const s = state.currentScript;
   if (!s) return;
   const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
   if (!url) { showToast('모델 음성 없음'); return; }
-  $('compare-status-text').textContent = '🎵 모델 음성 재생 중...';
-  $('compare-status-text').classList.remove('hidden');
-  const a = new Audio(url);
-  _cmp.audio = a;
-  a.play().catch(() => {});
-  a.onended = () => {
-    $('compare-status-text').classList.add('hidden');
-    $('compare-status-text').textContent = '';
-    _cmp.audio = null;
-  };
+  if (_rvcModelAudio) { _rvcModelAudio.pause(); }
+  _rvcModelAudio = new Audio(url);
+  if (btn) btn.textContent = '⏸ 일시정지';
+  _rvcAttachScrub(_rvcModelAudio, 'rvc-model-scrub', 'rvc-model-time', 'btn-play-model');
+  _rvcModelAudio.play().catch(()=>{});
+  console.log('[완료] 모델 음성 재생');
 }
 
 function playMyRecording() {
   _cmpStop();
+  const btn = $('btn-play-my');
+  // 토글
+  if (_rvcMyAudio && !_rvcMyAudio.paused) {
+    _rvcMyAudio.pause(); if (btn) btn.textContent = '▶ 재생'; return;
+  }
+  if (_rvcMyAudio && _rvcMyAudio.paused) {
+    _rvcMyAudio.play().catch(()=>{}); if (btn) btn.textContent = '⏸ 일시정지'; return;
+  }
   if (!_lastRecordingBlob) { showToast('녹음 파일 없음'); return; }
+  if (_cmp.myUrl) { URL.revokeObjectURL(_cmp.myUrl); }
   const url = URL.createObjectURL(_lastRecordingBlob);
   _cmp.myUrl = url;
-  $('compare-status-text').textContent = '🎤 내 녹음 재생 중...';
-  $('compare-status-text').classList.remove('hidden');
-  const b = new Audio(url);
-  _cmp.audio = b;
-  b.play().catch(() => {});
-  b.onended = () => {
-    URL.revokeObjectURL(url);
-    _cmp.myUrl = null;
-    $('compare-status-text').classList.add('hidden');
-    $('compare-status-text').textContent = '';
-    _cmp.audio = null;
-  };
+  _rvcMyAudio = new Audio(url);
+  if (btn) btn.textContent = '⏸ 일시정지';
+  _rvcAttachScrub(_rvcMyAudio, 'rvc-my-scrub', 'rvc-my-time', 'btn-play-my');
+  _rvcMyAudio.onended = () => { if (btn) btn.textContent = '▶ 재생'; };
+  _rvcMyAudio.play().catch(()=>{});
+  console.log('[완료] 내 녹음 재생');
 }
 
 async function startModelComparison() {
@@ -1949,7 +2055,7 @@ function analyzeAndShow(duration) {
     }
   };
 
-  $('loading-overlay').classList.add('hidden');
+  // 오버레이는 Gemini 완료 후 _completeOverlay()에서 제거
   showResults(result, transcript);
 }
 
@@ -2026,60 +2132,62 @@ function measureAmpPeaks(samples) {
 // ===== RESULTS =====
 function showResults(result, transcript) {
   showScreen('screen-result');
-  // 비교 버튼 (모델 음성 있는 경우만 표시, 이전 비교 상태 초기화)
   stopModelComparison();
-  const hasModelVoice = !!_getCachedModelVoiceUrl(state.currentScript?.id, state.selectedLang);
-  $('result-compare-section').classList.toggle('hidden', !hasModelVoice);
+  // 결과 화면 진입 시 음성 객체 초기화
+  if (_rvcModelAudio) { _rvcModelAudio.pause(); _rvcModelAudio = null; }
+  if (_rvcMyAudio)    { _rvcMyAudio.pause();    _rvcMyAudio    = null; }
+  const modelBtn = $('btn-play-model'); if (modelBtn) modelBtn.textContent = '▶ 재생';
+  const myBtn    = $('btn-play-my');    if (myBtn)    myBtn.textContent    = '▶ 재생';
+  const mScrub   = $('rvc-model-scrub'); if (mScrub) { mScrub.value = 0; mScrub.disabled = true; }
+  const yScrub   = $('rvc-my-scrub');   if (yScrub)  { yScrub.value = 0; yScrub.disabled = true; }
+  const mTime    = $('rvc-model-time'); if (mTime)  mTime.textContent  = '0:00 / 0:00';
+  const yTime    = $('rvc-my-time');    if (yTime)  yTime.textContent   = '0:00 / 0:00';
 
-  const lang = state.currentScript.langs[state.selectedLang];
+  const lang    = state.currentScript.langs[state.selectedLang];
   const isAdmin = isEditUnlocked();
 
-  $('total-score-value').textContent = result.total;
-  $('total-score-value').classList.toggle('hidden', !isAdmin);
-  const gradeEl = $('total-grade');
-  const _isJaCa = state.selectedLang === 'ja' || state.selectedLang === 'ca';
-  let _emojiGrade, _gradeCls;
-  if (_isJaCa) {
-    _emojiGrade = result.total >= 85 ? '✨ 훌륭해요' : result.total >= 70 ? '👍 잘했어요' : result.total >= 55 ? '🌱 성장 중' : '💪 더 연습해요';
-    _gradeCls   = result.total >= 85 ? 'grade-A' : result.total >= 70 ? 'grade-B' : result.total >= 55 ? 'grade-C' : 'grade-D';
-  } else {
-    _emojiGrade = result.total >= 90 ? '✨ 훌륭해요' : result.total >= 75 ? '👍 잘했어요' : result.total >= 60 ? '🌱 성장 중' : '💪 더 연습해요';
-    _gradeCls   = result.total >= 90 ? 'grade-A' : result.total >= 75 ? 'grade-B' : result.total >= 60 ? 'grade-C' : 'grade-D';
+  // 내 녹음 없으면 scrub 영역 메시지
+  if (!_lastRecordingBlob) {
+    const yTime2 = $('rvc-my-time'); if (yTime2) yTime2.textContent = '녹음 파일 없음';
   }
-  gradeEl.textContent = _emojiGrade;
-  gradeEl.className   = `total-grade ${_gradeCls}`;
 
-  const barsEl = $('score-bars');
-  barsEl.innerHTML = `<div class="score-simple-grid">
-    ${Object.entries(CHECKLIST).map(([key, cat]) => {
-      const cr = result.categories[key];
-      const pct = Math.round(cr.score / cat.max * 100);
-      const level = pct >= 87 ? '우수' : pct >= 60 ? '보통' : '노력필요';
-      const emoji = pct >= 87 ? '🔥' : pct >= 60 ? '✅' : '⚠️';
-      const lvlCls = pct >= 87 ? 'ss-good' : pct >= 60 ? 'ss-mid' : 'ss-low';
-      return `<div class="score-simple-row">
-        <span class="score-simple-name">${cat.icon} ${cat.label}</span>
-        <span class="score-simple-level ${lvlCls}">${emoji} ${level}</span>
-      </div>`;
-    }).join('')}
-  </div>`;
   renderTranscriptCompare(transcript, lang);
 
-  // AI 채점 섹션 초기화
+  // AI 상세 분석 섹션 — 스켈레톤 4개 표시
   const aiSec = $('ai-result-section');
   if (aiSec) {
-    aiSec.classList.add('hidden');
-    aiSec.innerHTML = '';
+    const skeletonCard = () => `
+      <div class="ai-ske-card">
+        <div class="ai-ske-header">
+          <div class="skeleton-line" style="width:30%"></div>
+          <div class="skeleton-line" style="width:18%"></div>
+        </div>
+        <div class="skeleton-line" style="width:90%"></div>
+        <div class="skeleton-line" style="width:75%"></div>
+        <div class="skeleton-line" style="width:85%"></div>
+      </div>`;
+    aiSec.innerHTML = skeletonCard() + skeletonCard() + skeletonCard() + skeletonCard();
   }
+  console.log('[완료] 결과 화면 표시 (스켈레톤)');
 
-  // AI 채점 (Firebase 초기화된 경우 자동 실행 — audioBlob을 직접 Gemini에 전달)
+  // AI 채점 — 완료 시 오버레이 종료 + 스켈레톤 교체
   if (firebase.apps.length && state.audioBlob) {
     callGeminiScoring(lang.text, state.audioBlob, state.selectedLang, lang.checkpoints).then(aiResult => {
+      _completeOverlay();
       if (aiResult) {
         renderAiResult(aiResult, isAdmin);
         if (aiResult.transcript) renderTranscriptCompare(aiResult.transcript, lang);
+      } else {
+        if (aiSec) aiSec.innerHTML = '<div class="ai-ske-error">AI 분석을 불러오지 못했습니다.</div>';
       }
-    }).catch(() => {});
+    }).catch(() => {
+      _completeOverlay();
+      if (aiSec) aiSec.innerHTML = '<div class="ai-ske-error">AI 분석 중 오류가 발생했습니다.</div>';
+    });
+  } else {
+    // Firebase 없는 경우 즉시 오버레이 종료
+    _completeOverlay();
+    if (aiSec) aiSec.innerHTML = '<div class="ai-ske-error">AI 분석은 배포 환경에서 사용 가능합니다.</div>';
   }
 }
 
@@ -3042,19 +3150,17 @@ ${sharedJson}`;
 function renderAiResult(ai, isAdmin) {
   const sec = $('ai-result-section');
   if (!sec) return;
-  sec.classList.remove('hidden');
 
-  const lang = ai.language || state.selectedLang;
-  const isKoEn = lang === 'ko' || lang === 'en';
-  const isJaCa = lang === 'ja' || lang === 'ca';
-  const score = typeof ai.score === 'number' ? ai.score : 0;
-  const grade = ai.grade || (isKoEn ? '미취득' : 'FAIL');
+  const lang    = ai.language || state.selectedLang;
+  const isKoEn  = lang === 'ko' || lang === 'en';
+  const isJaCa  = lang === 'ja' || lang === 'ca';
+  const score   = typeof ai.score === 'number' ? ai.score : 0;
+  const grade   = ai.grade || (isKoEn ? '미취득' : 'FAIL');
 
   const gradeColor = isKoEn
     ? (grade === 'A' ? '#16a34a' : grade === 'B' ? '#2563eb' : grade === 'C' ? '#d97706' : '#dc2626')
     : (grade === 'PASS' ? '#16a34a' : '#dc2626');
-
-  const emojiGradeAI = isKoEn
+  const emojiGrade = isKoEn
     ? (score >= 90 ? '✨ 훌륭해요' : score >= 75 ? '👍 잘했어요' : score >= 60 ? '🌱 성장 중' : '💪 더 연습해요')
     : (score >= 85 ? '✨ 훌륭해요' : score >= 70 ? '👍 잘했어요' : score >= 55 ? '🌱 성장 중' : '💪 더 연습해요');
 
@@ -3063,61 +3169,56 @@ function renderAiResult(ai, isAdmin) {
     : { fluency: 30, atmosphere: 25, intonation: 25, pronunciation: 20 };
 
   const catMeta = {
-    fluency:       { name: '유창성',        icon: '💨', color: '#10b981', max: maxScores.fluency },
-    atmosphere:    { name: '분위기/목소리',  icon: '🎙',  color: '#f59e0b', max: maxScores.atmosphere },
-    intonation:    { name: '억양',          icon: '〰️', color: '#8b5cf6', max: maxScores.intonation },
-    pronunciation: { name: '발음',          icon: '🗣',  color: '#3b82f6', max: maxScores.pronunciation }
+    fluency:       { name: '유창성',       icon: '💨', max: maxScores.fluency },
+    atmosphere:    { name: '분위기/목소리', icon: '🎙',  max: maxScores.atmosphere },
+    intonation:    { name: '억양',         icon: '〰️', max: maxScores.intonation },
+    pronunciation: { name: '발음',         icon: '🗣',  max: maxScores.pronunciation }
   };
 
-  // 잘한 점 — 초록 박스 (상단)
+  // 등급 헤더
+  const gradeHeaderHtml = `
+    <div class="ai-grade-header">
+      <span class="ai-grade-badge-new" style="background:${gradeColor}">${emojiGrade}</span>
+      ${isAdmin ? `<span class="ai-score-chip">${score}점</span>` : ''}
+    </div>`;
+
+  // 잘한 점 박스
   const goodPointsHtml = ai.goodPoints?.length
     ? `<div class="ai-good-points-box">
         <div class="ai-good-points-label">👏 잘하셨어요!</div>
         ${ai.goodPoints.map(p => `<div class="ai-good-point-item">✓ ${escHtml(p)}</div>`).join('')}
-      </div>`
-    : '';
+      </div>` : '';
 
-  // 등급 + 점수 헤더
-  const gradeHtml = `<span class="ai-grade-badge" style="background:${gradeColor}">${emojiGradeAI}</span>
-    ${isAdmin ? `<div class="ai-grade-note">${isKoEn ? 'A≥90 / B≥75 / C≥60 / 미취득<60' : 'PASS: 85점 이상'} (AI: ${score}점)</div>` : ''}`;
-
-  const scoreHeaderHtml = `
-    <div class="ai-score-header">
-      ${isAdmin ? `<div class="ai-score-value" style="color:${gradeColor}">${score}</div>` : ''}
-      <div class="ai-score-meta">
-        ${isAdmin ? `<div class="ai-score-label">AI 평가 점수 / 100</div>` : ''}
-        ${gradeHtml}
-      </div>
-    </div>`;
-
-  // 카테고리별
-  const catsHtml = Object.entries(ai.categories || {}).map(([key, cat]) => {
+  // 카테고리 카드
+  const catCardsHtml = Object.entries(ai.categories || {}).map(([key, cat]) => {
     const m = catMeta[key];
     if (!m) return '';
-    const pct = Math.round((Math.min(cat.score, m.max) / m.max) * 100);
+    const pct   = Math.round((Math.min(cat.score, m.max) / m.max) * 100);
     const level = cat.level || (pct >= 87 ? '우수' : pct >= 60 ? '보통' : '노력필요');
-    const levelCls = level === '우수' ? 'level-good' : level === '보통' ? 'level-mid' : 'level-low';
-    const pronDetailsHtml = (key === 'pronunciation' && cat.details?.length)
-      ? `<div class="ai-pron-details">
-          ${cat.details.map(d => `<div class="ai-pron-detail-item">💬 ${escHtml(d)}</div>`).join('')}
-         </div>`
-      : '';
-    // [5] 피드백 3파트 분리: 첫 문장→잘된 점, 둘째 문장→개선 포인트, practiceTip→연습 목표
-    const fbSentences = (cat.feedback || '').split(/(?<=[.!?。])\s+/).filter(Boolean);
-    const fbGood    = fbSentences[0] ? `<div class="ai-fb-part ai-fb-good">✅ 잘된 점: ${escHtml(fbSentences[0])}</div>` : '';
-    const fbImprove = fbSentences[1] ? `<div class="ai-fb-part ai-fb-improve">📌 개선 포인트: ${escHtml(fbSentences.slice(1).join(' '))}</div>` : '';
-    const fbTip     = cat.practiceTip ? `<div class="ai-fb-part ai-fb-tip">🎯 다음 연습 목표: ${escHtml(cat.practiceTip)}</div>` : '';
+    const bgCls = level === '우수' ? 'ai-card-good' : level === '보통' ? 'ai-card-mid' : 'ai-card-low';
+    const lvlCls = level === '우수' ? 'lvl-good' : level === '보통' ? 'lvl-mid' : 'lvl-low';
+    const lvlEmoji = level === '우수' ? '🔥' : level === '보통' ? '✅' : '⚠️';
 
-    return `<div class="ai-cat-bar-row">
-      <div class="ai-cat-bar-header">
-        <span class="ai-cat-icon">${m.icon}</span>
-        <span class="ai-cat-name">${m.name}</span>
-        <span class="ai-cat-level ${levelCls}">${level}</span>
-        ${isAdmin ? `<span class="ai-cat-score" style="color:${m.color}">${cat.score}<span style="font-size:11px;color:#94a3b8">/${m.max}</span></span>` : ''}
+    // 피드백 마침표 기준 분리
+    const fbSentences = (cat.feedback || '').split(/(?<=[.!?。])\s+/).filter(Boolean);
+    const fbGood    = fbSentences[0]
+      ? `<div class="ai-card-fb-row ai-card-fb-good"><span class="ai-card-fb-icon">✅</span><div><strong>잘된 점</strong><br>${escHtml(fbSentences[0])}</div></div>` : '';
+    const fbImprove = fbSentences[1]
+      ? `<div class="ai-card-fb-row ai-card-fb-improve"><span class="ai-card-fb-icon">📌</span><div><strong>개선 포인트</strong><br>${escHtml(fbSentences.slice(1).join(' '))}</div></div>` : '';
+    const fbTip     = cat.practiceTip
+      ? `<div class="ai-card-fb-row ai-card-fb-tip"><span class="ai-card-fb-icon">🎯</span><div><strong>다음 연습 목표</strong><br>${escHtml(cat.practiceTip)}</div></div>` : '';
+    const pronDetails = (key === 'pronunciation' && cat.details?.length)
+      ? cat.details.map(d => `<div class="ai-pron-detail-item">💬 ${escHtml(d)}</div>`).join('') : '';
+
+    return `<div class="ai-cat-card ${bgCls}">
+      <div class="ai-cat-card-header">
+        <span class="ai-cat-card-icon">${m.icon}</span>
+        <span class="ai-cat-card-name">${m.name}</span>
+        <span class="ai-cat-level-badge ${lvlCls}">${lvlEmoji} ${level}</span>
+        ${isAdmin ? `<span class="ai-cat-score-chip">${cat.score}/${m.max}</span>` : ''}
       </div>
-      ${isAdmin ? `<div class="ai-cat-bar-track"><div class="ai-cat-bar-fill" style="width:${pct}%;background:${m.color}"></div></div>` : ''}
       ${fbGood}${fbImprove}${fbTip}
-      ${pronDetailsHtml}
+      ${pronDetails}
     </div>`;
   }).join('');
 
@@ -3126,52 +3227,31 @@ function renderAiResult(ai, isAdmin) {
     ? `<div class="ai-missed-box">
         <div class="ai-missed-label">⚠️ 누락된 핵심 키워드</div>
         <div class="ai-missed-list">${ai.missedKeywords.map(k => `<span class="ai-missed-item">${escHtml(k)}</span>`).join('')}</div>
-      </div>`
-    : '';
+      </div>` : '';
 
-  // 다음 연습 핵심 목표 + 연습 방법 (행동 지침 박스)
-  const nextFocusHtml = ai.nextFocus
-    ? `<div class="ai-next-focus-box">
-        <div class="ai-next-focus-label">🎯 다음 연습 핵심 목표</div>
-        <div class="ai-next-focus-content">${escHtml(ai.nextFocus)}</div>
+  // 핵심 목표 카드
+  const nextFocusHtml = (ai.nextFocus || ai.improvementTip)
+    ? `<div class="ai-focus-card">
+        <div class="ai-focus-title">🎯 이번 핵심 개선 목표</div>
+        <div class="ai-focus-content">${escHtml(ai.nextFocus || ai.improvementTip)}</div>
         ${ai.practiceMethod
-          ? `<div class="ai-practice-method">
-              <span class="ai-pm-label">💡 이렇게 연습하세요</span>
-              ${escHtml(ai.practiceMethod)}
-            </div>`
-          : ''}
-      </div>`
-    : (ai.improvementTip
-      ? `<div class="ai-improvement-box">
-          <div class="ai-improvement-label">🎯 핵심 개선 포인트</div>
-          <div class="ai-improvement-text">${escHtml(ai.improvementTip)}</div>
-        </div>`
-      : '');
+          ? `<div class="ai-focus-method"><span class="ai-pm-label">💡 단계별 연습 방법</span> ${escHtml(ai.practiceMethod)}</div>` : ''}
+      </div>` : '';
 
-  // 응원 메시지
+  // 응원 카드
   const encourageHtml = ai.encouragement
-    ? `<div class="ai-encouragement-box">
-        <div class="ai-encouragement-text">💙 ${escHtml(ai.encouragement)}</div>
-      </div>`
-    : '';
-
-  // 액션 버튼
-  const buttonsHtml = `
-    <div class="ai-action-buttons">
-      <button class="btn-ai-retry" onclick="if(state.currentScript) startPrep(state.currentScript)">🔄 다시 연습</button>
-      <button class="btn-ai-select" onclick="showScreen('screen-home')">📋 다른 방송문 선택</button>
-    </div>`;
+    ? `<div class="ai-encourage-card">💪 ${escHtml(ai.encouragement)}</div>` : '';
 
   sec.innerHTML = `
-    <div class="section-heading">🤖 AI 상세 분석</div>
+    <div class="ai-result-heading">🤖 AI 상세 분석</div>
+    ${gradeHeaderHtml}
     ${goodPointsHtml}
-    ${scoreHeaderHtml}
-    <div class="ai-categories-box">${catsHtml}</div>
+    ${catCardsHtml}
     ${missedHtml}
     ${nextFocusHtml}
     ${encourageHtml}
-    ${buttonsHtml}
   `;
+  console.log('[완료] AI 상세 분석 렌더링');
 }
 
 // ===== ADMIN =====
@@ -3890,5 +3970,5 @@ document.addEventListener('DOMContentLoaded', () => {
   // 결과 화면 버튼
   document.getElementById('btn-result-select')?.addEventListener('click', () => { stopModelComparison(); showScreen('screen-home'); });
   document.getElementById('btn-result-retry-2')?.addEventListener('click', () => { stopModelComparison(); if (state.currentScript) startPrep(state.currentScript); });
-  $('btn-retry')?.addEventListener('click', () => { stopModelComparison(); });
+  $('btn-retry')?.addEventListener('click', () => { stopModelComparison(); if (state.currentScript) startPrep(state.currentScript); });
 });
