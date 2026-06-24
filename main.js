@@ -712,6 +712,14 @@ function renderScriptText(text) {
 function renderBilingualScript(text, langCode) {
   if (langCode !== 'ja' && langCode !== 'ca') return renderScriptText(text);
 
+  console.log('[이중언어] 입력 텍스트 첫 200자:', text?.substring(0, 200));
+  console.log('[이중언어] 총 줄 수:', text?.split('\n').length);
+  console.log('[이중언어] 각 줄 판단:', text?.split('\n').map(l => ({
+    line: l.substring(0, 30),
+    hasKorean: /[가-힣]/.test(l),
+    hasJapanese: /[぀-ヿ一-鿿]/.test(l)
+  })));
+
   const hasJapanese  = s => /[぀-ヿ一-鿿]/.test(s);
   const hasKorean    = s => /[가-힣]/.test(s);
   const hasChinese   = s => /[一-鿿]/.test(s);
@@ -1469,6 +1477,7 @@ async function generateChineseReadings(scriptText, scriptId) {
   if (_db) {
     try {
       const snap = await _db.collection('scripts').doc(scriptId).get();
+      console.log('[중국어독음] Firestore 조회:', snap.exists, snap.data()?.chineseReadings?.length);
       const saved = snap.exists ? snap.data()?.chineseReadings : null;
       if (saved?.length) {
         _readingsCache[cacheKey] = saved;
@@ -1507,6 +1516,7 @@ ${scriptText}`;
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
+    console.log('[중국어독음] API raw:', raw?.substring(0, 300));
     const m = raw.match(/\[[\s\S]*\]/);
     if (m) readings = JSON.parse(m[0]);
   } catch (e) {
@@ -1529,6 +1539,7 @@ ${scriptText}`;
 
 // 중국어 독음 로딩 상태 표시 + 생성 후 렌더 적용
 async function _autoLoadChineseReadings(scriptText, scriptId) {
+  console.log('[중국어독음] 시작:', scriptId);
   const el = $('study-script-text');
   if (!el) return;
 
@@ -1541,9 +1552,11 @@ async function _autoLoadChineseReadings(scriptText, scriptId) {
 
   try {
     const readings = await generateChineseReadings(scriptText, scriptId);
+    console.log('[중국어독음] API 결과:', readings);
     const ind = document.getElementById('cn-reading-indicator');
     if (ind) ind.remove();
     if (readings?.length) {
+      console.log('[중국어독음] 렌더링 시작, readings 수:', readings.length);
       _renderChineseScriptWithReadings(scriptText, readings);
     }
   } catch (e) {
