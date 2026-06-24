@@ -1005,18 +1005,7 @@ function _renderDetailContent(s, lang) {
     cpEl.classList.add('hidden');
   }
 
-  // 모델 음성 (언어별): localStorage base64 또는 메모리 캐시에 URL이 있으면 표시
-  const voiceBtn = $('detail-voice-btn');
-  const hasVoice = !!loadModelVoice(s.id, lang) || !!_getCachedModelVoiceUrl(s.id, lang);
-  voiceBtn.classList.toggle('hidden', !hasVoice);
-  if (!hasVoice) {
-    // 비동기로 Firestore modelFiles 확인 후 버튼 갱신
-    _resolveModelVoiceUrl(s.id, lang).then(url => {
-      if (_selectedScriptId === s.id && _detailLang === lang) {
-        voiceBtn.classList.toggle('hidden', !url);
-      }
-    });
-  }
+  // detail-voice-btn 제거됨
 
   // 연습 횟수 + 마지막 날짜
   const practiceEl = $('detail-practice-info');
@@ -1360,7 +1349,7 @@ async function startStudyMode() {
     const btn = $(`study-gender-${g.toLowerCase()}`);
     if (btn) btn.classList.toggle('active', g === _currentGender);
   });
-  createModelVoicePlayer('study-model-player');
+  createModelVoicePlayer('study-model-player', { noGender: true });
 
   // 가이드 초기화
   $('study-guide-result').classList.add('hidden');
@@ -3818,7 +3807,7 @@ document.addEventListener('DOMContentLoaded', () => {
       _currentGender = G;
       ['m', 'f'].forEach(x => $(`study-gender-${x}`)?.classList.toggle('active', x === g));
       if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio = null; }
-      createModelVoicePlayer('study-model-player');
+      createModelVoicePlayer('study-model-player', { noGender: true });
     });
   });
   // 가이드 생성
@@ -3941,28 +3930,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const s = _allScripts.find(x => x.id === _selectedScriptId);
     if (s) { state.selectedLang = _detailLang; startPrep(s, _detailLang); }
   });
-  $('detail-voice-btn').addEventListener('click', async () => {
-    if (!_selectedScriptId) return;
-    const s = _allScripts.find(x => x.id === _selectedScriptId);
-    if (!s) return;
-    const base64 = loadModelVoice(s.id, _detailLang);
-    if (base64) {
-      if (_mvAudioUrl) { URL.revokeObjectURL(_mvAudioUrl); _mvAudioUrl = null; }
-      const blob = base64ToBlob(base64);
-      _mvAudioUrl = URL.createObjectURL(blob);
-      if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
-      _currentModelAudio = new Audio(_mvAudioUrl);
-      _currentModelAudio.play().catch(()=>{});
-      return;
-    }
-    // 로컬 정적 파일 URL (Firestore modelFiles 기반)
-    const url = await _resolveModelVoiceUrl(s.id, _detailLang);
-    if (url) {
-      if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
-      _currentModelAudio = new Audio(url);
-      _currentModelAudio.play().catch(()=>{});
-    }
-  });
+  // detail-voice-btn 제거됨 — 모델 음성은 학습 화면(screen-study)에서 재생
   $('detail-edit-btn').addEventListener('click', () => {
     if (!_selectedScriptId) return;
     const btn = $('detail-edit-btn');

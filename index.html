@@ -72,7 +72,6 @@
           <div class="detail-checkpoints hidden" id="detail-checkpoints"></div>
           <div class="detail-practice-info" id="detail-practice-info"></div>
           <div class="detail-actions">
-            <button class="btn-model-voice detail-voice-btn hidden" id="detail-voice-btn">🎵 모델 음성 듣기</button>
             <button class="btn-primary detail-start-btn" id="detail-start-btn">✈ 연습 시작 →</button>
           </div>
         </div>
@@ -212,13 +211,19 @@
     <div class="study-topbar">
       <button class="btn-icon" id="btn-back-study">← 뒤로</button>
       <div class="study-title-bar" id="study-title-bar"></div>
-      <div class="mvp-gender-wrap" id="study-gender-wrap">
-        <button class="mvp-gender-btn active" data-g="M" id="study-gender-m">남</button>
-        <button class="mvp-gender-btn" data-g="F" id="study-gender-f">여</button>
-      </div>
+      <div style="width:80px"></div>
     </div>
     <div class="study-body">
-      <div id="study-model-player"></div>
+      <div class="study-mvp-card">
+        <div class="study-mvp-header">
+          <span class="study-mvp-title">🎵 모델 음성</span>
+          <div class="mvp-gender-wrap" id="study-gender-wrap">
+            <button class="mvp-gender-btn active" data-g="M" id="study-gender-m">남</button>
+            <button class="mvp-gender-btn" data-g="F" id="study-gender-f">여</button>
+          </div>
+        </div>
+        <div id="study-model-player"></div>
+      </div>
       <div class="study-guide-section">
         <div class="study-guide-header">
           <span class="study-guide-title">💡 이 방송문 핵심 포인트</span>
