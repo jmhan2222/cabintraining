@@ -1480,6 +1480,46 @@ html, body {
   padding: 24px; font-size: 14px;
 }
 
+/* AI 오류 재시도 카드 */
+.ai-error-card {
+  background: #fff8f0; border: 1px solid #fed7aa;
+  border-radius: var(--radius-lg); padding: 24px 20px;
+  text-align: center; display: flex; flex-direction: column;
+  align-items: center; gap: 10px;
+}
+.ai-error-icon { font-size: 32px; line-height: 1; }
+.ai-error-title {
+  font-size: 15px; font-weight: 700; color: #92400e;
+}
+.ai-error-sub {
+  font-size: 13px; color: #78350f; line-height: 1.5;
+}
+.ai-error-actions {
+  display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+  margin-top: 4px;
+}
+.ai-error-btn {
+  padding: 10px 18px; border-radius: 10px; border: none;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: opacity .15s;
+}
+.ai-error-btn:hover { opacity: .85; }
+.ai-error-btn-retry {
+  background: #f59e0b; color: #fff;
+}
+.ai-error-btn-rerecord {
+  background: #e2e8f0; color: #334155;
+}
+.ai-error-hint {
+  font-size: 12px; color: #b45309; line-height: 1.6;
+  background: #fef3c7; border-radius: 8px; padding: 8px 12px;
+  width: 100%; box-sizing: border-box;
+}
+@media (max-width: 480px) {
+  .ai-error-actions { flex-direction: column; width: 100%; }
+  .ai-error-btn { width: 100%; }
+}
+
 /* 등급 헤더 */
 .ai-grade-header {
   display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
@@ -2050,12 +2090,18 @@ html, body {
 .sg-save-btn { margin-top: 14px; width: 100%; }
 /* 끊어읽기 */
 .sg-break-item {
-  padding: 5px 0; font-size: 14px; line-height: 1.8; color: var(--color-text-primary);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border); margin-bottom: 2px;
 }
 .sg-break-item:last-child { border-bottom: none; }
-.sg-bp-short { color: #16a34a; font-weight: 700; }  /* ,(반박자) — 초록 */
-.sg-bp-long  { color: #2563eb; font-weight: 700; }  /* |(한박자) — 파랑 */
+.break-script-line {
+  font-size: 16px; color: #1D1D1F; line-height: 1.8; padding: 10px 14px 4px;
+}
+.break-guide-line {
+  font-size: 13px; color: #6E6E73; background: #F5F5F7;
+  padding: 5px 14px 10px; border-left: 3px solid #D2D2D7; margin-bottom: 2px;
+}
+.sg-bp-short { color: #E65C00; font-weight: 800; font-size: 1.1em; }  /* ∙(반박자) — 진한 주황 */
+.sg-bp-long  { color: #E65C00; font-weight: 800; font-size: 1.1em; }  /* /(한박자) — 진한 주황 */
 .sg-bp-legend {
   font-size: 12px; margin-bottom: 6px; display: flex; gap: 14px; flex-wrap: wrap;
 }
@@ -2071,18 +2117,21 @@ html, body {
   font-size: 14px; line-height: 1.6; padding: 4px 0;
   color: var(--color-text-primary);
 }
-.sg-inton-details { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.sg-inton-details { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
 .sg-inton-detail {
-  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
-  font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--color-border);
+  font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--color-border);
 }
 .sg-inton-detail:last-child { border-bottom: none; }
-.sg-inton-symbol { font-size: 17px; font-weight: 700; flex-shrink: 0; width: 24px; }
-.sg-inton-up   { color: #e11d48; }
-.sg-inton-down { color: #2563eb; }
-.sg-inton-flat { color: #64748b; }
+.sg-inton-detail-top { display: flex; align-items: center; gap: 8px; }
+.sg-inton-symbol { font-size: 20px; font-weight: 700; flex-shrink: 0; width: 28px; }
+.sg-inton-up   { color: #FF3B30; font-weight: 700; font-size: 1.2em; }
+.sg-inton-down { color: #0051C8; font-weight: 700; font-size: 1.2em; }
+.sg-inton-flat { color: #34C759; font-weight: 700; font-size: 1.2em; }
 .sg-inton-phrase { font-weight: 600; color: var(--color-text-primary); }
-.sg-inton-guide { color: var(--color-text-secondary); font-size: 12px; }
+.sg-inton-guide {
+  color: var(--color-text-secondary); font-size: 12px;
+  margin-top: 4px; padding-left: 36px; display: block;
+}
 /* 팁 */
 .sg-tip-item {
   padding: 5px 0; font-size: 14px; line-height: 1.5;
@@ -2100,9 +2149,22 @@ html, body {
   margin-bottom: 10px; letter-spacing: .3px;
 }
 .study-script-text {
-  font-size: 15px; line-height: 1.9; color: var(--color-text-primary);
-  white-space: pre-wrap;
+  line-height: 1.8; margin-bottom: 0; color: var(--color-text-primary);
 }
+/* 한국어·영어 개별 줄 */
+.study-script-line {
+  font-size: 15px; line-height: 1.8; margin-bottom: 8px; padding: 0;
+}
+.study-script-sep { height: 8px; margin-bottom: 0; }
+/* 이중 언어(ja/ca) 학습 화면 전용 오버라이드 — 다른 화면의 bilingual 스타일과 독립 */
+.study-script-text .bilingual-reading {
+  font-size: 13px; color: #AEAEB2; line-height: 1.5; margin-bottom: 2px; margin-top: 0;
+}
+.study-script-text .bilingual-original {
+  font-size: 16px; color: #1D1D1F; line-height: 1.7; margin-bottom: 10px; margin-top: 0;
+}
+.study-script-text .bilingual-pair { margin-bottom: 2px; }
+.study-script-text .bilingual-sep  { height: 6px; }
 /* 하단 버튼 */
 .study-bottom {
   display: flex; gap: 10px; padding: 14px 16px;

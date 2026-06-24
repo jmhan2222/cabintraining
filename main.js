@@ -1308,8 +1308,12 @@ function stopRecording() {
     const mimeType = state.mediaRecorder?.mimeType || 'audio/webm';
     state.audioBlob = new Blob(state.audioChunks, { type: mimeType });
     _lastRecordingBlob = state.audioBlob;
+    _aiAnalysisRetryCount = 0;
     if (_lastRecordingUrl) { URL.revokeObjectURL(_lastRecordingUrl); }
     _lastRecordingUrl = URL.createObjectURL(_lastRecordingBlob);
+    if (_lastRecordingBlob.size > 500 * 1024) {
+      showToast('음성 파일이 큽니다. 분석에 시간이 걸릴 수 있어요.', 3500);
+    }
     analyzeAndShow(duration);
   };
 
@@ -1346,6 +1350,70 @@ function tierScore(ratio, maxPt) {
 // ===== STUDY MODE =====
 const _studyGuideCache = {}; // key: `${scriptId}_${lang}`
 
+// ─── 학습 화면 방송문 텍스트 렌더 ─────────────────────────────────────────
+// ja/ca: renderBilingualScript 활용 | ko/en: 빈 줄 압축 + 줄 단위 div 렌더
+function _renderStudyScriptText(text, langCode) {
+  const el = $('study-script-text');
+  if (!el) return;
+
+  const lines = String(text || '').split('\n');
+  const firstValid = lines.find(l => l.trim())?.substring(0, 60) || '(없음)';
+  console.log('[방송문] 총 라인 수:', lines.length, '첫 줄:', firstValid);
+
+  if (langCode === 'ja' || langCode === 'ca') {
+    el.innerHTML = renderBilingualScript(text, langCode);
+  } else {
+    // 연속 빈 줄은 하나로 압축, 첫 줄은 무조건 보존
+    const out = [];
+    let prevBlank = false;
+    for (const line of lines) {
+      if (!line.trim()) {
+        if (!prevBlank) out.push('');
+        prevBlank = true;
+      } else {
+        out.push(line);
+        prevBlank = false;
+      }
+    }
+    el.innerHTML = out.map(l => l
+      ? `<div class="study-script-line">${escHtml(l)}</div>`
+      : '<div class="study-script-sep"></div>'
+    ).join('');
+  }
+  console.log('[완료] 방송문 첫 줄 보존 렌더링');
+}
+
+// ─── 중국어 방송문 한글 독음 덮어쓰기 ────────────────────────────────────
+function _renderChineseScriptWithReadings(text, chineseReadings) {
+  const el = $('study-script-text');
+  if (!el || !chineseReadings?.length) return;
+  const hasCJK = s => /[一-鿿]/.test(s);
+  const isSectionHeader = s => /^\[[^\]]+\]$/.test(s.trim()) && !hasCJK(s);
+
+  const readingMap = new Map();
+  chineseReadings.forEach(r => {
+    if (r.original && r.reading) readingMap.set(r.original.trim(), r.reading.trim());
+  });
+
+  let html = '';
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (!t) { html += '<div class="bilingual-sep"></div>'; continue; }
+    if (isSectionHeader(t)) { html += `<div class="bilingual-header">${escHtml(t)}</div>`; continue; }
+    if (hasCJK(t)) {
+      const reading = readingMap.get(t);
+      html += `<div class="bilingual-pair">
+        ${reading ? `<div class="bilingual-reading">${escHtml(reading)}</div>` : ''}
+        <div class="bilingual-original">${escHtml(t)}</div>
+      </div>`;
+    } else {
+      html += `<div class="bilingual-pair"><div class="bilingual-original">${escHtml(t)}</div></div>`;
+    }
+  }
+  el.innerHTML = `<div class="script-text-rendered">${html}</div>`;
+  console.log('[완료] 중국어 한글 독음 표시');
+}
+
 async function startStudyMode() {
   const s = state.currentScript;
   if (!s) return;
@@ -1353,7 +1421,7 @@ async function startStudyMode() {
   if (!lang) return;
 
   $('study-title-bar').textContent = s.title;
-  $('study-script-text').textContent = lang.text;
+  _renderStudyScriptText(lang.text, state.selectedLang);
   ['M', 'F'].forEach(g => {
     const btn = $(`study-gender-${g.toLowerCase()}`);
     if (btn) btn.classList.toggle('active', g === _currentGender);
@@ -1372,7 +1440,11 @@ async function startStudyMode() {
   // 캐시 → Firestore 순으로 가이드 조회
   const cacheKey = `${s.id}_${state.selectedLang}`;
   if (_studyGuideCache[cacheKey]) {
-    _renderStudyGuide(_studyGuideCache[cacheKey]);
+    const cached = _studyGuideCache[cacheKey];
+    _renderStudyGuide(cached);
+    if (state.selectedLang === 'ca' && cached.chineseReadings?.length) {
+      _renderChineseScriptWithReadings(lang.text, cached.chineseReadings);
+    }
     $('btn-gen-guide').textContent = '✅ 가이드 완성';
   } else {
     const statusEl = $('study-guide-status');
@@ -1385,6 +1457,9 @@ async function startStudyMode() {
       if (saved) {
         _studyGuideCache[cacheKey] = saved;
         _renderStudyGuide(saved);
+        if (state.selectedLang === 'ca' && saved.chineseReadings?.length) {
+          _renderChineseScriptWithReadings(lang.text, saved.chineseReadings);
+        }
         $('btn-gen-guide').textContent = '✅ 가이드 완성';
         console.log('[완료] Firestore 저장 가이드 로드');
       }
@@ -1393,6 +1468,30 @@ async function startStudyMode() {
     }
   }
   console.log('[완료] 학습 모드 화면 진입');
+}
+
+async function _retryGuideWithSimplePrompt(scriptText) {
+  const simplePrompt = `아래 방송문의 핵심 포인트를 한국어로 설명해줘.
+방송문 텍스트에 한글 독음이나 특수 기호가 포함되어 있어도 무시하고 분석해줘.
+반드시 아래 JSON 형식으로만 반환:
+{"summary":"...","tips":["팁1","팁2","팁3"]}
+JSON 외 어떤 텍스트도 포함하지 말 것.
+방송문: ${scriptText}`;
+
+  const res = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gemini-2.5-flash',
+      contents: [{ parts: [{ text: simplePrompt }] }]
+    })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('단순화 재시도 JSON 파싱 실패');
+  return JSON.parse(m[0]);
 }
 
 async function callGeminiGuide(scriptText, langCode) {
@@ -1413,7 +1512,9 @@ async function callGeminiGuide(scriptText, langCode) {
 - 각 단어 성조 표시 예) '女士(3성4성) 先生(1성1성)'
 - 성조 변조 규칙 표시 (不/一)
 - 리듬감 있는 연결 방법
-- 스타카토 지양 포인트`,
+- 스타카토 지양 포인트
+- 방송문 각 문장(줄)에 한글 발음 독음 추가 (성조 제외, 한국어 화자가 읽기 쉽게 표기)
+  예) "女士们、先生们，" → "뉘스먼 셴셩먼"`,
     ko: `한국어 억양 가이드 필수 포함:
 - 문장 끝 어미 처리(~니다↘, ~세요↘) 반드시 포함
 - 강조 단어 위치의 음높이 변화`
@@ -1421,6 +1522,9 @@ async function callGeminiGuide(scriptText, langCode) {
 
   const prompt = `당신은 항공사 기내방송 전문 교관입니다.
 아래 방송문을 분석해서 JSON만 반환하세요 (설명·주석 없이).
+
+방송문 텍스트에 한글 독음이나 특수 기호가 포함되어 있어도 무시하고 분석해줘.
+반드시 유효한 JSON만 반환해야 해. JSON 외 어떤 텍스트도 포함하지 말 것.
 
 방송문 (${langName}):
 ${scriptText}
@@ -1445,8 +1549,10 @@ ${langSpecific[langCode] || langSpecific.ko}
   "intonationDetails": [
     { "phrase": "실제 방송문 구간 (원어)", "direction": "up 또는 down 또는 flat", "symbol": "↗ 또는 ↘ 또는 →", "guide": "구체적 연출 방법 (한국어)" }
   ],
-  "tips": ["실전 팁 1 (한국어)", "..."]
-}`;
+  "tips": ["실전 팁 1 (한국어)", "..."],
+  "chineseReadings": [{"original":"중국어 원문 줄","reading":"한글 독음"}]
+}
+중국어(ca)인 경우에만 chineseReadings 필드를 채워줘. 다른 언어는 chineseReadings 생략.`;
 
   const res = await fetch('/api/gemini', {
     method: 'POST',
@@ -1460,10 +1566,29 @@ ${langSpecific[langCode] || langSpecific.ko}
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
-  const m = raw.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error('응답 JSON 파싱 실패');
-  return JSON.parse(m[0]);
+
+  // 1차: 직접 파싱
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    // 2차: JSON 블록 추출 후 파싱
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (m) {
+      try {
+        return JSON.parse(m[0]);
+      } catch (e2) {
+        // 3차: 단순화된 프롬프트로 재시도
+        console.warn('[가이드] JSON 파싱 2회 실패 → 단순 프롬프트 재시도');
+        return await _retryGuideWithSimplePrompt(scriptText);
+      }
+    }
+    // JSON 블록 자체가 없으면 바로 단순 재시도
+    console.warn('[가이드] JSON 블록 없음 → 단순 프롬프트 재시도');
+    return await _retryGuideWithSimplePrompt(scriptText);
+  }
 }
+
+console.log('[완료] 학습 가이드 JSON 파싱 재시도 로직');
 
 // ─── Firestore studyGuide 저장/로드 ───────────────────────────────────────
 async function _saveGuideToFirestore(scriptId, langCode, guide) {
@@ -1481,17 +1606,40 @@ async function _loadGuideFromFirestore(scriptId, langCode) {
   } catch (e) { console.warn('[가이드 로드 실패]', e.message); return null; }
 }
 
-// ─── 끊어읽기 텍스트 색상 변환 ────────────────────────────────────────────
+// ─── 끊어읽기 텍스트 기호 변환 ────────────────────────────────────────────
+// ,(반박자) → ∙(가운데점)  |(한박자) → /(굵은 사선) — 둘 다 진한 주황
 function _colorizeBreakText(text) {
-  // 단일 정규식으로 한 번에 치환 (순차 치환 시 이미 삽입된 span 내부 재매칭 방지)
   return escHtml(String(text || '')).replace(/,\(반박자\)|\|\(한박자\)|,|\|/g, m => {
-    if (m === ',(반박자)') return '<span class="sg-bp-short">,<small>(반박자)</small></span>';
-    if (m === '|(한박자)') return '<span class="sg-bp-long">|<small>(한박자)</small></span>';
-    if (m === ',')         return '<span class="sg-bp-short">,</span>';
-    if (m === '|')         return '<span class="sg-bp-long">|</span>';
+    if (m === ',(반박자)') return '<span class="sg-bp-short">∙<small>(반박자)</small></span>';
+    if (m === '|(한박자)') return '<span class="sg-bp-long">/<small>(한박자)</small></span>';
+    if (m === ',')         return '<span class="sg-bp-short">∙</span>';
+    if (m === '|')         return '<span class="sg-bp-long">/</span>';
     return m;
   });
 }
+
+// ─── 끊어읽기 항목 렌더: 방송문 줄 / 가이드 줄 분리 ─────────────────────
+// 데이터 형식: "방송문(기호 포함) — 한국어 설명" 또는 줄바꿈 구분
+function _renderBreakItem(b) {
+  const text = String(b || '');
+  let scriptPart = text;
+  let guidePart  = '';
+  const sepIdx = text.indexOf(' — ');
+  if (sepIdx !== -1) {
+    scriptPart = text.slice(0, sepIdx).trim();
+    guidePart  = text.slice(sepIdx + 3).trim();
+  } else if (text.includes('\n')) {
+    const parts = text.split('\n');
+    scriptPart = parts[0].trim();
+    guidePart  = parts.slice(1).join(' ').trim();
+  }
+  const scriptHtml = _colorizeBreakText(scriptPart);
+  return guidePart
+    ? `<div class="break-script-line">${scriptHtml}</div><div class="break-guide-line">💬 ${escHtml(guidePart)}</div>`
+    : `<div class="break-script-line">${scriptHtml}</div>`;
+}
+
+console.log('[완료] 끊어읽기 기호 변환 및 레이아웃 분리');
 
 // ─── 편집 모드 저장 처리 ───────────────────────────────────────────────────
 async function _saveEditedGuide() {
@@ -1547,9 +1695,9 @@ function _renderStudyGuide(guide) {
         <div class="sg-section-header">
           <span class="sg-section-title">끊어읽기 포인트</span>${editBtn('break')}
         </div>
-        <div class="sg-bp-legend"><span class="sg-bp-short">,(반박자)</span> 짧게 쉬기&nbsp;&nbsp;<span class="sg-bp-long">|(한박자)</span> 충분히 쉬기</div>
+        <div class="sg-bp-legend"><span class="sg-bp-short">∙(반박자)</span> 짧게 쉬기&nbsp;&nbsp;<span class="sg-bp-long">/(한박자)</span> 충분히 쉬기</div>
         <div id="sg-body-break">
-          ${guide.breakPoints.map(b => `<div class="sg-break-item">${_colorizeBreakText(b)}</div>`).join('')}
+          ${guide.breakPoints.map(b => `<div class="sg-break-item">${_renderBreakItem(b)}</div>`).join('')}
         </div>
        </div>` : '';
 
@@ -1561,15 +1709,21 @@ function _renderStudyGuide(guide) {
         <div id="sg-body-emphasis" class="sg-emphasis-wrap">${guide.emphasisWords.map(w => `<span class="sg-emphasis-badge">${esc(w)}</span>`).join('')}</div>
        </div>` : '';
 
-  // [3] 억양 — intonationDetails 표시
+  // [3] 억양 — intonationDetails 표시 (기호 색상 + 2행 레이아웃)
+  const _dirSymbol = { up: '↗', down: '↘', flat: '→' };
   const intonDetailHtml = (guide.intonationDetails?.length)
-    ? guide.intonationDetails.map((d) =>
-        `<div class="sg-inton-detail">
-          <span class="sg-inton-symbol sg-inton-${d.direction || 'flat'}">${esc(d.symbol || '→')}</span>
-          <span class="sg-inton-phrase">${esc(d.phrase)}</span>
-          <span class="sg-inton-guide">— ${esc(d.guide)}</span>
-        </div>`
-      ).join('') : '';
+    ? guide.intonationDetails.map((d) => {
+        const dir = d.direction || 'flat';
+        const sym = d.symbol || _dirSymbol[dir] || '→';
+        return `<div class="sg-inton-detail">
+          <div class="sg-inton-detail-top">
+            <span class="sg-inton-symbol sg-inton-${dir}">${esc(sym)}</span>
+            <span class="sg-inton-phrase">${esc(d.phrase)}</span>
+          </div>
+          <span class="sg-inton-guide">${esc(d.guide)}</span>
+        </div>`;
+      }).join('') : '';
+  console.log('[완료] 억양 표시 색상 및 레이아웃 강화');
 
   const speedIntonHtml = (guide.speedGuide || guide.intonationGuide || guide.intonationDetails?.length)
     ? `<div class="sg-section" id="sg-sec-inton">
@@ -1824,6 +1978,7 @@ function _completeOverlay() {
 // ===== RESULT MODEL VOICE COMPARISON =====
 let _lastRecordingBlob = null;
 let _lastRecordingUrl  = null;
+let _aiAnalysisRetryCount = 0;  // 재분석 시도 횟수 (최대 2회)
 let _cmp = { active: false, audio: null, timeout: null, myUrl: null };
 let _rvcModelAudio = null;   // 결과 화면 모델 음성 Audio 객체
 let _rvcMyAudio    = null;   // 결과 화면 내 녹음 Audio 객체
@@ -2180,17 +2335,99 @@ function showResults(result, transcript) {
         renderAiResult(aiResult, isAdmin);
         if (aiResult.transcript) renderTranscriptCompare(aiResult.transcript, lang);
       } else {
-        if (aiSec) aiSec.innerHTML = '<div class="ai-ske-error">AI 분석을 불러오지 못했습니다.</div>';
+        if (aiSec) _showAiErrorWithRetry(aiSec);
       }
     }).catch(() => {
       _completeOverlay();
-      if (aiSec) aiSec.innerHTML = '<div class="ai-ske-error">AI 분석 중 오류가 발생했습니다.</div>';
+      if (aiSec) _showAiErrorWithRetry(aiSec);
     });
   } else {
     // Firebase 없는 경우 즉시 오버레이 종료
     _completeOverlay();
     if (aiSec) aiSec.innerHTML = '<div class="ai-ske-error">AI 분석은 배포 환경에서 사용 가능합니다.</div>';
   }
+}
+
+function _showAiErrorWithRetry(aiSec) {
+  const hasBlob = !!_lastRecordingBlob;
+  const retryBtnHtml = hasBlob
+    ? `<button class="ai-error-btn ai-error-btn-retry" onclick="_retryAiAnalysis()">🔄 다시 분석하기</button>
+       <button class="ai-error-btn ai-error-btn-rerecord" onclick="_goRerecord()">🎤 다시 녹음하기</button>`
+    : `<button class="ai-error-btn ai-error-btn-rerecord" onclick="_goRerecord()">🎤 다시 녹음하기</button>`;
+
+  aiSec.innerHTML = `
+    <div class="ai-error-card">
+      <div class="ai-error-icon">⚠️</div>
+      <div class="ai-error-title">분석 중 오류가 발생했습니다</div>
+      ${hasBlob ? '<div class="ai-error-sub">녹음 파일은 보존되어 있습니다.<br>다시 분석을 시도해보세요.</div>' : ''}
+      <div class="ai-error-actions">${retryBtnHtml}</div>
+      <div class="ai-error-hint">💡 오류가 반복되면:<br>네트워크 상태를 확인하거나 잠시 후 다시 시도해주세요.</div>
+    </div>`;
+  console.log('[완료] AI 오류 화면 표시 (재시도 버튼 포함)');
+}
+
+async function _retryAiAnalysis() {
+  if (!_lastRecordingBlob) {
+    showToast('녹음 파일이 없습니다. 다시 녹음해주세요.', 3000);
+    return;
+  }
+
+  _aiAnalysisRetryCount++;
+  if (_aiAnalysisRetryCount > 2) {
+    const aiSec = $('ai-result-section');
+    if (aiSec) aiSec.innerHTML = `
+      <div class="ai-error-card">
+        <div class="ai-error-icon">⚠️</div>
+        <div class="ai-error-title">네트워크 오류로 분석이 어렵습니다</div>
+        <div class="ai-error-sub">다시 녹음 후 시도해주세요.</div>
+        <div class="ai-error-actions">
+          <button class="ai-error-btn ai-error-btn-rerecord" onclick="_goRerecord()">🎤 다시 녹음하기</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const aiSec = $('ai-result-section');
+  const skeletonCard = () => `
+    <div class="ai-ske-card">
+      <div class="ai-ske-header">
+        <div class="skeleton-line" style="width:30%"></div>
+        <div class="skeleton-line" style="width:18%"></div>
+      </div>
+      <div class="skeleton-line" style="width:90%"></div>
+      <div class="skeleton-line" style="width:75%"></div>
+      <div class="skeleton-line" style="width:85%"></div>
+    </div>`;
+  if (aiSec) aiSec.innerHTML = skeletonCard() + skeletonCard() + skeletonCard() + skeletonCard();
+
+  $('loading-overlay').classList.remove('hidden');
+  _startOverlayTimers();
+
+  const s = state.currentScript;
+  const lang = s?.langs[state.selectedLang];
+  const isAdmin = isEditUnlocked();
+
+  try {
+    const aiResult = await callGeminiScoring(lang.text, _lastRecordingBlob, state.selectedLang, lang.checkpoints);
+    _completeOverlay();
+    if (aiResult) {
+      renderAiResult(aiResult, isAdmin);
+      if (aiResult.transcript) renderTranscriptCompare(aiResult.transcript, lang);
+    } else {
+      if (aiSec) _showAiErrorWithRetry(aiSec);
+    }
+  } catch {
+    _completeOverlay();
+    if (aiSec) _showAiErrorWithRetry(aiSec);
+  }
+  console.log(`[완료] AI 재분석 시도 ${_aiAnalysisRetryCount}회`);
+}
+
+function _goRerecord() {
+  _lastRecordingBlob = null;
+  if (_lastRecordingUrl) { URL.revokeObjectURL(_lastRecordingUrl); _lastRecordingUrl = null; }
+  if (state.currentScript) startPrep(state.currentScript, state.selectedLang);
+  console.log('[완료] 다시 녹음하기 → 준비 화면 복귀');
 }
 
 function renderRadar(result) {
@@ -2857,10 +3094,15 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
     - 문법 구조 중간에 끊거나, 끊김이 너무 잦거나 없으면 감점
     - 예) "손님 여러분 / 저희 비행기는" O, "손님 / 여러분 저희" X
   속도(5):
-    - 300~400 음절/분 범위가 적정
-    - 너무 빠르면(400음절 이상) 단어 뭉개짐, 너무 느리면(250음절 이하) 지루함
-    - 실제 음성을 듣고 체감 속도로 판단할 것
-    - WPM 수치가 아닌 실제 들리는 속도감을 기준으로 평가
+    [속도 채점 기준 — 반드시 준수]
+    기내방송의 가장 흔한 문제는 '너무 빠름'. 승무원들은 대부분 빠르게 읽는 경향이 있음.
+    - 빠르게 읽어서 단어가 뭉개지면 → 반드시 감점
+    - 빠르게 읽어서 끊어읽기가 없으면 → 반드시 감점
+    - 천천히 명확하게 읽으면 → 우수 평가 (5점)
+    - 적당한 속도면 → 보통 평가 (3~4점)
+    금지 표현: '더 빠르게', '속도를 높여', '빠릿하게', '템포를 올려'
+    권장 표현: '천천히 명확하게', '여유 있게', '충분히 끊어서', '승객이 이해할 수 있는 속도로'
+    속도가 느린 경우에만 '조금 더 자연스럽게'라고 표현. '더 빠르게 읽으라'는 피드백은 절대 금지.
   강조 표현(5):
     - 편명·목적지·안전 관련 핵심 단어에서 강조(살짝 느리게 또는 음량 높임)가 들어가는가
     - 전체가 동일한 강도로 읽히면 감점
@@ -2914,7 +3156,12 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
 
 유창성 ${maxFluency}점:
   끊어읽기(5): 의미 단위(구·절) 경계에서 자연스럽게 끊는가. 단어 중간에 끊으면 감점
-  속도(5): 100~130 WPM 범위 내인가. 뭉개지거나 너무 느리면 감점
+  속도(5):
+    [속도 채점 기준 — 반드시 준수]
+    기내방송의 가장 흔한 문제는 '너무 빠름'. 단어가 뭉개질 정도로 빠르면 반드시 감점.
+    - 천천히 명확하게 읽으면 → 우수 평가 (5점)
+    금지 표현: '더 빠르게', '속도를 높여', 'faster', 'speed up'
+    권장 표현: '천천히 명확하게', '여유 있게', '승객이 이해할 수 있는 속도로'
   강조(5): 주요 단어(flight number, destination, safety-related)에 강세 강조가 들어가는가
   문안 숙지(5): 버벅거림, 반복, 갑작스러운 멈춤 없는가
   말하는 듯한 연출(10):
@@ -2945,7 +3192,12 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
 유창성 ${maxFluency}점:
   끊어읽기(5): 일본어 문절 단위로 자연스럽게 끊는가
   문안 숙지(5): 버벅거림, 반복 없는가
-  속도(5): 일본어 기내방송에 적합한 속도인가 (너무 빠르면 장음 뭉개짐)
+  속도(5):
+    [속도 채점 기준 — 반드시 준수]
+    너무 빠르면 장음(ー)이 뭉개지고 발음이 부정확해짐 → 반드시 감점.
+    - 천천히 명확하게 읽으면 → 우수 평가 (5점)
+    금지 표현: '더 빠르게', '속도를 높여', '빠릿하게'
+    권장 표현: '천천히 명확하게', '여유 있게', '장음을 충분히 늘여서'
   자연스러운 연출(10): 일본어로 말하는 듯한 자연스러운 리듬인가, 한국어 억양이 섞이지 않는가
 
 분위기·목소리 25점 (반드시 0점 이상 부여):
@@ -2972,7 +3224,12 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
   끊어읽기(5): 중국어 의미 단위로 자연스럽게 끊는가
   말하는 듯한 연출(10): 스타카토식(단어 단위로 끊어 읽는 방식) 지양. 자연스럽게 이어지는가
   강조(5): 중요 단어에서 강조가 들어가는가
-  속도(5): 너무 빠르거나 느리지 않은가. 성조가 뭉개질 정도로 빠르면 감점
+  속도(5):
+    [속도 채점 기준 — 반드시 준수]
+    너무 빠르면 성조가 뭉개짐 → 반드시 감점.
+    - 천천히 명확하게 읽으면 → 우수 평가 (5점)
+    금지 표현: '더 빠르게', '속도를 높여', '빠릿하게'
+    권장 표현: '천천히 명확하게', '여유 있게', '성조를 살려서 읽기'
   문안 숙지(5): 버벅거림, 반복 없는가
 
 분위기·목소리 25점 (반드시 0점 이상 부여):
@@ -3014,6 +3271,8 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
 - 문안 미완주인데 높은 점수 부여
 - 발음/억양 문제가 있는데 우수 판정
 - 모호하거나 일반적인 피드백
+- 속도 피드백에서 '더 빠르게', '속도를 높여', '빠릿하게', '템포를 올려' 사용
+  (기내방송의 흔한 문제는 너무 빠름. 속도 개선 피드백은 항상 '여유 있게' 방향으로)
 
 [문안 완주 체크 — 최우선 적용]
 채점 전 반드시:
@@ -3158,19 +3417,27 @@ ${sharedRules}
 ${sharedJson}`;
 
   try {
-    const res = await fetch('/api/gemini', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gemini-2.5-flash',
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: audioBlob.type || 'audio/webm', data: base64Audio } },
-            { text: audioPrompt }
-          ]
-        }]
-      })
-    });
+    const _audioController = new AbortController();
+    const _audioTimeoutId = setTimeout(() => _audioController.abort(), 60000);
+    let res;
+    try {
+      res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: _audioController.signal,
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash',
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: audioBlob.type || 'audio/webm', data: base64Audio } },
+              { text: audioPrompt }
+            ]
+          }]
+        })
+      });
+    } finally {
+      clearTimeout(_audioTimeoutId);
+    }
     if (res.status === 501) {
       console.warn('로컬 환경: 배포 후 테스트 필요');
       return null;
@@ -3185,7 +3452,11 @@ ${sharedJson}`;
     if (m) return JSON.parse(m[0]);
     throw new Error('응답 JSON 파싱 실패');
   } catch (e) {
-    console.error('audio 채점 실패, STT 텍스트 방식으로 전환:', e);
+    if (e.name === 'AbortError') {
+      console.warn('audio 채점 타임아웃(60초), STT 방식으로 전환');
+    } else {
+      console.error('audio 채점 실패, STT 텍스트 방식으로 전환:', e);
+    }
   }
 
   // ── 2차 fallback: Web Speech API STT 텍스트로 채점 ──
@@ -3202,11 +3473,17 @@ ${transcript}
 
 ${sharedJson}`;
 
-  const result = await model.generateContent(textPrompt);
-  const raw = result.response.text().trim();
-  const m = raw.match(/\{[\s\S]*\}/);
-  if (!m) return null;
-  try { return JSON.parse(m[0]); } catch { return null; }
+  const _textController = new AbortController();
+  const _textTimeoutId = setTimeout(() => _textController.abort(), 60000);
+  try {
+    const result = await model.generateContent(textPrompt);
+    const raw = result.response.text().trim();
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try { return JSON.parse(m[0]); } catch { return null; }
+  } finally {
+    clearTimeout(_textTimeoutId);
+  }
 }
 
 function renderAiResult(ai, isAdmin) {
@@ -3893,7 +4170,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!s) return;
     const lang = state.selectedLang;
     const cacheKey = `${s.id}_${lang}`;
-    if (_studyGuideCache[cacheKey]) { _renderStudyGuide(_studyGuideCache[cacheKey]); return; }
+    if (_studyGuideCache[cacheKey]) {
+      const cached = _studyGuideCache[cacheKey];
+      _renderStudyGuide(cached);
+      if (lang === 'ca' && cached.chineseReadings?.length) {
+        _renderChineseScriptWithReadings(s.langs[lang].text, cached.chineseReadings);
+      }
+      return;
+    }
     const guideBtn = $('btn-gen-guide');
     const statusEl = $('study-guide-status');
     guideBtn.disabled = true;
@@ -3907,6 +4191,9 @@ document.addEventListener('DOMContentLoaded', () => {
       _studyGuideCache[cacheKey] = guide;
       statusEl.classList.add('hidden');
       _renderStudyGuide(guide);
+      if (lang === 'ca' && guide.chineseReadings?.length) {
+        _renderChineseScriptWithReadings(s.langs[lang].text, guide.chineseReadings);
+      }
       guideBtn.textContent = '✅ 가이드 완성';
       // Firestore 자동 저장 (실패해도 무시)
       _saveGuideToFirestore(s.id, lang, guide);
