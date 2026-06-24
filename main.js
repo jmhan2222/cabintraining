@@ -93,10 +93,10 @@ async function _resolveModelVoiceUrl(scriptId, lang, gender = _currentGender) {
   // 3. Firestore scripts/{num}.modelFiles — M: lang, F: lang_F
   if (_db) {
     try {
-      const numMatch = scriptId.match(/^(\d+(?:\.\d+)*)/);
+      const numMatch = scriptId.match(/^(\d+(?:[.\-]\d+)*)/);
       const num = numMatch ? numMatch[1] : scriptId;
       const firestoreId = num.replace(/\./g, '-');
-      console.log('[모델음성] firestoreId:', firestoreId);
+      console.log('[모델음성] num:', num, 'firestoreId:', firestoreId);
       const doc = await _db.collection('scripts').doc(firestoreId).get();
       if (doc.exists) {
         const fsKey = gender === 'F' ? `${lang}_F` : lang;
