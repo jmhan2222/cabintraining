@@ -63,10 +63,14 @@ function _buildLocalModelVoiceUrl(fileName, lang, gender = 'M') {
     encodeURIComponent(fileName);
 }
 
-// 방송문 ID에서 섹션 번호 추출 (예: "2.1.1", "[별표 3]")
+// 방송문 ID에서 섹션 번호 추출 → 점(.) 구분 형식으로 반환 (예: "2.1.1")
+// Firestore ID는 하이픈 형식("2-1-1")이므로 점 형식으로 변환
 function _extractScriptNum(script) {
   const id = script.id || '';
-  // 숫자 패턴 (예: "2.1.1")
+  // 하이픈 형식 Firestore ID (예: "2-1-1" → "2.1.1")
+  const hyphenMatch = id.match(/^(\d+(?:-\d+)+)/);
+  if (hyphenMatch) return hyphenMatch[1].replace(/-/g, '.');
+  // 점 형식 (예: "2.1.1")
   const numMatch = id.match(/^(\d+(?:\.\d+)*)/);
   if (numMatch) return numMatch[1];
   // [별표 N] 패턴
@@ -76,6 +80,189 @@ function _extractScriptNum(script) {
   const titleNum = (script.title || '').match(/^(\d+(?:\.\d+)*)/);
   if (titleNum) return titleNum[1];
   return null;
+}
+
+// ===== COMMON MODEL VOICE PLAYER =====
+// containerId: 렌더링할 컨테이너 DOM ID
+// opts.onAvailable(bool): 음성 가용 여부 콜백 (드릴 버튼 활성화 등)
+// 반환: { stop() } 컨트롤 객체
+function createModelVoicePlayer(containerId, opts = {}) {
+  const container = $(containerId);
+  if (!container) return { stop: () => {} };
+  const fmt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+
+  container.innerHTML = `<div class="mvp-wrap" id="${containerId}-mvp">
+    <button class="mvp-play-btn" id="${containerId}-play" disabled>▶ 재생</button>
+    <div class="mvp-scrub-wrap">
+      <input type="range" class="mvp-scrub" id="${containerId}-scrub" min="0" max="100" value="0" step="0.1" disabled>
+      <span class="mvp-time" id="${containerId}-time">0:00 / 0:00</span>
+    </div>
+    ${!opts.noGender ? `<div class="mvp-gender-wrap">
+      <button class="mvp-gender-btn${_currentGender === 'M' ? ' active' : ''}" data-g="M">남</button>
+      <button class="mvp-gender-btn${_currentGender === 'F' ? ' active' : ''}" data-g="F">여</button>
+    </div>` : ''}
+  </div>`;
+
+  const playBtn  = $(`${containerId}-play`);
+  const scrub    = $(`${containerId}-scrub`);
+  const timeEl   = $(`${containerId}-time`);
+  let _playerAudio = null;
+
+  const setAvailable = (ok) => {
+    playBtn.disabled = !ok;
+    scrub.disabled = !ok;
+    if (!ok) { playBtn.textContent = '모델 음성 미등록'; scrub.value = 0; timeEl.textContent = '0:00 / 0:00'; }
+    else if (playBtn.textContent === '모델 음성 미등록') playBtn.textContent = '▶ 재생';
+    if (opts.onAvailable) opts.onAvailable(ok);
+  };
+
+  const stopPlayer = () => {
+    if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
+    _currentModelAudio = null;
+    _playerAudio = null;
+    playBtn.textContent = '▶ 재생';
+    scrub.value = 0;
+    timeEl.textContent = '0:00 / 0:00';
+  };
+
+  const attachHandlers = () => {
+    _currentModelAudio.ontimeupdate = () => {
+      if (!_currentModelAudio) return;
+      const dur = _currentModelAudio.duration || 0;
+      const cur = _currentModelAudio.currentTime || 0;
+      if (dur > 0) { scrub.max = dur; scrub.value = cur; }
+      timeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
+    };
+    const onEnd = () => {
+      playBtn.textContent = '▶ 재생';
+      scrub.value = 0;
+      timeEl.textContent = '0:00 / 0:00';
+      _playerAudio = null;
+    };
+    _currentModelAudio.onended = onEnd;
+    _currentModelAudio.onerror = onEnd;
+  };
+
+  const doPlay = async () => {
+    const s = state.currentScript;
+    if (!s) return;
+    // 토글: 이 플레이어가 재생 중이면 일시정지
+    if (_playerAudio && _playerAudio === _currentModelAudio && !_currentModelAudio.paused) {
+      _currentModelAudio.pause();
+      playBtn.textContent = '▶ 재생';
+      return;
+    }
+    // 일시정지 상태면 현재 위치에서 재개 (Bug 2: currentTime 유지)
+    if (_playerAudio && _playerAudio === _currentModelAudio && _currentModelAudio.paused) {
+      _currentModelAudio.play().catch(() => {});
+      playBtn.textContent = '⏸ 일시정지';
+      return;
+    }
+    // _currentModelAudio가 이미 있으면 재사용 (Bug 2: 새 Audio 생성 안 함)
+    if (_currentModelAudio && _currentModelAudio.src) {
+      _playerAudio = _currentModelAudio;
+      attachHandlers();
+      _currentModelAudio.play().catch(() => {});
+      playBtn.textContent = '⏸ 일시정지';
+      return;
+    }
+    // 없는 경우에만 새로 생성
+    const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
+    if (!url) { setAvailable(false); return; }
+    _currentModelAudio = new Audio(url);
+    _playerAudio = _currentModelAudio;
+    attachHandlers();
+    _currentModelAudio.play().catch(() => {});
+    playBtn.textContent = '⏸ 일시정지';
+  };
+
+  playBtn.addEventListener('click', doPlay);
+
+  scrub.addEventListener('input', () => {
+    if (_playerAudio && _playerAudio === _currentModelAudio) {
+      _currentModelAudio.currentTime = parseFloat(scrub.value);
+    }
+  });
+
+  // 성별 토글
+  container.querySelectorAll('.mvp-gender-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const g = btn.dataset.g;
+      if (!g || _currentGender === g) return;
+      _currentGender = g;
+      container.querySelectorAll('.mvp-gender-btn').forEach(b => b.classList.toggle('active', b.dataset.g === g));
+      stopPlayer();
+      initState();
+    });
+  });
+
+  // 가용성 초기 확인 (기존 _currentModelAudio 있으면 현재 상태 즉시 반영)
+  const initState = () => {
+    if (_currentModelAudio && _currentModelAudio.src) {
+      setAvailable(true);
+      const dur = _currentModelAudio.duration || 0;
+      const cur = _currentModelAudio.currentTime || 0;
+      if (dur > 0) { scrub.max = dur; scrub.value = cur; }
+      if (cur > 0 || dur > 0) timeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
+      playBtn.textContent = _currentModelAudio.paused ? '▶ 재생' : '⏸ 일시정지';
+      return;
+    }
+    const s = state.currentScript;
+    if (!s) { setAvailable(false); return; }
+    const cached = _getCachedModelVoiceUrl(s.id, state.selectedLang);
+    const local  = loadModelVoice(s.id, state.selectedLang);
+    if (cached || local) { setAvailable(true); return; }
+    _resolveModelVoiceUrl(s.id, state.selectedLang).then(url => setAvailable(!!url));
+  };
+  initState();
+
+  console.log('[완료] 모델 음성 플레이어 생성:', containerId);
+  return { stop: stopPlayer };
+}
+
+// ===== MODEL VOICE SCAN =====
+// 핵심 스캔 로직 (버튼 관리 없이 순수 매핑만 처리)
+async function _doScanLocalModelVoices() {
+  const res = await fetch('./cabinvoice%20pro/manifest.json');
+  if (!res.ok) throw new Error(`manifest.json 로드 실패 (${res.status})`);
+  const manifest = await res.json();
+  if (!_db) throw new Error('Firebase 연결이 필요합니다');
+
+  let matched = 0;
+  const batch = _db.batch();
+
+  for (const script of _allScripts) {
+    const num = _extractScriptNum(script);
+    if (!num) continue;
+
+    const firestoreId = num.replace(/\./g, '-');
+    const modelFiles = {};
+
+    for (const [lang, folder] of Object.entries(_MV_LOCAL_FOLDERS)) {
+      const files = manifest[folder] || [];
+      const file = files.find(f => f.startsWith(num + ' ') || f.startsWith(num + '_'));
+      if (file) modelFiles[lang] = file;
+    }
+    for (const [lang, folder] of Object.entries(_MV_LOCAL_FOLDERS_F)) {
+      const files = manifest[folder] || [];
+      const file = files.find(f => f.startsWith(num + ' ') || f.startsWith(num + '_'));
+      if (file) modelFiles[`${lang}_F`] = file;
+    }
+
+    console.log('[스캔]', num, '→', {
+      ko: modelFiles.ko || null, en: modelFiles.en || null,
+      ja: modelFiles.ja || null, ca: modelFiles.ca || null
+    });
+
+    if (Object.keys(modelFiles).length > 0) {
+      batch.set(_db.collection('scripts').doc(firestoreId), { modelFiles }, { merge: true });
+      matched++;
+    }
+  }
+
+  await batch.commit();
+  Object.keys(_mvUrlCache).forEach(k => delete _mvUrlCache[k]);
+  return matched;
 }
 
 // 로컬 정적 파일 → 모델 음성 URL 조회
@@ -481,26 +668,7 @@ function renderClickableScript(text, langCode) {
   }).join(' ');
 }
 
-// 모델 음성 구간 재생 (준비 화면 문장 클릭 시)
-function _playModelVoiceSegment(idx) {
-  const s = state.currentScript;
-  if (!s) return;
-  const url = _getCachedModelVoiceUrl(s.id, state.selectedLang);
-  if (!url) return;
-  const lang = s.langs[state.selectedLang];
-  const numSentences = Math.max(1, splitSentences(lang.text).length);
-  if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
-  _currentModelAudio = new Audio(url);
-  _currentModelAudio.addEventListener('loadedmetadata', () => {
-    const seg = _currentModelAudio.duration / numSentences;
-    _currentModelAudio.currentTime = seg * idx;
-    _currentModelAudio.play().catch(() => {});
-    showToast('이 구간 모델 음성 재생 🔊');
-    const stop = setTimeout(() => _currentModelAudio?.pause(), (seg + 0.15) * 1000);
-    _currentModelAudio.onended = () => clearTimeout(stop);
-  });
-  _currentModelAudio.onerror = () => {};
-}
+console.log('[완료] 문구 클릭 기능 제거');
 
 // ===== HTML ESCAPING & SCRIPT TEXT RENDERING =====
 function escHtml(s) {
@@ -933,53 +1101,7 @@ function updatePrepContent() {
   if ($('prep-title-bar')) $('prep-title-bar').textContent = s.title;
   $('prep-text').innerHTML = renderClickableScript(lang.text, state.selectedLang);
 
-  // 문장 클릭 핸들러 등록
-  document.querySelectorAll('#prep-text .script-sentence').forEach(el => {
-    el.addEventListener('click', () => {
-      document.querySelectorAll('#prep-text .script-sentence').forEach(s => s.classList.remove('sentence-active'));
-      el.classList.add('sentence-active');
-      _playModelVoiceSegment(parseInt(el.dataset.idx, 10));
-    });
-  });
-
-  // 모델 음성 바 (남/여 성별 토글 포함)
-  const mvBtn = $('btn-model-voice');
-  const drillBtn = $('btn-drill-mode');
-  const _setMvState = (enabled) => {
-    mvBtn.disabled = !enabled;
-    mvBtn.textContent = enabled ? '🎵 모델 음성 듣기' : '🎵 모델 음성 미등록';
-    mvBtn.classList.toggle('mv-btn-disabled', !enabled);
-    if (drillBtn) { drillBtn.disabled = !enabled; drillBtn.title = enabled ? '' : '모델 음성 등록 후 사용 가능'; }
-  };
-  // 현재 스크립트+언어+성별로 음성 버튼 상태 갱신하는 함수 (gender toggle에서도 호출)
-  _prepSetMvState = _setMvState;
-
-  // 성별 버튼 초기화 (일단 비활성 → 비동기 확인 후 개별 활성)
-  const gBtns = { M: $('btn-gender-m'), F: $('btn-gender-f') };
-  Object.values(gBtns).forEach(b => { if (b) b.disabled = true; });
-  ['M', 'F'].forEach(g => {
-    if (gBtns[g]) gBtns[g].classList.toggle('active', g === _currentGender);
-  });
-
-  // localStorage base64 있으면 즉시 활성 (gender 무관)
-  const localVoice = !!loadModelVoice(s.id, state.selectedLang);
-  if (localVoice) {
-    _setMvState(true);
-    Object.values(gBtns).forEach(b => { if (b) b.disabled = false; });
-  } else {
-    // 캐시 확인 후 즉시 상태 설정
-    const cached = _getCachedModelVoiceUrl(s.id, state.selectedLang);
-    _setMvState(!!cached);
-    // 남/여 각각 비동기 확인
-    const _sid = s.id, _slang = state.selectedLang;
-    ['M', 'F'].forEach(g => {
-      _resolveModelVoiceUrl(_sid, _slang, g).then(url => {
-        if (state.currentScript?.id !== _sid || state.selectedLang !== _slang) return;
-        if (gBtns[g]) gBtns[g].disabled = !url;
-        if (g === _currentGender) _setMvState(!!url);
-      });
-    });
-  }
+  // 준비 화면 — 모델 음성 플레이어 제거됨, 드릴/학습은 각 화면에서 관리
 
   $('prep-checkpoints').innerHTML = lang.checkpoints.map(c =>
     `<span class="checkpoint-item">✓ ${c}</span>`).join('');
@@ -994,6 +1116,8 @@ function startPrepTimer() { /* 타이머 제거됨 */ }
 // ===== RECORDING =====
 async function startRecording() {
   clearInterval(state.prepTimerInterval);
+  // 녹음 시작 시 모델 음성 즉시 중지
+  if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; _currentModelAudio = null; }
 
   // 3-2-1 카운트다운
   await new Promise(resolve => {
@@ -1220,8 +1344,115 @@ function tierScore(ratio, maxPt) {
   return 0;
 }
 
+// ===== STUDY MODE =====
+const _studyGuideCache = {}; // key: `${scriptId}_${lang}`
+
+function startStudyMode() {
+  const s = state.currentScript;
+  if (!s) return;
+  const lang = s.langs[state.selectedLang];
+  if (!lang) return;
+
+  $('study-title-bar').textContent = s.title;
+  // 방송문 텍스트 (읽기 전용)
+  $('study-script-text').textContent = lang.text;
+  // 성별 버튼 초기 상태
+  ['M', 'F'].forEach(g => {
+    const btn = $(`study-gender-${g.toLowerCase()}`);
+    if (btn) btn.classList.toggle('active', g === _currentGender);
+  });
+  // 공통 플레이어
+  createModelVoicePlayer('study-model-player');
+  // 가이드 리셋 (다른 방송문/언어로 전환 시 초기화)
+  $('study-guide-result').classList.add('hidden');
+  $('study-guide-result').innerHTML = '';
+  $('study-guide-status').classList.add('hidden');
+  $('btn-gen-guide').disabled = false;
+  $('btn-gen-guide').textContent = '가이드 생성하기';
+  // 이미 캐시된 가이드 있으면 바로 표시
+  const cacheKey = `${s.id}_${state.selectedLang}`;
+  if (_studyGuideCache[cacheKey]) _renderStudyGuide(_studyGuideCache[cacheKey]);
+
+  showScreen('screen-study');
+  console.log('[완료] 학습 모드 화면 진입');
+}
+
+async function callGeminiGuide(scriptText, langCode) {
+  const langName = { ko: '한국어', en: '영어', ja: '일본어', ca: '중국어' }[langCode] || '한국어';
+  const prompt = `당신은 항공사 기내방송 전문 교관입니다.
+아래 방송문을 분석해서 JSON만 반환하세요 (설명·주석 없이).
+
+방송문 (${langName}):
+${scriptText}
+
+반환 형식:
+{
+  "summary": "이 방송문의 핵심 특징 1-2문장",
+  "breakPoints": ["끊어읽기 포인트 설명 1", "설명 2"],
+  "emphasisWords": ["강조할 단어1", "단어2"],
+  "speedGuide": "속도 가이드 (예: 전반부 천천히, 후반부 안정적으로)",
+  "intonationGuide": "억양 가이드 (예: 문장 끝 내려읽기)",
+  "tips": ["실전 팁 1", "팁 2", "팁 3"]
+}`;
+
+  const res = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gemini-2.5-flash',
+      contents: [{ parts: [{ text: prompt }] }]
+    })
+  });
+  if (res.status === 501) throw new Error('로컬 환경에서는 배포 후 사용 가능합니다.');
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('응답 JSON 파싱 실패');
+  return JSON.parse(m[0]);
+}
+
+function _renderStudyGuide(guide) {
+  const el = $('study-guide-result');
+  const esc = s => escHtml(String(s || ''));
+
+  const breakPointsHtml = (guide.breakPoints?.length)
+    ? `<div class="sg-section">
+        <div class="sg-section-title">끊어읽기 포인트</div>
+        ${guide.breakPoints.map(b => `<div class="sg-break-item"><span class="sg-break-pipe">|</span><span>${esc(b)}</span></div>`).join('')}
+       </div>` : '';
+
+  const emphasisHtml = (guide.emphasisWords?.length)
+    ? `<div class="sg-section">
+        <div class="sg-section-title">강조 단어</div>
+        <div class="sg-emphasis-wrap">${guide.emphasisWords.map(w => `<span class="sg-emphasis-badge">${esc(w)}</span>`).join('')}</div>
+       </div>` : '';
+
+  const speedIntonHtml = (guide.speedGuide || guide.intonationGuide)
+    ? `<div class="sg-section">
+        <div class="sg-section-title">속도 & 억양</div>
+        ${guide.speedGuide ? `<div class="sg-speed-row">🐢 속도: ${esc(guide.speedGuide)}</div>` : ''}
+        ${guide.intonationGuide ? `<div class="sg-intonation-row">↗↘ 억양: ${esc(guide.intonationGuide)}</div>` : ''}
+       </div>` : '';
+
+  const tipsHtml = (guide.tips?.length)
+    ? `<div class="sg-section">
+        <div class="sg-section-title">실전 팁</div>
+        ${guide.tips.map(t => `<div class="sg-tip-item">💡 ${esc(t)}</div>`).join('')}
+       </div>` : '';
+
+  el.innerHTML = `
+    ${guide.summary ? `<div class="sg-summary-card">${esc(guide.summary)}</div>` : ''}
+    ${breakPointsHtml}
+    ${emphasisHtml}
+    ${speedIntonHtml}
+    ${tipsHtml}
+  `;
+  el.classList.remove('hidden');
+}
+
 // ===== DRILL MODE =====
-let _prepSetMvState = null; // showPrepScreen에서 할당, 성별 토글 핸들러에서 호출
+// _prepSetMvState 제거됨 — 공통 플레이어(createModelVoicePlayer)가 상태 관리
 let _currentModelAudio = null;
 let _drill = { sentences: [], idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
 
@@ -1230,7 +1461,7 @@ async function startDrillMode() {
   const lang = s?.langs[state.selectedLang];
   if (!lang) return;
   const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
-  if (!url) return;
+  if (!url) { showToast('모델 음성이 없습니다. 학습 모드를 먼저 확인해주세요.', 3000); return; }
   const sentences = splitSentences(lang.text).filter(s => s.length > 2);
   if (!sentences.length) { showToast('방송문이 없습니다'); return; }
   _drill = { sentences, idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
@@ -1249,27 +1480,18 @@ function _drillRender() {
   const recBtn = $('btn-drill-record');
   recBtn.textContent = '🎤 따라읽기 시작';
   recBtn.onclick = _drillStartRec;
+  // [3] 플레이어 초기화 — 새 문장마다 공통 플레이어 재생성
+  if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; _currentModelAudio = null; }
+  createModelVoicePlayer('drill-model-player');
   console.log(`[드릴모드] 문장 ${idx + 1}/${sentences.length} 시작`);
 }
 
-function _drillPlayModel(btn) {
-  const s = state.currentScript;
-  const url = _getCachedModelVoiceUrl(s.id, state.selectedLang);
-  if (!url) return;
-  if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
-  _currentModelAudio = new Audio(url);
-  _drill.modelAudio = _currentModelAudio;
-  if (btn) { btn.disabled = true; btn.textContent = '🔊 재생 중...'; }
-  showToast(`현재 ${_drill.idx + 1}번째 문장 연습 중 — 전체 음성을 들으며 해당 구간을 집중해서 들으세요`, 4000);
-  _currentModelAudio.play().catch(() => {});
-  const onEnd = () => {
-    if (btn) { btn.disabled = false; btn.textContent = btn.id === 'btn-drill-play-model' ? '▶ 모델 음성 듣기' : '▶ 모델'; }
-  };
-  _currentModelAudio.onended = onEnd;
-  _currentModelAudio.onerror = onEnd;
-}
-
 async function _drillStartRec() {
+  // 따라읽기 시작 시 모델 음성 일시정지만 (currentTime·객체 유지 — 비교 화면에서 이어듣기 위해)
+  if (_currentModelAudio) { _currentModelAudio.pause(); }
+  const mvpPlay = $('drill-model-player-play');
+  if (mvpPlay) { mvpPlay.textContent = '▶ 재생'; }
+
   try {
     _drill.chunks = [];
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1283,6 +1505,8 @@ async function _drillStartRec() {
       _drill.myAudioUrl = URL.createObjectURL(_drill.myBlob);
       $('drill-actions').classList.add('hidden');
       $('drill-compare').classList.remove('hidden');
+      // Bug 1: 비교 화면에 모델 음성 스크럽바 표시 (기존 _currentModelAudio 재사용)
+      createModelVoicePlayer('drill-compare-player', { noGender: true });
       console.log(`[드릴모드] 문장 ${_drill.idx + 1} 녹음 완료`);
     };
     mr.start();
@@ -1609,50 +1833,32 @@ function showResults(result, transcript) {
   $('total-score-value').textContent = result.total;
   $('total-score-value').classList.toggle('hidden', !isAdmin);
   const gradeEl = $('total-grade');
-  gradeEl.textContent = result.pass ? 'PASS ✓' : 'FAIL ✗';
-  gradeEl.className   = `total-grade ${result.pass ? 'grade-A' : 'grade-D'}`;
-
-  renderRadar(result);
+  const _isJaCa = state.selectedLang === 'ja' || state.selectedLang === 'ca';
+  let _emojiGrade, _gradeCls;
+  if (_isJaCa) {
+    _emojiGrade = result.total >= 85 ? '✨ 훌륭해요' : result.total >= 70 ? '👍 잘했어요' : result.total >= 55 ? '🌱 성장 중' : '💪 더 연습해요';
+    _gradeCls   = result.total >= 85 ? 'grade-A' : result.total >= 70 ? 'grade-B' : result.total >= 55 ? 'grade-C' : 'grade-D';
+  } else {
+    _emojiGrade = result.total >= 90 ? '✨ 훌륭해요' : result.total >= 75 ? '👍 잘했어요' : result.total >= 60 ? '🌱 성장 중' : '💪 더 연습해요';
+    _gradeCls   = result.total >= 90 ? 'grade-A' : result.total >= 75 ? 'grade-B' : result.total >= 60 ? 'grade-C' : 'grade-D';
+  }
+  gradeEl.textContent = _emojiGrade;
+  gradeEl.className   = `total-grade ${_gradeCls}`;
 
   const barsEl = $('score-bars');
-  barsEl.innerHTML = Object.entries(CHECKLIST).map(([key, cat]) => {
-    const cr = result.categories[key];
-    const pct = Math.round(cr.score / cat.max * 100);
-    const catLevel = pct >= 87 ? '우수' : pct >= 60 ? '보통' : '노력필요';
-    const catLevelCls = pct >= 87 ? 'tier-good' : pct >= 60 ? 'tier-mid' : 'tier-low';
-    const itemsHTML = cat.items.map((item, i) => {
-      const got = cr.items[i];
-      const tier = got/item.max >= 0.87 ? '우수' : got >= (item.max === 10 ? 6 : 3) ? '보통' : '노력필요';
-      const tc   = got/item.max >= 0.87 ? 'tier-good' : got >= (item.max === 10 ? 6 : 3) ? 'tier-mid' : 'tier-low';
-      return `<div class="sub-item">
-        <div class="sub-item-name">${item.label}</div>
-        <div class="sub-item-right">
-          <span class="sub-tier ${tc}">${tier}</span>
-          ${isAdmin ? `<span class="sub-score">${got}<span class="sub-max">/${item.max}</span></span>` : ''}
-        </div>
+  barsEl.innerHTML = `<div class="score-simple-grid">
+    ${Object.entries(CHECKLIST).map(([key, cat]) => {
+      const cr = result.categories[key];
+      const pct = Math.round(cr.score / cat.max * 100);
+      const level = pct >= 87 ? '우수' : pct >= 60 ? '보통' : '노력필요';
+      const emoji = pct >= 87 ? '🔥' : pct >= 60 ? '✅' : '⚠️';
+      const lvlCls = pct >= 87 ? 'ss-good' : pct >= 60 ? 'ss-mid' : 'ss-low';
+      return `<div class="score-simple-row">
+        <span class="score-simple-name">${cat.icon} ${cat.label}</span>
+        <span class="score-simple-level ${lvlCls}">${emoji} ${level}</span>
       </div>`;
-    }).join('');
-    return `<div class="score-cat-block">
-      <div class="score-bar-header">
-        <div class="score-bar-name">${cat.icon} ${cat.label}</div>
-        <div class="score-bar-val" style="${isAdmin ? `color:${cat.color}` : ''}">
-          ${isAdmin
-            ? `${cr.score}<span style="font-size:12px;color:#94a3b8">/${cat.max}</span>`
-            : `<span class="sub-tier ${catLevelCls}">${catLevel}</span>`}
-        </div>
-      </div>
-      <div class="score-bar-track">
-        <div class="score-bar-fill" style="width:0%;background:${cat.color}" data-target="${pct}"></div>
-      </div>
-      <div class="sub-items">${itemsHTML}</div>
-    </div>`;
-  }).join('');
-
-  requestAnimationFrame(() => {
-    barsEl.querySelectorAll('.score-bar-fill').forEach(el => { el.style.width = el.dataset.target + '%'; });
-  });
-
-  renderFeedback(result, transcript, lang, isAdmin);
+    }).join('')}
+  </div>`;
   renderTranscriptCompare(transcript, lang);
 
   // AI 채점 섹션 초기화
@@ -2535,10 +2741,36 @@ ${script}`;
 
 중요: atmosphere(분위기·목소리) score는 반드시 1 이상의 정수를 반환하세요.
 음성이 존재하는 한 0점은 절대 불가합니다.
-발성·톤·친근함 각 항목에 최소 점수 기준을 적용하세요.`;
+발성·톤·친근함 각 항목에 최소 점수 기준을 적용하세요.
+
+[6] 발음 채점 추가 기준:
+STT 인식 결과에서 아래 유형은 실제 발음 오류로 판단하고 감점:
+- 초성 오류: 손→스, 비→피 등 자음 혼동
+- 모음 오류: 여→야, 이→에 등
+- 받침 탈락: 있습니다→이습니다
+감점 기준:
+- 오류 1~2개: 최대 2점 감점
+- 오류 3개 이상: 최대 5점 감점
+- 단순 STT 인식 실패(조사 변형 등)는 제외
+- 전반적으로 기내방송 수준이면 높은 점수 유지`;
 
   // ── 1차 시도: /api/gemini 프록시 경유로 audio inlineData 전달 ──
-  const audioPrompt = `당신은 항공사 기내방송 전문 교관입니다.
+  const audioPrompt = `피드백 필수 규칙:
+1. 반드시 이 음성에서 실제로 들린 것만 언급
+2. 구체적인 단어나 구간 지목 필수
+   (예: '~바랍니다 어미가 올라갔습니다')
+   (예: '첫 문장 속도가 빠르다가 중반 안정됨')
+3. 매번 다른 표현 사용, 패턴 반복 금지
+4. 긍정 관찰 먼저, 개선점 나중에
+5. 전문 용어 대신 쉬운 말 사용
+6. '발음을 연습하세요' 같은 일반론 절대 금지
+
+이 음성에서 실제로 들은 구체적인 특징을 피드백에 반드시 포함하세요.
+- 어느 구간에서 어떤 문제가 발생했는지
+- 어떤 단어/문장에서 특히 두드러졌는지
+- 이 사람만의 특징적인 패턴이 무엇인지
+
+당신은 항공사 기내방송 전문 교관입니다.
 첨부된 음성 파일을 반드시 직접 들으세요. STT 텍스트 변환 없이 실제 음성을 기반으로 평가합니다.
 채점 전 아래 순서로 음성을 분석하세요:
 1. 전체 음성을 한 번 들으며 전반적인 분위기와 완성도 파악
@@ -2618,6 +2850,10 @@ function renderAiResult(ai, isAdmin) {
     ? (grade === 'A' ? '#16a34a' : grade === 'B' ? '#2563eb' : grade === 'C' ? '#d97706' : '#dc2626')
     : (grade === 'PASS' ? '#16a34a' : '#dc2626');
 
+  const emojiGradeAI = isKoEn
+    ? (score >= 90 ? '✨ 훌륭해요' : score >= 75 ? '👍 잘했어요' : score >= 60 ? '🌱 성장 중' : '💪 더 연습해요')
+    : (score >= 85 ? '✨ 훌륭해요' : score >= 70 ? '👍 잘했어요' : score >= 55 ? '🌱 성장 중' : '💪 더 연습해요');
+
   const maxScores = isJaCa
     ? { fluency: 25, atmosphere: 25, intonation: 25, pronunciation: 25 }
     : { fluency: 30, atmosphere: 25, intonation: 25, pronunciation: 20 };
@@ -2638,11 +2874,8 @@ function renderAiResult(ai, isAdmin) {
     : '';
 
   // 등급 + 점수 헤더
-  const gradeHtml = isKoEn
-    ? `<span class="ai-grade-badge" style="background:${gradeColor}">${grade}등급</span>
-       ${isAdmin ? `<div class="ai-grade-note">A≥90 / B≥75 / C≥60 / 미취득&lt;60</div>` : ''}`
-    : `<span class="ai-grade-badge" style="background:${gradeColor}">${grade}</span>
-       ${isAdmin ? `<div class="ai-grade-note">PASS: 85점 이상</div>` : ''}`;
+  const gradeHtml = `<span class="ai-grade-badge" style="background:${gradeColor}">${emojiGradeAI}</span>
+    ${isAdmin ? `<div class="ai-grade-note">${isKoEn ? 'A≥90 / B≥75 / C≥60 / 미취득<60' : 'PASS: 85점 이상'} (AI: ${score}점)</div>` : ''}`;
 
   const scoreHeaderHtml = `
     <div class="ai-score-header">
@@ -2665,9 +2898,12 @@ function renderAiResult(ai, isAdmin) {
           ${cat.details.map(d => `<div class="ai-pron-detail-item">💬 ${escHtml(d)}</div>`).join('')}
          </div>`
       : '';
-    const practiceTipHtml = cat.practiceTip
-      ? `<div class="ai-cat-practice-tip">📌 다음 연습 목표: ${escHtml(cat.practiceTip)}</div>`
-      : '';
+    // [5] 피드백 3파트 분리: 첫 문장→잘된 점, 둘째 문장→개선 포인트, practiceTip→연습 목표
+    const fbSentences = (cat.feedback || '').split(/(?<=[.!?。])\s+/).filter(Boolean);
+    const fbGood    = fbSentences[0] ? `<div class="ai-fb-part ai-fb-good">✅ 잘된 점: ${escHtml(fbSentences[0])}</div>` : '';
+    const fbImprove = fbSentences[1] ? `<div class="ai-fb-part ai-fb-improve">📌 개선 포인트: ${escHtml(fbSentences.slice(1).join(' '))}</div>` : '';
+    const fbTip     = cat.practiceTip ? `<div class="ai-fb-part ai-fb-tip">🎯 다음 연습 목표: ${escHtml(cat.practiceTip)}</div>` : '';
+
     return `<div class="ai-cat-bar-row">
       <div class="ai-cat-bar-header">
         <span class="ai-cat-icon">${m.icon}</span>
@@ -2676,9 +2912,8 @@ function renderAiResult(ai, isAdmin) {
         ${isAdmin ? `<span class="ai-cat-score" style="color:${m.color}">${cat.score}<span style="font-size:11px;color:#94a3b8">/${m.max}</span></span>` : ''}
       </div>
       ${isAdmin ? `<div class="ai-cat-bar-track"><div class="ai-cat-bar-fill" style="width:${pct}%;background:${m.color}"></div></div>` : ''}
-      <div class="ai-cat-feedback">${escHtml(cat.feedback || '')}</div>
+      ${fbGood}${fbImprove}${fbTip}
       ${pronDetailsHtml}
-      ${practiceTipHtml}
     </div>`;
   }).join('');
 
@@ -2775,49 +3010,11 @@ function _setupAdminMvSection() {
 // 로컬 모델 음성 자동 스캔 → Firestore scripts/{id}.modelFiles 저장
 async function _scanLocalModelVoices() {
   await new Promise(resolve => setTimeout(resolve, 500));
-  const user = auth.currentUser;
-  console.log('[스캔] 현재 사용자:', user?.email, user?.uid);
+  console.log('[스캔] 현재 사용자:', auth?.currentUser?.email);
   const btn = $('btn-admin-scan-mv');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 스캔 중...'; }
   try {
-    const res = await fetch('./cabinvoice%20pro/manifest.json');
-    if (!res.ok) throw new Error(`manifest.json 로드 실패 (${res.status})`);
-    const manifest = await res.json();
-
-    if (!_db) throw new Error('Firebase 연결이 필요합니다');
-
-    let matched = 0;
-    const batch = _db.batch();
-
-    for (const script of _allScripts) {
-      const num = _extractScriptNum(script);
-      if (!num) continue;
-
-      // 섹션 번호를 정규식으로 이스케이프 후 파일명 앞부분 매칭
-      const escaped = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const prefixRe = new RegExp('^' + escaped + '[ ._]');
-
-      const modelFiles = {};
-      // 남성(M) 매핑
-      for (const [lang, folder] of Object.entries(_MV_LOCAL_FOLDERS)) {
-        const file = (manifest[folder] || []).find(f => prefixRe.test(f));
-        if (file) modelFiles[lang] = file;
-      }
-      // 여성(F) 매핑 — lang_F 키 사용
-      for (const [lang, folder] of Object.entries(_MV_LOCAL_FOLDERS_F)) {
-        const file = (manifest[folder] || []).find(f => prefixRe.test(f));
-        if (file) modelFiles[`${lang}_F`] = file;
-      }
-
-      if (Object.keys(modelFiles).length > 0) {
-        batch.set(_db.collection('scripts').doc(script.id), { modelFiles }, { merge: true });
-        matched++;
-      }
-    }
-
-    await batch.commit();
-    // 메모리 캐시 초기화 (새 매핑 즉시 반영)
-    Object.keys(_mvUrlCache).forEach(k => delete _mvUrlCache[k]);
+    const matched = await _doScanLocalModelVoices();
     showToast(`✅ ${matched}개 방송문 매핑 완료`);
     console.log(`[스캔] ${matched}개 방송문 modelFiles 저장 완료`);
   } catch (e) {
@@ -2825,6 +3022,39 @@ async function _scanLocalModelVoices() {
     console.error('[스캔] 오류:', e);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '📂 로컬 모델 음성 스캔'; }
+  }
+}
+
+async function _resetAndRescanModelVoices() {
+  if (!confirm('scripts 컬렉션의 modelFiles 필드를 전부 삭제하고 재스캔합니다.\n계속하시겠습니까?')) return;
+
+  const btn = $('btn-admin-reset-scan-mv');
+  const scanBtn = $('btn-admin-scan-mv');
+  [btn, scanBtn].forEach(b => { if (b) b.disabled = true; });
+  if (btn) btn.textContent = '⏳ 초기화 중...';
+
+  try {
+    if (!_db) throw new Error('Firebase 연결이 필요합니다');
+
+    const snap = await _db.collection('scripts').get();
+    if (snap.docs.length > 0) {
+      const batch = _db.batch();
+      snap.docs.forEach(doc => {
+        batch.update(doc.ref, { modelFiles: firebase.firestore.FieldValue.delete() });
+      });
+      await batch.commit();
+    }
+    Object.keys(_mvUrlCache).forEach(k => delete _mvUrlCache[k]);
+
+    if (btn) btn.textContent = '⏳ 재스캔 중...';
+    const matched = await _doScanLocalModelVoices();
+    showToast(`✅ ${matched}개 방송문 재매핑 완료`);
+  } catch (e) {
+    showToast(`초기화/재스캔 실패: ${e.message}`);
+    console.error('[초기화]', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🗑️ 전체 초기화 후 재스캔'; }
+    if (scanBtn) scanBtn.disabled = false;
   }
 }
 
@@ -3287,31 +3517,75 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ===== 모델 음성 듣기 버튼 (prep screen) =====
-  $('btn-model-voice').addEventListener('click', async () => {
+  // ===== 학습 모드 =====
+  $('btn-study-mode').addEventListener('click', startStudyMode);
+  $('btn-back-study').addEventListener('click', () => {
+    if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio = null; }
+    if (state.currentScript) showScreen('screen-prep');
+    else showScreen('screen-home');
+  });
+  // 학습 화면 성별 버튼
+  ['m', 'f'].forEach(g => {
+    $(`study-gender-${g}`)?.addEventListener('click', () => {
+      const G = g.toUpperCase();
+      if (_currentGender === G) return;
+      _currentGender = G;
+      ['m', 'f'].forEach(x => $(`study-gender-${x}`)?.classList.toggle('active', x === g));
+      if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio = null; }
+      createModelVoicePlayer('study-model-player');
+    });
+  });
+  // 가이드 생성
+  $('btn-gen-guide').addEventListener('click', async () => {
     const s = state.currentScript;
     if (!s) return;
-    const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
-    if (!url) return;
-    const btn = $('btn-model-voice');
-    if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
-    _currentModelAudio = new Audio(url);
-    _currentModelAudio.play().catch(() => {});
-    btn.textContent = '🔊 재생 중...';
-    _currentModelAudio.onended = () => { btn.textContent = '🎵 모델 음성 듣기'; };
-    _currentModelAudio.onerror = () => { btn.textContent = '🎵 모델 음성 듣기'; };
+    const lang = state.selectedLang;
+    const cacheKey = `${s.id}_${lang}`;
+    if (_studyGuideCache[cacheKey]) { _renderStudyGuide(_studyGuideCache[cacheKey]); return; }
+    const guideBtn = $('btn-gen-guide');
+    const statusEl = $('study-guide-status');
+    guideBtn.disabled = true;
+    guideBtn.textContent = '⏳ 분석 중...';
+    statusEl.textContent = 'AI가 분석 중입니다...';
+    statusEl.className = 'study-guide-loading';
+    statusEl.classList.remove('hidden');
+    $('study-guide-result').classList.add('hidden');
+    try {
+      const guide = await callGeminiGuide(s.langs[lang].text, lang);
+      _studyGuideCache[cacheKey] = guide;
+      statusEl.classList.add('hidden');
+      _renderStudyGuide(guide);
+      guideBtn.textContent = '✅ 가이드 완성';
+      console.log('[완료] AI 학습 가이드 생성');
+    } catch (e) {
+      statusEl.textContent = '가이드 생성에 실패했습니다. 다시 시도해주세요.';
+      statusEl.className = 'study-guide-error';
+      guideBtn.disabled = false;
+      guideBtn.textContent = '가이드 생성하기';
+      console.error('[가이드 생성 실패]', e.message);
+    }
+  });
+  // 학습 화면 하단 버튼
+  $('btn-study-to-drill').addEventListener('click', () => {
+    if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio = null; }
+    startDrillMode();
+  });
+  $('btn-study-to-record').addEventListener('click', () => {
+    if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio = null; }
+    showScreen('screen-prep');
+    // prep에서 즉시 녹음 시작 트리거
+    $('btn-start-record').click();
   });
 
   // ===== 드릴 모드 =====
   $('btn-drill-mode').addEventListener('click', startDrillMode);
   $('btn-back-drill').addEventListener('click', () => {
     _drill.stream?.getTracks().forEach(t => t.stop());
+    if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio = null; }
     if (state.currentScript) showScreen('screen-prep');
     else showScreen('screen-home');
   });
-  $('btn-drill-play-model').addEventListener('click', () => _drillPlayModel($('btn-drill-play-model')));
   $('btn-drill-record').addEventListener('click', _drillStartRec);
-  $('btn-drill-play-model2').addEventListener('click', () => _drillPlayModel($('btn-drill-play-model2')));
   $('btn-drill-play-my').addEventListener('click', () => {
     if (_drill.myAudioUrl) new Audio(_drill.myAudioUrl).play().catch(() => {});
   });
@@ -3336,6 +3610,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-open-admin').addEventListener('click', openAdminScreen);
   $('btn-admin-back').addEventListener('click', () => { showScreen('screen-home'); loadAndRenderHome(); });
   if ($('btn-admin-scan-mv')) $('btn-admin-scan-mv').addEventListener('click', _scanLocalModelVoices);
+  if ($('btn-admin-reset-scan-mv')) $('btn-admin-reset-scan-mv').addEventListener('click', _resetAndRescanModelVoices);
   if ($('btn-save-firebase-cfg')) $('btn-save-firebase-cfg').addEventListener('click', () => {
     const ok = initFirebase();
     const el = $('admin-firebase-status');
@@ -3404,27 +3679,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!_selectedScriptId) return;
     const btn = $('detail-edit-btn');
     requireEditAuth(() => openEditModal(btn.dataset.id, btn.dataset.source));
-  });
-
-  // ===== 성별 토글 버튼 (prep screen) =====
-  document.querySelectorAll('.btn-gender').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const g = btn.dataset.gender;
-      if (!g || _currentGender === g) return;
-      _currentGender = g;
-      document.querySelectorAll('.btn-gender').forEach(b =>
-        b.classList.toggle('active', b.dataset.gender === g));
-      const s = state.currentScript;
-      if (!s) return;
-      const lang = state.selectedLang;
-      // 캐시 우선 확인
-      const cached = _getCachedModelVoiceUrl(s.id, lang, g);
-      if (_prepSetMvState) _prepSetMvState(!!cached || !!loadModelVoice(s.id, lang));
-      if (!cached && !loadModelVoice(s.id, lang)) {
-        const url = await _resolveModelVoiceUrl(s.id, lang, g);
-        if (_prepSetMvState) _prepSetMvState(!!url);
-      }
-    });
   });
 
   // 결과 화면 버튼

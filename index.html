@@ -102,26 +102,24 @@
       </div>
       <div class="tips-box" id="tips-box"></div>
       <div class="practice-choice-card">
-        <div class="practice-choice-header">
-          <div class="practice-choice-title">어떻게 연습할까요?</div>
-          <div class="gender-toggle">
-            <button class="btn-gender active" id="btn-gender-m" data-gender="M">남</button>
-            <button class="btn-gender" id="btn-gender-f" data-gender="F">여</button>
-          </div>
-        </div>
-        <div class="practice-choice-btns">
-          <button class="btn-model-voice" id="btn-model-voice">🎵 모델 음성 듣기</button>
+        <div class="practice-choice-title">어떻게 연습할까요?</div>
+        <div class="practice-three-btns">
+          <button class="btn-choice btn-choice-study" id="btn-study-mode">
+            <span class="choice-icon">📖</span>
+            <span class="choice-label">학습 모드</span>
+            <span class="choice-desc">AI 가이드</span>
+          </button>
+          <button class="btn-choice btn-choice-drill" id="btn-drill-mode">
+            <span class="choice-icon">🔁</span>
+            <span class="choice-label">드릴 모드</span>
+            <span class="choice-desc">문장별 따라읽기</span>
+          </button>
           <button class="btn-choice btn-choice-full pulse" id="btn-start-record">
             <span class="choice-icon">✈</span>
-            <span class="choice-label">연습 시작 →</span>
+            <span class="choice-label">연습 시작</span>
             <span class="choice-desc">AI 채점 포함</span>
           </button>
         </div>
-        <button class="btn-choice btn-choice-drill prep-drill-btn" id="btn-drill-mode" disabled title="모델 음성 등록 후 사용 가능">
-          <span class="choice-icon">🔁</span>
-          <span class="choice-label">드릴 모드 →</span>
-          <span class="choice-desc">문장별 따라읽기</span>
-        </button>
       </div>
     </div>
 
@@ -170,17 +168,9 @@
           <div class="total-score-label">종합 점수</div>
           <div class="total-grade" id="total-grade"></div>
         </div>
-        <div class="radar-wrap">
-          <canvas id="radar-chart"></canvas>
-        </div>
       </div>
 
       <div class="score-bars" id="score-bars"></div>
-
-      <div class="feedback-section">
-        <div class="section-heading">📊 카테고리별 피드백 & 개선 포인트</div>
-        <div class="feedback-cards" id="feedback-cards"></div>
-      </div>
 
       <div class="transcript-section">
         <div class="section-heading">📝 인식된 발화 내용</div>
@@ -215,7 +205,44 @@
     </div>
   </div>
 
-  <!-- ===== SCREEN 5: DRILL MODE ===== -->
+  <!-- ===== SCREEN 5: STUDY MODE ===== -->
+  <div id="screen-study" class="screen">
+    <div class="study-topbar">
+      <button class="btn-icon" id="btn-back-study">← 뒤로</button>
+      <div class="study-title-bar" id="study-title-bar"></div>
+      <div class="mvp-gender-wrap" id="study-gender-wrap">
+        <button class="mvp-gender-btn active" data-g="M" id="study-gender-m">남</button>
+        <button class="mvp-gender-btn" data-g="F" id="study-gender-f">여</button>
+      </div>
+    </div>
+    <div class="study-body">
+      <div id="study-model-player"></div>
+      <div class="study-guide-section">
+        <div class="study-guide-header">
+          <span class="study-guide-title">💡 이 방송문 핵심 포인트</span>
+          <button class="btn-primary study-gen-btn" id="btn-gen-guide">가이드 생성하기</button>
+        </div>
+        <div id="study-guide-status" class="hidden"></div>
+        <div id="study-guide-result" class="hidden"></div>
+      </div>
+      <div class="study-script-section">
+        <div class="study-script-label">📄 방송문</div>
+        <div class="study-script-text" id="study-script-text"></div>
+      </div>
+    </div>
+    <div class="study-bottom">
+      <button class="btn-choice btn-choice-drill study-bottom-btn" id="btn-study-to-drill">
+        <span class="choice-icon">🔁</span>
+        <span class="choice-label">드릴 모드로</span>
+      </button>
+      <button class="btn-choice btn-choice-full study-bottom-btn" id="btn-study-to-record">
+        <span class="choice-icon">✈</span>
+        <span class="choice-label">바로 연습하기</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 6: DRILL MODE ===== -->
   <div id="screen-drill" class="screen">
     <div class="drill-topbar">
       <button class="btn-icon" id="btn-back-drill">← 뒤로</button>
@@ -228,12 +255,12 @@
     <div class="drill-body">
       <div class="drill-sentence-box" id="drill-sentence-box"></div>
       <div class="drill-actions" id="drill-actions">
-        <button class="btn-icon" id="btn-drill-play-model">▶ 모델 음성 듣기</button>
+        <div id="drill-model-player"></div>
         <button class="btn-primary" id="btn-drill-record">🎤 따라읽기 시작</button>
       </div>
       <div class="drill-compare hidden" id="drill-compare">
-        <div class="drill-nav-row">
-          <button class="btn-icon" id="btn-drill-play-model2">▶ 모델</button>
+        <div id="drill-compare-player"></div>
+        <div class="drill-nav-row" style="margin-top:8px">
           <button class="btn-icon" id="btn-drill-play-my">▶ 내 음성</button>
         </div>
         <div class="drill-nav-row">
@@ -540,8 +567,9 @@
         <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">방송문을 선택하고 언어별 모델 음성을 업로드하거나, 로컬 폴더를 자동 스캔하세요.</div>
         <div class="admin-row-btns" style="margin-bottom:10px">
           <button class="btn-primary" id="btn-admin-scan-mv" style="background:#6366f1">📂 로컬 모델 음성 스캔</button>
-          <span style="color:var(--gray-400);font-size:12px;align-self:center">cabinvoice pro/ 폴더 → Firestore 자동 매핑</span>
+          <button class="btn-primary" id="btn-admin-reset-scan-mv" style="background:#dc2626">🗑️ 전체 초기화 후 재스캔</button>
         </div>
+        <div style="color:var(--gray-400);font-size:12px;margin-bottom:10px">cabinvoice pro/ 폴더 → Firestore 자동 매핑 | 초기화: 기존 modelFiles 전체 삭제 후 재스캔</div>
         <div class="admin-row-btns">
           <select id="admin-mv-script" class="admin-input" style="flex:1;max-width:360px">
             <option value="">-- 방송문 선택 --</option>
