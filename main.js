@@ -1480,8 +1480,9 @@ function _drillRender() {
   const recBtn = $('btn-drill-record');
   recBtn.textContent = '🎤 따라읽기 시작';
   recBtn.onclick = _drillStartRec;
-  // [3] 플레이어 초기화 — 새 문장마다 공통 플레이어 재생성
-  if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; _currentModelAudio = null; }
+  // [2] 같은 방송문 내 문장 전환 시 audio 객체 유지 — URL 동일하므로 재사용
+  // (새 URL이면 doPlay 첫 호출 시 createModelVoicePlayer 내부에서 자동 교체됨)
+  if (_currentModelAudio) { _currentModelAudio.pause(); }
   createModelVoicePlayer('drill-model-player');
   console.log(`[드릴모드] 문장 ${idx + 1}/${sentences.length} 시작`);
 }
@@ -1503,9 +1504,10 @@ async function _drillStartRec() {
       _drill.myBlob = new Blob(_drill.chunks, { type: 'audio/webm' });
       if (_drill.myAudioUrl) URL.revokeObjectURL(_drill.myAudioUrl);
       _drill.myAudioUrl = URL.createObjectURL(_drill.myBlob);
+      // [1] 비교 화면은 0:00부터 새로 듣기 — currentTime만 초기화, 객체·src 유지
+      if (_currentModelAudio) { _currentModelAudio.currentTime = 0; }
       $('drill-actions').classList.add('hidden');
       $('drill-compare').classList.remove('hidden');
-      // Bug 1: 비교 화면에 모델 음성 스크럽바 표시 (기존 _currentModelAudio 재사용)
       createModelVoicePlayer('drill-compare-player', { noGender: true });
       console.log(`[드릴모드] 문장 ${_drill.idx + 1} 녹음 완료`);
     };
