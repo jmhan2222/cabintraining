@@ -712,46 +712,91 @@ function renderScriptText(text) {
 function renderBilingualScript(text, langCode) {
   if (langCode !== 'ja' && langCode !== 'ca') return renderScriptText(text);
 
-  const hasJapanese = s => /[぀-ヿ一-鿿]/.test(s);
+  const hasJapanese  = s => /[぀-ヿ一-鿿]/.test(s);
+  const hasKorean    = s => /[가-힣]/.test(s);
+  const hasChinese   = s => /[一-鿿]/.test(s);
   const isSectionHeader = s => /^\[[^\]]+\]$/.test(s.trim()) && !hasJapanese(s);
   const hv = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
 
   const lines = text.split('\n');
   let html = '';
-  let i = 0;
 
-  while (i < lines.length) {
-    const line = lines[i].trim();
+  if (langCode === 'ja') {
+    // 각 줄을 독립적으로 판단: 한글 포함 → 독음, 히라가나/한자 포함 → 원문
+    // 독음 줄 버퍼: 바로 다음에 오는 원문 줄과 짝을 이루도록
+    let pendingReading = null;
 
-    if (!line) {
-      html += '<div class="bilingual-sep"></div>';
-      i++;
-      continue;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      if (!line) {
+        if (pendingReading !== null) {
+          // 독음만 있고 원문 없이 빈 줄 → 독음 단독 출력
+          html += `<div class="bilingual-pair"><div class="bilingual-reading">${hv(pendingReading)}</div></div>`;
+          pendingReading = null;
+        }
+        html += '<div class="bilingual-sep"></div>';
+        continue;
+      }
+
+      if (isSectionHeader(line)) {
+        if (pendingReading !== null) {
+          html += `<div class="bilingual-pair"><div class="bilingual-reading">${hv(pendingReading)}</div></div>`;
+          pendingReading = null;
+        }
+        html += `<div class="bilingual-header">${hv(line)}</div>`;
+        continue;
+      }
+
+      if (hasKorean(line) && !hasJapanese(line)) {
+        // 한글 독음 줄
+        if (pendingReading !== null) {
+          // 독음 연속 시 이전 것 단독 출력
+          html += `<div class="bilingual-pair"><div class="bilingual-reading">${hv(pendingReading)}</div></div>`;
+        }
+        pendingReading = line;
+      } else if (hasJapanese(line)) {
+        // 일본어 원문 줄
+        if (pendingReading !== null) {
+          html += `<div class="bilingual-pair">
+            <div class="bilingual-reading">${hv(pendingReading)}</div>
+            <div class="bilingual-original">${hv(line)}</div>
+          </div>`;
+          pendingReading = null;
+        } else {
+          html += `<div class="bilingual-pair"><div class="bilingual-original">${hv(line)}</div></div>`;
+        }
+      } else {
+        // 기타 (섹션 태그 등)
+        if (pendingReading !== null) {
+          html += `<div class="bilingual-pair"><div class="bilingual-reading">${hv(pendingReading)}</div></div>`;
+          pendingReading = null;
+        }
+        html += `<div class="bilingual-pair"><div class="bilingual-original">${hv(line)}</div></div>`;
+      }
     }
 
-    if (isSectionHeader(line)) {
-      html += `<div class="bilingual-header">${hv(line)}</div>`;
-      i++;
-      continue;
+    if (pendingReading !== null) {
+      html += `<div class="bilingual-pair"><div class="bilingual-reading">${hv(pendingReading)}</div></div>`;
     }
 
-    // 현재 줄이 한글 독음이고 다음 줄이 일본어 원문이면 쌍으로 렌더
-    const nextLine = lines[i + 1]?.trim() || '';
-    if (!hasJapanese(line) && nextLine && hasJapanese(nextLine)) {
-      html += `<div class="bilingual-pair">
-        <div class="bilingual-reading">${hv(line)}</div>
-        <div class="bilingual-original">${hv(nextLine)}</div>
-      </div>`;
-      i += 2;
-    } else if (hasJapanese(line)) {
-      html += `<div class="bilingual-pair"><div class="bilingual-original">${hv(line)}</div></div>`;
-      i++;
-    } else {
-      html += `<div class="bilingual-pair"><div class="bilingual-reading">${hv(line)}</div></div>`;
-      i++;
+  } else {
+    // ca(중국어): 한자 포함 → 원문, 한글 포함 → 독음
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) { html += '<div class="bilingual-sep"></div>'; continue; }
+      if (isSectionHeader(line)) { html += `<div class="bilingual-header">${hv(line)}</div>`; continue; }
+      if (hasChinese(line)) {
+        html += `<div class="bilingual-pair"><div class="bilingual-original">${hv(line)}</div></div>`;
+      } else if (hasKorean(line)) {
+        html += `<div class="bilingual-pair"><div class="bilingual-reading">${hv(line)}</div></div>`;
+      } else {
+        html += `<div class="bilingual-pair"><div class="bilingual-original">${hv(line)}</div></div>`;
+      }
     }
   }
 
+  console.log('[완료] 이중언어 방송문 렌더링 (자동 판단 방식)');
   return `<div class="script-text-rendered">${html}</div>`;
 }
 
@@ -1348,7 +1393,8 @@ function tierScore(ratio, maxPt) {
 }
 
 // ===== STUDY MODE =====
-const _studyGuideCache = {}; // key: `${scriptId}_${lang}`
+const _studyGuideCache = {};   // key: `${scriptId}_${lang}`
+const _readingsCache   = {};   // key: `${scriptId}_ca_readings`
 
 // ─── 학습 화면 방송문 텍스트 렌더 ─────────────────────────────────────────
 // ja/ca: renderBilingualScript 활용 | ko/en: 빈 줄 압축 + 줄 단위 div 렌더
@@ -1414,6 +1460,99 @@ function _renderChineseScriptWithReadings(text, chineseReadings) {
   console.log('[완료] 중국어 한글 독음 표시');
 }
 
+// ─── 중국어 독음 독립 API (가이드 생성과 독립적으로 즉시 호출) ──────────────
+async function generateChineseReadings(scriptText, scriptId) {
+  const cacheKey = `${scriptId}_ca_readings`;
+  if (_readingsCache[cacheKey]) return _readingsCache[cacheKey];
+
+  // Firestore에 저장된 readings 우선 확인
+  if (_db) {
+    try {
+      const snap = await _db.collection('scripts').doc(scriptId).get();
+      const saved = snap.exists ? snap.data()?.chineseReadings : null;
+      if (saved?.length) {
+        _readingsCache[cacheKey] = saved;
+        return saved;
+      }
+    } catch (e) { /* Firestore 실패 시 API 호출로 이어짐 */ }
+  }
+
+  const prompt = `아래 중국어 방송문의 각 문장(줄)에 한글 발음 독음을 달아줘.
+
+규칙:
+- 성조 번호 없이 한국어 화자가 읽기 쉬운 한국어 발음으로만 표기
+- 각 단어 사이 띄어쓰기 유지
+- 한자가 포함된 줄만 독음 처리 (빈 줄, 섹션 태그 제외)
+- 원문과 독음을 쌍으로 JSON 배열 반환
+
+반환 형식 (JSON 배열만, 설명 없이):
+[
+  {"original": "各位旅客，", "reading": "거웨이 뤼커,"},
+  {"original": "飞机遇有不稳定气流，", "reading": "페이지 위요우 부원딩 치리우,"}
+]
+
+중국어 방송문:
+${scriptText}`;
+
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), 60000);
+  let readings = null;
+  try {
+    const res = await fetch('/api/gemini', {
+      signal: controller.signal,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }] })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
+    const m = raw.match(/\[[\s\S]*\]/);
+    if (m) readings = JSON.parse(m[0]);
+  } catch (e) {
+    console.warn('[중국어 독음] API 오류:', e.message);
+    return null;
+  } finally { clearTimeout(tid); }
+
+  if (readings?.length) {
+    _readingsCache[cacheKey] = readings;
+    // Firestore 캐싱 (실패 무시)
+    if (_db) {
+      _db.collection('scripts').doc(scriptId)
+        .set({ chineseReadings: readings }, { merge: true })
+        .catch(e => console.warn('[중국어 독음 저장 실패]', e.message));
+    }
+    console.log('[완료] 중국어 독음 생성 및 캐싱');
+  }
+  return readings;
+}
+
+// 중국어 독음 로딩 상태 표시 + 생성 후 렌더 적용
+async function _autoLoadChineseReadings(scriptText, scriptId) {
+  const el = $('study-script-text');
+  if (!el) return;
+
+  // 로딩 인디케이터 (방송문 위에 작은 텍스트)
+  const indicator = document.createElement('div');
+  indicator.id = 'cn-reading-indicator';
+  indicator.className = 'cn-reading-loading';
+  indicator.textContent = '중국어 독음을 생성하고 있습니다... 🔄';
+  el.parentNode?.insertBefore(indicator, el);
+
+  try {
+    const readings = await generateChineseReadings(scriptText, scriptId);
+    const ind = document.getElementById('cn-reading-indicator');
+    if (ind) ind.remove();
+    if (readings?.length) {
+      _renderChineseScriptWithReadings(scriptText, readings);
+    }
+  } catch (e) {
+    const ind = document.getElementById('cn-reading-indicator');
+    if (ind) ind.remove();
+    console.warn('[중국어 독음 자동 로드 실패]', e.message);
+  }
+}
+
 async function startStudyMode() {
   const s = state.currentScript;
   if (!s) return;
@@ -1422,6 +1561,12 @@ async function startStudyMode() {
 
   $('study-title-bar').textContent = s.title;
   _renderStudyScriptText(lang.text, state.selectedLang);
+
+  // 중국어: 가이드 생성과 무관하게 즉시 독음 자동 로드
+  if (state.selectedLang === 'ca') {
+    _autoLoadChineseReadings(lang.text, s.id);
+  }
+
   ['M', 'F'].forEach(g => {
     const btn = $(`study-gender-${g.toLowerCase()}`);
     if (btn) btn.classList.toggle('active', g === _currentGender);

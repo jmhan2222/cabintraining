@@ -1449,12 +1449,12 @@ html, body {
 #screen-prep { position: relative; }
 
 /* ===== BILINGUAL (JA 독음 + 원문) ===== */
-.bilingual-pair    { margin-bottom: 6px; }
-.bilingual-reading { font-size: 12px; color: var(--color-text-tertiary); line-height: 1.5; letter-spacing: 0.02em; }
-.bilingual-original { font-size: 15px; color: var(--color-text-primary); line-height: 1.75; }
+.bilingual-pair    { margin-bottom: 4px; }
+.bilingual-reading { font-size: 12px; color: var(--color-text-tertiary); line-height: 1.4; letter-spacing: 0.02em; margin-bottom: 2px; margin-top: 0; }
+.bilingual-original { font-size: 15px; color: var(--color-text-primary); line-height: 1.6; margin-top: 0; margin-bottom: 0; }
 .bilingual-header  { display: inline-block; font-size: 12px; font-weight: 700; color: var(--color-text-secondary);
                      background: var(--color-bg); border-radius: 5px; padding: 2px 8px; margin: 8px 0 4px; }
-.bilingual-sep     { height: 10px; }
+.bilingual-sep     { height: 8px; }
 
 /* ===== AI RESULT SECTION ===== */
 .ai-result-section { margin-top: 0; }
@@ -2158,13 +2158,18 @@ html, body {
 .study-script-sep { height: 8px; margin-bottom: 0; }
 /* 이중 언어(ja/ca) 학습 화면 전용 오버라이드 — 다른 화면의 bilingual 스타일과 독립 */
 .study-script-text .bilingual-reading {
-  font-size: 13px; color: #AEAEB2; line-height: 1.5; margin-bottom: 2px; margin-top: 0;
+  font-size: 12px; color: #AEAEB2; line-height: 1.4; margin-bottom: 2px; margin-top: 0;
 }
 .study-script-text .bilingual-original {
-  font-size: 16px; color: #1D1D1F; line-height: 1.7; margin-bottom: 10px; margin-top: 0;
+  font-size: 15px; color: #1D1D1F; line-height: 1.6; margin-bottom: 0; margin-top: 0;
 }
-.study-script-text .bilingual-pair { margin-bottom: 2px; }
-.study-script-text .bilingual-sep  { height: 6px; }
+.study-script-text .bilingual-pair { margin-bottom: 12px; }
+.study-script-text .bilingual-sep  { height: 8px; }
+/* 중국어 독음 로딩 인디케이터 */
+.cn-reading-loading {
+  font-size: 12px; color: #8E8E93; text-align: center;
+  padding: 6px 0 4px; letter-spacing: 0.01em;
+}
 /* 하단 버튼 */
 .study-bottom {
   display: flex; gap: 10px; padding: 14px 16px;
