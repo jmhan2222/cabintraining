@@ -98,16 +98,18 @@ async function _resolveModelVoiceUrl(scriptId, lang, gender = _currentGender) {
       const firestoreId = num.replace(/\./g, '-');
       console.log('[모델음성] num:', num, 'firestoreId:', firestoreId);
       const doc = await _db.collection('scripts').doc(firestoreId).get();
-      if (doc.exists) {
-        const fsKey = gender === 'F' ? `${lang}_F` : lang;
-        const fileName = doc.data().modelFiles?.[fsKey];
-        console.log('[모델음성] num:', num, '파일:', fileName);
-        if (fileName) {
-          const url = _buildLocalModelVoiceUrl(fileName, lang, gender);
-          if (url) {
-            _mvUrlCache[cacheKey] = url;
-            return url;
-          }
+      if (!doc.exists) {
+        console.warn('[모델음성] 문서 없음:', firestoreId);
+        return null;
+      }
+      const fsKey = gender === 'F' ? `${lang}_F` : lang;
+      const fileName = doc.data().modelFiles?.[fsKey];
+      console.log('[모델음성] num:', num, '파일:', fileName);
+      if (fileName) {
+        const url = _buildLocalModelVoiceUrl(fileName, lang, gender);
+        if (url) {
+          _mvUrlCache[cacheKey] = url;
+          return url;
         }
       }
     } catch {}
@@ -460,18 +462,10 @@ function showToast(msg, duration = 2200) {
 
 // ===== SENTENCE SPLIT & CLICKABLE RENDER =====
 function splitSentences(text) {
-  const parts = [];
-  let cur = '';
-  for (const ch of text) {
-    cur += ch;
-    if ('.!?,。！？、，\n'.includes(ch)) {
-      const t = cur.trim();
-      if (t.length > 1) parts.push(t);
-      cur = '';
-    }
-  }
-  if (cur.trim().length > 1) parts.push(cur.trim());
-  return parts;
+  return text
+    .split(/(?<=\.)\s+|\n+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 5);
 }
 
 function renderClickableScript(text, langCode) {
