@@ -732,18 +732,21 @@ function renderBilingualScript(text, langCode) {
     hasJapanese: /[぀-ヿ一-鿿]/.test(l)
   })));
 
-  const hasJapanese  = s => /[぀-ヿ一-鿿]/.test(s);
-  // 한글 수가 히라가나 수보다 많고, 한글이 2자 초과여야 독음 줄로 판단
-  const hasKorean    = s => {
-    const korCnt = (s.match(/[가-힣]/g) || []).length;
-    const jpCnt  = (s.match(/[぀-ヿ]/g) || []).length;
-    return korCnt > jpCnt && korCnt > 2;
-  };
+  // 히라가나+가타카나만 (한자 제외) — 한자는 한중일 공통이라 제외
+  const hasJapanese  = s => /[぀-ヿ]/.test(s);
+  // 완성형 한글(AC00-D7A3) + 자모(3131-318E) 포함 여부
+  const hasKorean    = s => /[가-힣ㄱ-ㆎ]/.test(s);
   const hasChinese   = s => /[一-鿿]/.test(s);
   const isSectionHeader = s => /^\[[^\]]+\]$/.test(s.trim()) && !hasJapanese(s);
   const hv = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
 
   const lines = text.split('\n');
+  // 줄별 판단 로그
+  lines.forEach((line, i) => {
+    const korean = hasKorean(line);
+    const japanese = hasJapanese(line);
+    console.log(`[줄${i}]`, JSON.stringify(line.substring(0, 20)), 'Korean:', korean, 'Japanese:', japanese);
+  });
   let html = '';
 
   if (langCode === 'ja') {
@@ -1500,7 +1503,7 @@ async function generateChineseReadings(scriptText, scriptId) {
         _readingsCache[cacheKey] = saved;
         return saved;
       }
-    } catch (e) { /* Firestore 실패 시 API 호출로 이어짐 */ }
+    } catch (e) { console.warn('[중국어독음] generateChineseReadings Firestore 오류:', e.message); }
   }
 
   const prompt = `아래 중국어 방송문의 각 문장(줄)에 한글 발음 독음을 달아줘.
@@ -1556,9 +1559,13 @@ ${scriptText}`;
 
 // 중국어 독음 로딩 상태 표시 + 생성 후 렌더 적용
 async function _autoLoadChineseReadings(scriptText, scriptId) {
-  console.log('[중국어독음] 시작:', scriptId);
+  console.log('[중국어독음] 1. 함수 진입, scriptId:', scriptId);
+
   const el = $('study-script-text');
-  if (!el) return;
+  if (!el) { console.error('[중국어독음] study-script-text 엘리먼트 없음'); return; }
+
+  const cacheKey = `${scriptId}_ca_readings`;
+  console.log('[중국어독음] 2. 캐시 확인:', cacheKey, '캐시 히트:', !!_readingsCache[cacheKey]);
 
   // 로딩 인디케이터 (방송문 위에 작은 텍스트)
   const indicator = document.createElement('div');
@@ -1567,19 +1574,32 @@ async function _autoLoadChineseReadings(scriptText, scriptId) {
   indicator.textContent = '중국어 독음을 생성하고 있습니다... 🔄';
   el.parentNode?.insertBefore(indicator, el);
 
+  console.log('[중국어독음] 3. Firestore 조회 시작, _db 존재:', !!_db);
+  if (_db) {
+    try {
+      const doc = await _db.collection('scripts').doc(scriptId).get();
+      console.log('[중국어독음] 4. Firestore 결과:', doc.exists, doc.data()?.chineseReadings);
+    } catch (e) {
+      console.error('[중국어독음] Firestore 오류:', e);
+    }
+  }
+
+  console.log('[중국어독음] 5. API 호출 시작 (generateChineseReadings)');
   try {
     const readings = await generateChineseReadings(scriptText, scriptId);
-    console.log('[중국어독음] API 결과:', readings);
+    console.log('[중국어독음] 6. API 결과:', readings);
     const ind = document.getElementById('cn-reading-indicator');
     if (ind) ind.remove();
     if (readings?.length) {
       console.log('[중국어독음] 렌더링 시작, readings 수:', readings.length);
       _renderChineseScriptWithReadings(scriptText, readings);
+    } else {
+      console.warn('[중국어독음] readings 없음 또는 빈 배열');
     }
   } catch (e) {
     const ind = document.getElementById('cn-reading-indicator');
     if (ind) ind.remove();
-    console.warn('[중국어 독음 자동 로드 실패]', e.message);
+    console.error('[중국어독음] API 오류:', e);
   }
 }
 
