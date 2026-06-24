@@ -1485,13 +1485,14 @@ async function _loadGuideFromFirestore(scriptId, langCode) {
 
 // ─── 끊어읽기 텍스트 색상 변환 ────────────────────────────────────────────
 function _colorizeBreakText(text) {
-  const esc = s => escHtml(String(s || ''));
-  // ,(반박자) → 초록, |(한박자) → 파랑
-  return esc(text)
-    .replace(/,\(반박자\)/g, '<span class="sg-bp-short">,<small>(반박자)</small></span>')
-    .replace(/\|\(한박자\)/g, '<span class="sg-bp-long">|<small>(한박자)</small></span>')
-    .replace(/,/g, '<span class="sg-bp-short">,</span>')
-    .replace(/\|/g, '<span class="sg-bp-long">|</span>');
+  // 단일 정규식으로 한 번에 치환 (순차 치환 시 이미 삽입된 span 내부 재매칭 방지)
+  return escHtml(String(text || '')).replace(/,\(반박자\)|\|\(한박자\)|,|\|/g, m => {
+    if (m === ',(반박자)') return '<span class="sg-bp-short">,<small>(반박자)</small></span>';
+    if (m === '|(한박자)') return '<span class="sg-bp-long">|<small>(한박자)</small></span>';
+    if (m === ',')         return '<span class="sg-bp-short">,</span>';
+    if (m === '|')         return '<span class="sg-bp-long">|</span>';
+    return m;
+  });
 }
 
 // ─── 편집 모드 저장 처리 ───────────────────────────────────────────────────
@@ -2130,6 +2131,7 @@ function measureAmpPeaks(samples) {
 }
 
 // ===== RESULTS =====
+// eslint-disable-next-line no-unused-vars
 function showResults(result, transcript) {
   showScreen('screen-result');
   stopModelComparison();
