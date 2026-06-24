@@ -1165,7 +1165,25 @@ function updatePrepContent() {
   const lang = s.langs[state.selectedLang];
 
   if ($('prep-title-bar')) $('prep-title-bar').textContent = s.title;
-  $('prep-text').innerHTML = renderClickableScript(lang.text, state.selectedLang);
+
+  const prepTextEl = $('prep-text');
+  if (state.selectedLang === 'ja' || state.selectedLang === 'ca') {
+    // ja/ca: 이중언어 렌더 (원문만 먼저)
+    prepTextEl.innerHTML = renderBilingualScript(lang.text, state.selectedLang);
+    // ca: 독음 비동기 로드 → prep-text에 덮어씌우기
+    if (state.selectedLang === 'ca') {
+      const caText = lang.text;
+      const caId   = s.id;
+      generateChineseReadings(caText, caId).then(readings => {
+        if (readings?.length) {
+          _renderChineseScriptWithReadings(caText, readings, prepTextEl);
+          console.log('[완료] 준비 화면 중국어 독음 표시');
+        }
+      }).catch(e => console.warn('[준비화면 중국어 독음 실패]', e.message));
+    }
+  } else {
+    prepTextEl.innerHTML = renderClickableScript(lang.text, state.selectedLang);
+  }
 
   // 준비 화면 — 모델 음성 플레이어 제거됨, 드릴/학습은 각 화면에서 관리
 
@@ -1458,8 +1476,9 @@ function _renderStudyScriptText(text, langCode) {
 }
 
 // ─── 중국어 방송문 한글 독음 덮어쓰기 ────────────────────────────────────
-function _renderChineseScriptWithReadings(text, chineseReadings) {
-  const el = $('study-script-text');
+// targetEl: 기본값 study-script-text, 준비 화면에서는 prep-text 전달
+function _renderChineseScriptWithReadings(text, chineseReadings, targetEl = null) {
+  const el = targetEl || $('study-script-text');
   if (!el || !chineseReadings?.length) return;
   const hasCJK = s => /[一-鿿]/.test(s);
   const isSectionHeader = s => /^\[[^\]]+\]$/.test(s.trim()) && !hasCJK(s);
@@ -1527,7 +1546,7 @@ ${scriptText}`;
   const tid = setTimeout(() => controller.abort(), 60000);
   let readings = null;
   try {
-    const res = await fetch('/api/gemini', {
+    const res = await fetchWithRetry('/api/gemini', {
       signal: controller.signal,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1683,20 +1702,47 @@ async function _retryGuideWithSimplePrompt(scriptText) {
 JSON 외 어떤 텍스트도 포함하지 말 것.
 방송문: ${scriptText}`;
 
-  const res = await fetch('/api/gemini', {
+  const res = await fetchWithRetry('/api/gemini', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'gemini-2.5-flash',
       contents: [{ parts: [{ text: simplePrompt }] }]
     })
-  });
+  }, { statusEl: $('study-guide-status') });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
   const m = raw.match(/\{[\s\S]*\}/);
   if (!m) throw new Error('단순화 재시도 JSON 파싱 실패');
   return JSON.parse(m[0]);
+}
+
+// ─── Gemini API fetch 재시도 유틸리티 ──────────────────────────────────────
+// 503/429 발생 시 지수 백오프 재시도 (최대 3회)
+async function fetchWithRetry(url, options, { maxRetries = 3, statusEl = null } = {}) {
+  for (let i = 0; i < maxRetries; i++) {
+    let res;
+    try {
+      res = await fetch(url, options);
+    } catch (e) {
+      if (i === maxRetries - 1) throw e;
+      const delay = Math.pow(2, i) * 1000;
+      console.log(`[재시도] 네트워크 오류, ${i + 1}번째 재시도 ${delay}ms 후`);
+      if (statusEl) statusEl.textContent = `⏳ 연결 오류. 재시도 중... (${i + 1}/${maxRetries})`;
+      await new Promise(r => setTimeout(r, delay));
+      continue;
+    }
+    if ((res.status === 503 || res.status === 429) && i < maxRetries - 1) {
+      const delay = Math.pow(2, i) * 1000;
+      console.log(`[재시도] HTTP ${res.status}, ${i + 1}번째 재시도 ${delay}ms 후`);
+      if (statusEl) statusEl.textContent = `⏳ 서버가 바쁩니다. 잠시 후 재시도합니다... (${i + 1}/${maxRetries})`;
+      await new Promise(r => setTimeout(r, delay));
+      continue;
+    }
+    return res;
+  }
+  throw new Error('최대 재시도 횟수 초과');
 }
 
 async function callGeminiGuide(scriptText, langCode) {
@@ -1759,16 +1805,16 @@ ${langSpecific[langCode] || langSpecific.ko}
 }
 중국어(ca)인 경우에만 chineseReadings 필드를 채워줘. 다른 언어는 chineseReadings 생략.`;
 
-  const res = await fetch('/api/gemini', {
+  const res = await fetchWithRetry('/api/gemini', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'gemini-2.5-flash',
       contents: [{ parts: [{ text: prompt }] }]
     })
-  });
+  }, { statusEl: $('study-guide-status') });
   if (res.status === 501) throw new Error('로컬 환경에서는 배포 후 사용 가능합니다.');
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw new Error(res.status === 503 ? '일시적인 서버 오류입니다. 잠시 후 다시 시도해주세요.' : `HTTP ${res.status}`);
   const data = await res.json();
   const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
 
@@ -3626,7 +3672,7 @@ ${sharedJson}`;
     const _audioTimeoutId = setTimeout(() => _audioController.abort(), 60000);
     let res;
     try {
-      res = await fetch('/api/gemini', {
+      res = await fetchWithRetry('/api/gemini', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: _audioController.signal,
