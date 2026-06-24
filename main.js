@@ -1186,6 +1186,7 @@ function stopRecording() {
 
   const finish = () => {
     state.audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
+    _lastRecordingBlob = state.audioBlob;
     analyzeAndShow(duration);
   };
 
@@ -1313,14 +1314,66 @@ function _drillNext() {
 }
 
 // ===== RESULT MODEL VOICE COMPARISON =====
-let _cmp = { active: false, audio: null, timeout: null };
+let _lastRecordingBlob = null;
+let _cmp = { active: false, audio: null, timeout: null, myUrl: null };
 
-function startModelComparison() {
+function _cmpStop() {
+  _cmp.active = false;
+  _cmp.audio?.pause(); _cmp.audio = null;
+  clearTimeout(_cmp.timeout); _cmp.timeout = null;
+  if (_cmp.myUrl) { URL.revokeObjectURL(_cmp.myUrl); _cmp.myUrl = null; }
+  $('compare-status-text').classList.add('hidden');
+  $('compare-status-text').textContent = '';
+  $('btn-compare-stop').classList.add('hidden');
+  $('btn-compare-voice').classList.remove('hidden');
+}
+
+function stopModelComparison() { _cmpStop(); }
+
+async function playModelVoice() {
+  _cmpStop();
   const s = state.currentScript;
   if (!s) return;
-  const base64 = _getCachedModelVoiceUrl(s.id, state.selectedLang);
-  if (!base64) return;
-  if (!state.audioBlob) { showToast('내 녹음이 없습니다'); return; }
+  const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
+  if (!url) { showToast('모델 음성 없음'); return; }
+  $('compare-status-text').textContent = '🎵 모델 음성 재생 중...';
+  $('compare-status-text').classList.remove('hidden');
+  const a = new Audio(url);
+  _cmp.audio = a;
+  a.play().catch(() => {});
+  a.onended = () => {
+    $('compare-status-text').classList.add('hidden');
+    $('compare-status-text').textContent = '';
+    _cmp.audio = null;
+  };
+}
+
+function playMyRecording() {
+  _cmpStop();
+  if (!_lastRecordingBlob) { showToast('녹음 파일 없음'); return; }
+  const url = URL.createObjectURL(_lastRecordingBlob);
+  _cmp.myUrl = url;
+  $('compare-status-text').textContent = '🎤 내 녹음 재생 중...';
+  $('compare-status-text').classList.remove('hidden');
+  const b = new Audio(url);
+  _cmp.audio = b;
+  b.play().catch(() => {});
+  b.onended = () => {
+    URL.revokeObjectURL(url);
+    _cmp.myUrl = null;
+    $('compare-status-text').classList.add('hidden');
+    $('compare-status-text').textContent = '';
+    _cmp.audio = null;
+  };
+}
+
+async function startModelComparison() {
+  const s = state.currentScript;
+  if (!s) return;
+  const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
+  if (!url) { showToast('모델 음성 없음'); return; }
+  if (!_lastRecordingBlob) { showToast('내 녹음이 없습니다'); return; }
+  _cmpStop();
   _cmp.active = true;
   $('compare-status-text').classList.remove('hidden');
   $('btn-compare-stop').classList.remove('hidden');
@@ -1329,40 +1382,31 @@ function startModelComparison() {
   _cmpCycle();
 }
 
-function stopModelComparison() {
-  _cmp.active = false;
-  _cmp.audio?.pause(); _cmp.audio = null;
-  clearTimeout(_cmp.timeout); _cmp.timeout = null;
-  $('compare-status-text').classList.add('hidden');
-  $('compare-status-text').textContent = '';
-  $('btn-compare-stop').classList.add('hidden');
-  $('btn-compare-voice').classList.remove('hidden');
-}
-
 function _cmpCycle() {
   if (!_cmp.active) return;
-  const base64 = _getCachedModelVoiceUrl(state.currentScript.id, state.selectedLang);
+  const url = _getCachedModelVoiceUrl(state.currentScript.id, state.selectedLang)
+    || _mvUrlCache[`${state.currentScript.id}_${state.selectedLang}_${_currentGender}`];
   $('compare-status-text').textContent = '🎵 모델 음성 재생 중...';
-  const a = new Audio(base64);
+  const a = new Audio(url);
   _cmp.audio = a;
   a.play().catch(() => {});
   a.onended = () => {
     if (!_cmp.active) return;
-    $('compare-status-text').textContent = '⏸ 잠시 대기 중...';
     _cmp.timeout = setTimeout(() => {
       if (!_cmp.active) return;
-      $('compare-status-text').textContent = '🎤 내 음성 재생 중...';
-      const url = URL.createObjectURL(state.audioBlob);
-      const b = new Audio(url);
+      $('compare-status-text').textContent = '🎤 내 녹음 재생 중...';
+      const myUrl = URL.createObjectURL(_lastRecordingBlob);
+      _cmp.myUrl = myUrl;
+      const b = new Audio(myUrl);
       _cmp.audio = b;
       b.play().catch(() => {});
       b.onended = () => {
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(myUrl);
+        _cmp.myUrl = null;
         if (!_cmp.active) return;
-        $('compare-status-text').textContent = '⏸ 잠시 대기 중...';
-        _cmp.timeout = setTimeout(_cmpCycle, 2000);
+        _cmp.timeout = setTimeout(_cmpCycle, 1000);
       };
-    }, 2000);
+    }, 1000);
   };
 }
 
@@ -3283,6 +3327,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ===== 결과 화면 모델 음성 비교 =====
+  $('btn-play-model').addEventListener('click', playModelVoice);
+  $('btn-play-my').addEventListener('click', playMyRecording);
   $('btn-compare-voice').addEventListener('click', startModelComparison);
   $('btn-compare-stop').addEventListener('click', stopModelComparison);
 

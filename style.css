@@ -1687,8 +1687,11 @@ html, body {
   border-radius: var(--radius-md);
 }
 .result-compare-section.hidden { display: none; }
-.compare-controls  { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.compare-status    { font-size: 14px; font-weight: 600; color: var(--color-primary); }
+.compare-controls  { display: flex; flex-direction: column; gap: 10px; }
+.compare-row       { display: flex; align-items: center; gap: 12px; }
+.compare-label     { font-size: 14px; font-weight: 600; min-width: 80px; }
+.compare-row-alt   { margin-top: 4px; }
+.compare-status    { font-size: 14px; font-weight: 600; color: var(--color-primary); padding: 4px 0; }
 .compare-status.hidden { display: none; }
 
 /* ===== TOAST ===== */

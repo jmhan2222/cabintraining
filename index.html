@@ -192,9 +192,19 @@
       <div class="result-compare-section hidden" id="result-compare-section">
         <div class="section-heading">🎵 모델 음성 비교</div>
         <div class="compare-controls">
-          <button class="btn-icon" id="btn-compare-voice">🎵 모델 음성과 비교하기</button>
+          <div class="compare-row">
+            <span class="compare-label">🎵 모델 음성</span>
+            <button class="btn-icon sm" id="btn-play-model">▶ 재생</button>
+          </div>
+          <div class="compare-row">
+            <span class="compare-label">🎤 내 녹음</span>
+            <button class="btn-icon sm" id="btn-play-my">▶ 재생</button>
+          </div>
+          <div class="compare-row compare-row-alt">
+            <button class="btn-icon" id="btn-compare-voice">🔄 번갈아 비교 재생</button>
+            <button class="btn-icon hidden" id="btn-compare-stop">■ 중지</button>
+          </div>
           <div class="compare-status hidden" id="compare-status-text"></div>
-          <button class="btn-icon hidden" id="btn-compare-stop">⏹ 비교 중지</button>
         </div>
       </div>
 
