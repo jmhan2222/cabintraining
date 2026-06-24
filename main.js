@@ -1563,7 +1563,7 @@ function _renderStudyGuide(guide) {
 
   // [3] 억양 — intonationDetails 표시
   const intonDetailHtml = (guide.intonationDetails?.length)
-    ? guide.intonationDetails.map((d, i) =>
+    ? guide.intonationDetails.map((d) =>
         `<div class="sg-inton-detail">
           <span class="sg-inton-symbol sg-inton-${d.direction || 'flat'}">${esc(d.symbol || '→')}</span>
           <span class="sg-inton-phrase">${esc(d.phrase)}</span>
