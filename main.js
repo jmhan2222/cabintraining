@@ -1610,14 +1610,21 @@ async function startStudyMode() {
   if (!lang) return;
 
   $('study-title-bar').textContent = s.title;
-  _renderStudyScriptText(lang.text, state.selectedLang);
+  const langCode = state.selectedLang;
+  _renderStudyScriptText(lang.text, langCode);
 
-  console.log('[study진입] langCode:', state.selectedLang, 'ca여부:', state.selectedLang === 'ca');
+  console.log('[study] langCode 확인:', langCode);
 
   // 중국어: 가이드 생성과 무관하게 즉시 독음 자동 로드
-  if (state.selectedLang === 'ca') {
-    console.log('[중국어독음] 자동 로드 시작');
-    _autoLoadChineseReadings(lang.text, s.id);
+  if (langCode === 'ca') {
+    console.log('[study] 중국어 독음 로드 시작');
+    const scriptText = s.langs?.ca?.text || '';
+    const scriptId   = s.id || '';
+    if (scriptText && scriptId) {
+      _autoLoadChineseReadings(scriptText, scriptId);
+    } else {
+      console.warn('[study] ca 텍스트 또는 ID 없음', { scriptText: !!scriptText, scriptId });
+    }
   }
 
   ['M', 'F'].forEach(g => {
@@ -4196,8 +4203,19 @@ document.addEventListener('DOMContentLoaded', () => {
     tab.addEventListener('click', () => {
       $('lang-tabs').querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
-      state.selectedLang = tab.dataset.lang;
+      const newLangCode = tab.dataset.lang;
+      state.selectedLang = newLangCode;
       if (state.currentScript) updatePrepContent();
+
+      // 중국어 탭 선택 시 독음 미리 로드 (캐시되면 학습 모드 진입 즉시 표시)
+      if (newLangCode === 'ca' && state.currentScript) {
+        console.log('[탭전환] 중국어 독음 로드');
+        const scriptText = state.currentScript.langs?.ca?.text || '';
+        const scriptId   = state.currentScript.id || '';
+        if (scriptText && scriptId) {
+          generateChineseReadings(scriptText, scriptId);
+        }
+      }
     });
   });
 
