@@ -1347,52 +1347,106 @@ function tierScore(ratio, maxPt) {
 // ===== STUDY MODE =====
 const _studyGuideCache = {}; // key: `${scriptId}_${lang}`
 
-function startStudyMode() {
+async function startStudyMode() {
   const s = state.currentScript;
   if (!s) return;
   const lang = s.langs[state.selectedLang];
   if (!lang) return;
 
   $('study-title-bar').textContent = s.title;
-  // 방송문 텍스트 (읽기 전용)
   $('study-script-text').textContent = lang.text;
-  // 성별 버튼 초기 상태
   ['M', 'F'].forEach(g => {
     const btn = $(`study-gender-${g.toLowerCase()}`);
     if (btn) btn.classList.toggle('active', g === _currentGender);
   });
-  // 공통 플레이어
   createModelVoicePlayer('study-model-player');
-  // 가이드 리셋 (다른 방송문/언어로 전환 시 초기화)
+
+  // 가이드 초기화
   $('study-guide-result').classList.add('hidden');
   $('study-guide-result').innerHTML = '';
   $('study-guide-status').classList.add('hidden');
   $('btn-gen-guide').disabled = false;
   $('btn-gen-guide').textContent = '가이드 생성하기';
-  // 이미 캐시된 가이드 있으면 바로 표시
-  const cacheKey = `${s.id}_${state.selectedLang}`;
-  if (_studyGuideCache[cacheKey]) _renderStudyGuide(_studyGuideCache[cacheKey]);
 
   showScreen('screen-study');
+
+  // 캐시 → Firestore 순으로 가이드 조회
+  const cacheKey = `${s.id}_${state.selectedLang}`;
+  if (_studyGuideCache[cacheKey]) {
+    _renderStudyGuide(_studyGuideCache[cacheKey]);
+    $('btn-gen-guide').textContent = '✅ 가이드 완성';
+  } else {
+    const statusEl = $('study-guide-status');
+    statusEl.textContent = '저장된 가이드 확인 중...';
+    statusEl.className = 'study-guide-loading';
+    statusEl.classList.remove('hidden');
+    try {
+      const saved = await _loadGuideFromFirestore(s.id, state.selectedLang);
+      statusEl.classList.add('hidden');
+      if (saved) {
+        _studyGuideCache[cacheKey] = saved;
+        _renderStudyGuide(saved);
+        $('btn-gen-guide').textContent = '✅ 가이드 완성';
+        console.log('[완료] Firestore 저장 가이드 로드');
+      }
+    } catch (e) {
+      statusEl.classList.add('hidden');
+    }
+  }
   console.log('[완료] 학습 모드 화면 진입');
 }
 
 async function callGeminiGuide(scriptText, langCode) {
   const langName = { ko: '한국어', en: '영어', ja: '일본어', ca: '중국어' }[langCode] || '한국어';
+
+  const langSpecific = {
+    en: `영어 억양 가이드 필수 포함:
+- 강세 음절에 대문자 표시 예) 'faSTen your SEAT belt'
+- 내용어(content word) vs 기능어(function word) 구분
+- 문장 끝 억양 방향 표시
+- 연음(linking) 포인트 표시 예) 'seat_belt'`,
+    ja: `일본어 억양 가이드 필수 포함:
+- 고저 악센트 패턴 (高低로 표시) 예) 'ご搭乗 高低低低'
+- 장음 위치 강조 (ー 충분히)
+- 한국어 억양 개입 주의사항
+- ん/촉음 처리 포인트`,
+    ca: `중국어 억양 가이드 필수 포함:
+- 각 단어 성조 표시 예) '女士(3성4성) 先生(1성1성)'
+- 성조 변조 규칙 표시 (不/一)
+- 리듬감 있는 연결 방법
+- 스타카토 지양 포인트`,
+    ko: `한국어 억양 가이드 필수 포함:
+- 문장 끝 어미 처리(~니다↘, ~세요↘) 반드시 포함
+- 강조 단어 위치의 음높이 변화`
+  };
+
   const prompt = `당신은 항공사 기내방송 전문 교관입니다.
 아래 방송문을 분석해서 JSON만 반환하세요 (설명·주석 없이).
 
 방송문 (${langName}):
 ${scriptText}
 
+중요: 방송문이 영어/일본어/중국어이더라도 학습 가이드(summary, breakPoints 설명, speedGuide, intonationGuide, tips)는 반드시 한국어로 작성하세요. 단, emphasisWords와 intonationDetails의 phrase, breakPoints의 실제 방송문 구간은 원어 그대로 표시하고 설명만 한국어로 작성하세요.
+
+끊어읽기 표시 규칙:
+breakPoints 배열에서 각 문장의 끊어읽기를 아래 기호로 표시하세요:
+- ,(반박자): 살짝 쉬는 곳 (쉼표 정도의 짧은 끊김)
+- |(한박자): 충분히 쉬는 곳 (숨 한 번 쉬는 긴 끊김)
+예시: '손님 여러분,| 보조배터리,(반박자) 전자담배,(반박자) 라이터는| 선반에 보관할 수 없으며,'
+
+${langSpecific[langCode] || langSpecific.ko}
+
 반환 형식:
 {
-  "summary": "이 방송문의 핵심 특징 1-2문장",
-  "breakPoints": ["끊어읽기 포인트 설명 1", "설명 2"],
-  "emphasisWords": ["강조할 단어1", "단어2"],
-  "speedGuide": "속도 가이드 (예: 전반부 천천히, 후반부 안정적으로)",
-  "intonationGuide": "억양 가이드 (예: 문장 끝 내려읽기)",
-  "tips": ["실전 팁 1", "팁 2", "팁 3"]
+  "summary": "이 방송문의 핵심 특징 1-2문장 (한국어)",
+  "breakPoints": ["방송문 구간에 , | 기호 표시 후 한국어 설명", "..."],
+  "emphasisWords": ["강조할 단어/구1 (원어)", "..."],
+  "speedGuide": "속도 가이드 (한국어)",
+  "intonationGuide": "전체 억양 개요 (한국어)",
+  "intonationDetails": [
+    { "phrase": "실제 방송문 구간 (원어)", "direction": "up 또는 down 또는 flat", "symbol": "↗ 또는 ↘ 또는 →", "guide": "구체적 연출 방법 (한국어)" }
+  ],
+  "tips": ["실전 팁 1 (한국어)", "..."]
 }`;
 
   const res = await fetch('/api/gemini', {
@@ -1412,43 +1466,191 @@ ${scriptText}
   return JSON.parse(m[0]);
 }
 
+// ─── Firestore studyGuide 저장/로드 ───────────────────────────────────────
+async function _saveGuideToFirestore(scriptId, langCode, guide) {
+  if (!_db) return;
+  try {
+    await _db.collection('scripts').doc(scriptId).collection('studyGuide').doc(langCode).set(guide);
+  } catch (e) { console.warn('[가이드 저장 실패]', e.message); }
+}
+
+async function _loadGuideFromFirestore(scriptId, langCode) {
+  if (!_db) return null;
+  try {
+    const snap = await _db.collection('scripts').doc(scriptId).collection('studyGuide').doc(langCode).get();
+    return snap.exists ? snap.data() : null;
+  } catch (e) { console.warn('[가이드 로드 실패]', e.message); return null; }
+}
+
+// ─── 끊어읽기 텍스트 색상 변환 ────────────────────────────────────────────
+function _colorizeBreakText(text) {
+  const esc = s => escHtml(String(s || ''));
+  // ,(반박자) → 초록, |(한박자) → 파랑
+  return esc(text)
+    .replace(/,\(반박자\)/g, '<span class="sg-bp-short">,<small>(반박자)</small></span>')
+    .replace(/\|\(한박자\)/g, '<span class="sg-bp-long">|<small>(한박자)</small></span>')
+    .replace(/,/g, '<span class="sg-bp-short">,</span>')
+    .replace(/\|/g, '<span class="sg-bp-long">|</span>');
+}
+
+// ─── 편집 모드 저장 처리 ───────────────────────────────────────────────────
+async function _saveEditedGuide() {
+  const s = state.currentScript;
+  if (!s) return;
+  const lang = state.selectedLang;
+  const cacheKey = `${s.id}_${lang}`;
+  const guide = _studyGuideCache[cacheKey];
+  if (!guide) return;
+
+  // summary
+  const sumEl = document.querySelector('.sg-edit-summary');
+  if (sumEl) guide.summary = sumEl.value.trim();
+  // breakPoints
+  const bpEls = document.querySelectorAll('.sg-edit-bp');
+  if (bpEls.length) guide.breakPoints = Array.from(bpEls).map(t => t.value.trim()).filter(Boolean);
+  // emphasisWords
+  const ewEl = document.querySelector('.sg-edit-ew');
+  if (ewEl) guide.emphasisWords = ewEl.value.split(',').map(w => w.trim()).filter(Boolean);
+  // speedGuide
+  const sgEl = document.querySelector('.sg-edit-speed');
+  if (sgEl) guide.speedGuide = sgEl.value.trim();
+  // intonationGuide
+  const igEl = document.querySelector('.sg-edit-inton');
+  if (igEl) guide.intonationGuide = igEl.value.trim();
+  // intonationDetails
+  document.querySelectorAll('.sg-edit-id-guide').forEach((el, i) => {
+    if (guide.intonationDetails?.[i]) guide.intonationDetails[i].guide = el.value.trim();
+  });
+  // tips
+  const tipEls = document.querySelectorAll('.sg-edit-tip');
+  if (tipEls.length) guide.tips = Array.from(tipEls).map(t => t.value.trim()).filter(Boolean);
+
+  _studyGuideCache[cacheKey] = guide;
+  await _saveGuideToFirestore(s.id, lang, guide);
+  _renderStudyGuide(guide);
+  showToast('저장 완료');
+}
+
+// ─── 가이드 렌더링 ─────────────────────────────────────────────────────────
 function _renderStudyGuide(guide) {
   const el = $('study-guide-result');
   const esc = s => escHtml(String(s || ''));
+  const admin = isEditUnlocked();
 
+  const editBtn = (sectionId) => admin
+    ? `<button class="sg-edit-btn" data-section="${sectionId}" onclick="_sgToggleEdit('${sectionId}')">✏️</button>`
+    : '';
+
+  // [2] 끊어읽기 — , | 색상 구분 + 범례
   const breakPointsHtml = (guide.breakPoints?.length)
-    ? `<div class="sg-section">
-        <div class="sg-section-title">끊어읽기 포인트</div>
-        ${guide.breakPoints.map(b => `<div class="sg-break-item"><span class="sg-break-pipe">|</span><span>${esc(b)}</span></div>`).join('')}
+    ? `<div class="sg-section" id="sg-sec-break">
+        <div class="sg-section-header">
+          <span class="sg-section-title">끊어읽기 포인트</span>${editBtn('break')}
+        </div>
+        <div class="sg-bp-legend"><span class="sg-bp-short">,(반박자)</span> 짧게 쉬기&nbsp;&nbsp;<span class="sg-bp-long">|(한박자)</span> 충분히 쉬기</div>
+        <div id="sg-body-break">
+          ${guide.breakPoints.map(b => `<div class="sg-break-item">${_colorizeBreakText(b)}</div>`).join('')}
+        </div>
        </div>` : '';
 
   const emphasisHtml = (guide.emphasisWords?.length)
-    ? `<div class="sg-section">
-        <div class="sg-section-title">강조 단어</div>
-        <div class="sg-emphasis-wrap">${guide.emphasisWords.map(w => `<span class="sg-emphasis-badge">${esc(w)}</span>`).join('')}</div>
+    ? `<div class="sg-section" id="sg-sec-emphasis">
+        <div class="sg-section-header">
+          <span class="sg-section-title">강조 단어</span>${editBtn('emphasis')}
+        </div>
+        <div id="sg-body-emphasis" class="sg-emphasis-wrap">${guide.emphasisWords.map(w => `<span class="sg-emphasis-badge">${esc(w)}</span>`).join('')}</div>
        </div>` : '';
 
-  const speedIntonHtml = (guide.speedGuide || guide.intonationGuide)
-    ? `<div class="sg-section">
-        <div class="sg-section-title">속도 & 억양</div>
-        ${guide.speedGuide ? `<div class="sg-speed-row">🐢 속도: ${esc(guide.speedGuide)}</div>` : ''}
-        ${guide.intonationGuide ? `<div class="sg-intonation-row">↗↘ 억양: ${esc(guide.intonationGuide)}</div>` : ''}
+  // [3] 억양 — intonationDetails 표시
+  const intonDetailHtml = (guide.intonationDetails?.length)
+    ? guide.intonationDetails.map((d, i) =>
+        `<div class="sg-inton-detail">
+          <span class="sg-inton-symbol sg-inton-${d.direction || 'flat'}">${esc(d.symbol || '→')}</span>
+          <span class="sg-inton-phrase">${esc(d.phrase)}</span>
+          <span class="sg-inton-guide">— ${esc(d.guide)}</span>
+        </div>`
+      ).join('') : '';
+
+  const speedIntonHtml = (guide.speedGuide || guide.intonationGuide || guide.intonationDetails?.length)
+    ? `<div class="sg-section" id="sg-sec-inton">
+        <div class="sg-section-header">
+          <span class="sg-section-title">속도 & 억양</span>${editBtn('inton')}
+        </div>
+        <div id="sg-body-inton">
+          ${guide.speedGuide ? `<div class="sg-speed-row">🐢 속도: ${esc(guide.speedGuide)}</div>` : ''}
+          ${guide.intonationGuide ? `<div class="sg-intonation-row">↗↘ 억양 개요: ${esc(guide.intonationGuide)}</div>` : ''}
+          ${intonDetailHtml ? `<div class="sg-inton-details">${intonDetailHtml}</div>` : ''}
+        </div>
        </div>` : '';
 
   const tipsHtml = (guide.tips?.length)
-    ? `<div class="sg-section">
-        <div class="sg-section-title">실전 팁</div>
-        ${guide.tips.map(t => `<div class="sg-tip-item">💡 ${esc(t)}</div>`).join('')}
+    ? `<div class="sg-section" id="sg-sec-tips">
+        <div class="sg-section-header">
+          <span class="sg-section-title">실전 팁</span>${editBtn('tips')}
+        </div>
+        <div id="sg-body-tips">
+          ${guide.tips.map(t => `<div class="sg-tip-item">💡 ${esc(t)}</div>`).join('')}
+        </div>
        </div>` : '';
 
+  const saveBtn = admin
+    ? `<button class="btn-primary sg-save-btn hidden" id="sg-save-btn" onclick="_saveEditedGuide()">💾 저장</button>` : '';
+
   el.innerHTML = `
-    ${guide.summary ? `<div class="sg-summary-card">${esc(guide.summary)}</div>` : ''}
+    ${guide.summary ? `<div class="sg-summary-card" id="sg-sec-summary">
+      <div class="sg-section-header" style="margin-bottom:4px">
+        <span></span>${editBtn('summary')}
+      </div>
+      <div id="sg-body-summary">${esc(guide.summary)}</div>
+    </div>` : ''}
     ${breakPointsHtml}
     ${emphasisHtml}
     ${speedIntonHtml}
     ${tipsHtml}
+    ${saveBtn}
   `;
   el.classList.remove('hidden');
+}
+
+// ─── 관리자 인라인 편집 토글 ──────────────────────────────────────────────
+function _sgToggleEdit(section) {
+  const cacheKey = `${state.currentScript?.id}_${state.selectedLang}`;
+  const guide = _studyGuideCache[cacheKey];
+  if (!guide) return;
+  const esc = s => escHtml(String(s || ''));
+  const body = $(`sg-body-${section}`);
+  if (!body) return;
+
+  if (body.querySelector('textarea, input')) {
+    // 이미 편집 중 → 보기 모드로 되돌리기
+    _renderStudyGuide(guide);
+    return;
+  }
+
+  let html = '';
+  if (section === 'break') {
+    html = (guide.breakPoints || []).map(b =>
+      `<textarea class="sg-edit-bp sg-edit-area">${esc(b)}</textarea>`).join('');
+  } else if (section === 'emphasis') {
+    html = `<input class="sg-edit-ew sg-edit-input" value="${esc((guide.emphasisWords || []).join(', '))}">
+            <div class="sg-edit-hint">쉼표(,)로 구분</div>`;
+  } else if (section === 'inton') {
+    html = `${guide.speedGuide !== undefined ? `<div class="sg-edit-label">속도</div><textarea class="sg-edit-speed sg-edit-area">${esc(guide.speedGuide)}</textarea>` : ''}
+            ${guide.intonationGuide !== undefined ? `<div class="sg-edit-label">억양 개요</div><textarea class="sg-edit-inton sg-edit-area">${esc(guide.intonationGuide)}</textarea>` : ''}
+            ${(guide.intonationDetails || []).map((d, i) =>
+              `<div class="sg-edit-label">${esc(d.symbol)} ${esc(d.phrase)}</div>
+               <textarea class="sg-edit-id-guide sg-edit-area" data-idx="${i}">${esc(d.guide)}</textarea>`
+            ).join('')}`;
+  } else if (section === 'tips') {
+    html = (guide.tips || []).map(t =>
+      `<textarea class="sg-edit-tip sg-edit-area">${esc(t)}</textarea>`).join('');
+  } else if (section === 'summary') {
+    html = `<textarea class="sg-edit-summary sg-edit-area">${esc(guide.summary)}</textarea>`;
+  }
+
+  body.innerHTML = html;
+  const saveBtn = $('sg-save-btn');
+  if (saveBtn) saveBtn.classList.remove('hidden');
 }
 
 // ===== DRILL MODE =====
@@ -3558,7 +3760,9 @@ document.addEventListener('DOMContentLoaded', () => {
       statusEl.classList.add('hidden');
       _renderStudyGuide(guide);
       guideBtn.textContent = '✅ 가이드 완성';
-      console.log('[완료] AI 학습 가이드 생성');
+      // Firestore 자동 저장 (실패해도 무시)
+      _saveGuideToFirestore(s.id, lang, guide);
+      console.log('[완료] AI 학습 가이드 생성 및 저장');
     } catch (e) {
       statusEl.textContent = '가이드 생성에 실패했습니다. 다시 시도해주세요.';
       statusEl.className = 'study-guide-error';

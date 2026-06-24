@@ -1855,27 +1855,68 @@ html, body {
   margin-top: 14px;
 }
 .sg-section { margin-top: 14px; }
+.sg-section-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .sg-section-title {
   font-size: 13px; font-weight: 700; color: var(--color-text-secondary);
-  margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px;
+  text-transform: uppercase; letter-spacing: .3px; flex: 1;
 }
+/* 편집 버튼 */
+.sg-edit-btn {
+  background: none; border: 1px solid var(--color-border); border-radius: 6px;
+  padding: 2px 7px; font-size: 12px; cursor: pointer; color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+.sg-edit-btn:hover { background: var(--color-surface); }
+.sg-edit-area {
+  width: 100%; min-height: 52px; padding: 7px 9px; margin: 4px 0;
+  border: 1.5px solid #6366f1; border-radius: 6px;
+  font-size: 13px; line-height: 1.5; resize: vertical; box-sizing: border-box;
+  font-family: inherit;
+}
+.sg-edit-input {
+  width: 100%; padding: 7px 9px; margin: 4px 0;
+  border: 1.5px solid #6366f1; border-radius: 6px;
+  font-size: 13px; box-sizing: border-box; font-family: inherit;
+}
+.sg-edit-hint { font-size: 11px; color: var(--color-text-secondary); margin-top: -2px; }
+.sg-edit-label { font-size: 12px; color: var(--color-text-secondary); margin-top: 6px; }
+.sg-save-btn { margin-top: 14px; width: 100%; }
+/* 끊어읽기 */
 .sg-break-item {
-  display: flex; align-items: flex-start; gap: 8px;
-  padding: 5px 0; font-size: 14px; line-height: 1.5; color: var(--color-text-primary);
+  padding: 5px 0; font-size: 14px; line-height: 1.8; color: var(--color-text-primary);
   border-bottom: 1px solid var(--color-border);
 }
 .sg-break-item:last-child { border-bottom: none; }
-.sg-break-pipe { color: #6366f1; font-weight: 700; flex-shrink: 0; }
+.sg-bp-short { color: #16a34a; font-weight: 700; }  /* ,(반박자) — 초록 */
+.sg-bp-long  { color: #2563eb; font-weight: 700; }  /* |(한박자) — 파랑 */
+.sg-bp-legend {
+  font-size: 12px; margin-bottom: 6px; display: flex; gap: 14px; flex-wrap: wrap;
+}
+/* 강조 단어 */
 .sg-emphasis-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
 .sg-emphasis-badge {
   background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa;
   border-radius: 20px; padding: 3px 12px;
   font-size: 13px; font-weight: 700;
 }
+/* 속도 & 억양 */
 .sg-speed-row, .sg-intonation-row {
   font-size: 14px; line-height: 1.6; padding: 4px 0;
   color: var(--color-text-primary);
 }
+.sg-inton-details { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.sg-inton-detail {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--color-border);
+}
+.sg-inton-detail:last-child { border-bottom: none; }
+.sg-inton-symbol { font-size: 17px; font-weight: 700; flex-shrink: 0; width: 24px; }
+.sg-inton-up   { color: #e11d48; }
+.sg-inton-down { color: #2563eb; }
+.sg-inton-flat { color: #64748b; }
+.sg-inton-phrase { font-weight: 600; color: var(--color-text-primary); }
+.sg-inton-guide { color: var(--color-text-secondary); font-size: 12px; }
+/* 팁 */
 .sg-tip-item {
   padding: 5px 0; font-size: 14px; line-height: 1.5;
   border-bottom: 1px solid var(--color-border);
