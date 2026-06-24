@@ -2998,28 +2998,71 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
 
   const sharedRules = `언어: ${langName} | ${gradeRule}
 
-[채점 전 필수 확인 — 문안 완주 여부]
-1. AI 인식 텍스트가 원문의 70% 이상 커버하는가?
-   - 원문 단어 수 대비 인식된 단어 수 비율 계산
-   - 70% 미만이면 유창성·문안숙지 항목 대폭 감점
-   - 50% 미만이면 전체 점수 60점 초과 불가
-2. 원문에 없는 내용이 인식되었는가?
-   - 전혀 다른 내용이 인식된 경우 심각한 오류로 판단
-   - 이 경우 missedKeywords에 '방송문과 다른 내용이 녹음되었습니다' 포함
-3. 방송이 중간에 끊겼는가?
-   - 원문 후반부가 인식되지 않으면 미완성 방송으로 판단
-   - 유창성·문안숙지에서 최소 3점 감점
+[채점 원칙 — 반드시 준수]
+당신은 실제 항공사 기내방송 평가 교관입니다.
+훈련 목적으로 정직하고 정교하게 채점합니다.
 
-[관대하게 처리할 항목 — 아래 경우에만 허용]
+점수 기준:
+90점↑: 실제 기내방송으로 즉시 사용 가능한 수준
+80~89: 전반적으로 좋으나 1-2가지 개선 필요
+70~79: 기본기는 있으나 여러 부분 보완 필요
+60~69: 상당한 연습이 필요한 수준
+60미만: 방송문 숙지부터 다시 시작 필요
+
+절대 금지:
+- 실제로 잘하지 않았는데 칭찬하는 것
+- 문안 미완주인데 높은 점수 부여
+- 발음/억양 문제가 있는데 우수 판정
+- 모호하거나 일반적인 피드백
+
+[문안 완주 체크 — 최우선 적용]
+채점 전 반드시:
+1. 원문 핵심 문장 수 vs AI 인식 문장 수 비교
+2. 완주율 계산:
+   - 90%↑: 정상 채점
+   - 70~89%: 유창성 문안숙지 -3점, 전체 -5점
+   - 50~69%: 유창성 문안숙지 -5점, 전체 60점 상한
+   - 50%미만: 전체 50점 상한,
+     유창성 feedback에 '방송문을 끝까지 완주하지 못했습니다' 명시
+3. 원문에 없는 내용 인식 시:
+   발음 feedback에 명시, missedKeywords에 '방송문과 다른 내용이 녹음되었습니다' 포함
+
+[카테고리 good 필드 작성 규칙]
+각 카테고리의 good 필드는 이 음성에서 실제로 확인된 경우에만 구체적으로 작성.
+아래 경우 반드시 "" 반환:
+- 발화량이 너무 적어 평가 불가
+- 억양이 단조로워 칭찬할 내용 없음
+- 발음 오류가 많음
+- 분위기/목소리가 기내방송 수준 미달
+절대 금지: '발화된 부분이 짧아 평가하기 어려웠습니다' 같은 내용을 good에 넣는 것
+
+[카테고리별 피드백 작성 기준]
+유창성:
+- 끊어읽기: 실제로 자연스러운 위치에서 끊었는지
+- 속도: 체감되는 빠름/느림 구체적으로
+- 문안숙지: 버벅임, 반복, 멈춤 횟수 언급
+- 말하는 듯한 연출: 낭독체 vs 대화체 구분
+
+분위기/목소리:
+- 발성이 실제로 안정적인지
+- 톤이 기내방송에 어울리는지
+- 미소 느낌이 실제로 있었는지
+- 평가 불가한 경우 good = "" 반환
+
+억양:
+- 문장 끝 어미 실제 처리 방식 명시 ('~니다'가 올라갔는지 내려갔는지)
+- 상향 반복 패턴 있으면 반드시 지적
+- 단조로운 경우 good = "" 반환
+
+발음:
+- STT에서 감지된 실제 오류만 지적
+- 오류가 없으면 good에 구체적으로 언급
+- '모든 단어를 정확히' 같은 막연한 칭찬 금지
+
+[허용 예외 사항]
 • [목적지][편명][공항] 등 변수 자리 단어 대체
 • 선택 문안 중 하나만 말한 경우
-• 같은 의미를 살짝 다르게 표현한 경우 (단, 원문 70% 이상 커버 시)
-
-[점수 기준 — 관대한 채점 금지, 실제 평가 수준 적용]
-• 방송문을 정확히 완주하고 자연스러운 경우: 75~85점
-• 일부 실수가 있지만 전반적으로 양호한 경우: 60~75점
-• 방송문을 완주하지 못하거나 크게 틀린 경우: 60점 미만
-• 원문과 전혀 다른 내용인 경우: 40점 이하
+• 같은 의미를 살짝 다르게 표현한 경우 (단, 완주율 70% 이상 시)
 
 ${criteria}
 ${cpText}
@@ -3036,25 +3079,29 @@ ${script}`;
     "fluency": {
       "score": 0-${maxFluency} 정수,
       "level": "우수" 또는 "보통" 또는 "노력필요",
-      "feedback": "이 음성에서 들은 구체적 근거를 포함한 잘된 점과 개선 방향 (2문장)",
+      "good": "이 음성에서 실제로 확인된 잘된 점 (없으면 빈 문자열 \\"\\")",
+      "feedback": "개선이 필요한 부분 구체적으로 (2문장, 어느 구간에서 어떤 문제인지 명시)",
       "practiceTip": "다음 연습에서 바로 해볼 수 있는 구체적 방법 1가지 (예: '○○ 구간을 읽을 때 의도적으로 0.5초 멈춰보세요')"
     },
     "atmosphere": {
       "score": 1-25 정수 (음성이 존재하는 한 반드시 1 이상),
       "level": "우수" 또는 "보통" 또는 "노력필요",
-      "feedback": "이 음성의 목소리·톤·분위기에 대한 구체적 관찰 (2문장)",
+      "good": "이 음성에서 실제로 확인된 잘된 점 (없으면 빈 문자열 \\"\\")",
+      "feedback": "개선이 필요한 목소리·톤·분위기 관찰 (2문장)",
       "practiceTip": "구체적 연습 방법 1가지"
     },
     "intonation": {
       "score": 0-25 정수,
       "level": "우수" 또는 "보통" 또는 "노력필요",
-      "feedback": "이 음성에서 들은 억양 특성에 대한 구체적 관찰 (2문장)",
+      "good": "이 음성에서 실제로 확인된 잘된 점 (없으면 빈 문자열 \\"\\")",
+      "feedback": "억양 개선이 필요한 부분 (문장 끝 처리 방식·단조로움 등 구체적으로, 2문장)",
       "practiceTip": "구체적 연습 방법 1가지 (예: '문장 끝 단어를 약간 낮춰 읽는 연습을 5번 반복하세요')"
     },
     "pronunciation": {
       "score": 0-${maxPron} 정수,
       "level": "우수" 또는 "보통" 또는 "노력필요",
-      "feedback": "이 음성에서 들은 발음 특성에 대한 구체적 관찰 (2문장)",
+      "good": "이 음성에서 실제로 확인된 잘된 점 (없으면 빈 문자열 \\"\\")",
+      "feedback": "발음 개선이 필요한 부분 구체적으로 (2문장)",
       "practiceTip": "구체적 발음 연습 방법 1가지",
       "details": ["실제 오류 예시만: '○○'를 '△△'처럼 발음했는데, '□□'로 연습하세요 (오류 없으면 빈 배열)"]
     }
@@ -3212,12 +3259,13 @@ function renderAiResult(ai, isAdmin) {
     const lvlCls = level === '우수' ? 'lvl-good' : level === '보통' ? 'lvl-mid' : 'lvl-low';
     const lvlEmoji = level === '우수' ? '🔥' : level === '보통' ? '✅' : '⚠️';
 
-    // 피드백 마침표 기준 분리
-    const fbSentences = (cat.feedback || '').split(/(?<=[.!?。])\s+/).filter(Boolean);
-    const fbGood    = fbSentences[0]
-      ? `<div class="ai-card-fb-row ai-card-fb-good"><span class="ai-card-fb-icon">✅</span><div><strong>잘된 점</strong><br>${escHtml(fbSentences[0])}</div></div>` : '';
-    const fbImprove = fbSentences[1]
-      ? `<div class="ai-card-fb-row ai-card-fb-improve"><span class="ai-card-fb-icon">📌</span><div><strong>개선 포인트</strong><br>${escHtml(fbSentences.slice(1).join(' '))}</div></div>` : '';
+    // good 필드 우선, 없으면 feedback 첫 문장 fallback (레거시 호환)
+    const goodText  = (cat.good && cat.good.trim()) ? cat.good.trim() : null;
+    const fbImproveText = cat.feedback?.trim() || null;
+    const fbGood    = goodText
+      ? `<div class="ai-card-fb-row ai-card-fb-good"><span class="ai-card-fb-icon">✅</span><div><strong>잘된 점</strong><br>${escHtml(goodText)}</div></div>` : '';
+    const fbImprove = fbImproveText
+      ? `<div class="ai-card-fb-row ai-card-fb-improve"><span class="ai-card-fb-icon">📌</span><div><strong>개선 포인트</strong><br>${escHtml(fbImproveText)}</div></div>` : '';
     const fbTip     = cat.practiceTip
       ? `<div class="ai-card-fb-row ai-card-fb-tip"><span class="ai-card-fb-icon">🎯</span><div><strong>다음 연습 목표</strong><br>${escHtml(cat.practiceTip)}</div></div>` : '';
     const pronDetails = (key === 'pronunciation' && cat.details?.length)
@@ -3252,9 +3300,15 @@ function renderAiResult(ai, isAdmin) {
           ? `<div class="ai-focus-method"><span class="ai-pm-label">💡 단계별 연습 방법</span> ${escHtml(ai.practiceMethod)}</div>` : ''}
       </div>` : '';
 
-  // 응원 카드
-  const encourageHtml = ai.encouragement
-    ? `<div class="ai-encourage-card">💪 ${escHtml(ai.encouragement)}</div>` : '';
+  // 응원 카드 — 점수별 색상 및 추가 메시지
+  let encourageHtml = '';
+  if (ai.encouragement) {
+    const encCls  = score >= 85 ? 'ai-encourage-green' : score >= 70 ? 'ai-encourage-blue' : 'ai-encourage-orange';
+    const encIcon = score >= 85 ? '✨' : score >= 70 ? '👍' : '💪';
+    const encExtra = score < 70
+      ? `<div class="ai-encourage-extra">노력하는 과정이 실력이 됩니다.<br>체크리스트를 다시 확인하고 연습해보세요!</div>` : '';
+    encourageHtml = `<div class="ai-encourage-card ${encCls}">${encIcon} ${escHtml(ai.encouragement)}${encExtra}</div>`;
+  }
 
   sec.innerHTML = `
     <div class="ai-result-heading">🤖 AI 상세 분석</div>
