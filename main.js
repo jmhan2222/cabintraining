@@ -170,6 +170,8 @@ function createModelVoicePlayer(containerId, opts = {}) {
     const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
     if (!url) { setAvailable(false); return; }
     _currentModelAudio = new Audio(url);
+    _currentModelAudio.setAttribute('playsinline', '');
+    window._modelAudioKeepAlive = _currentModelAudio; // 모바일 GC 방지
     _playerAudio = _currentModelAudio;
     attachHandlers();
     _currentModelAudio.play().catch(() => {});
@@ -205,6 +207,8 @@ function createModelVoicePlayer(containerId, opts = {}) {
       if (dur > 0) { scrub.max = dur; scrub.value = cur; }
       if (cur > 0 || dur > 0) timeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
       playBtn.textContent = _currentModelAudio.paused ? '▶ 재생' : '⏸ 일시정지';
+      _playerAudio = _currentModelAudio;
+      attachHandlers(); // 화면 전환 후 새 DOM에 이벤트 재등록 (모바일 scrubbar 유지)
       return;
     }
     const s = state.currentScript;
@@ -1159,7 +1163,9 @@ async function startRecording() {
   state.sourceNode = state.audioContext.createMediaStreamSource(state.stream);
   state.sourceNode.connect(state.analyser);
 
-  state.mediaRecorder = new MediaRecorder(state.stream);
+  const _recOpts = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? { mimeType: 'audio/webm;codecs=opus' } : {};
+  state.mediaRecorder = new MediaRecorder(state.stream, _recOpts);
   state.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) state.audioChunks.push(e.data); };
   state.mediaRecorder.start(100);
 
@@ -1299,8 +1305,11 @@ function stopRecording() {
   _startOverlayTimers();
 
   const finish = () => {
-    state.audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
+    const mimeType = state.mediaRecorder?.mimeType || 'audio/webm';
+    state.audioBlob = new Blob(state.audioChunks, { type: mimeType });
     _lastRecordingBlob = state.audioBlob;
+    if (_lastRecordingUrl) { URL.revokeObjectURL(_lastRecordingUrl); }
+    _lastRecordingUrl = URL.createObjectURL(_lastRecordingBlob);
     analyzeAndShow(duration);
   };
 
@@ -1690,11 +1699,13 @@ async function _drillStartRec() {
     _drill.chunks = [];
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     _drill.stream = stream;
-    const mr = new MediaRecorder(stream);
+    const _drillRecOpts = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? { mimeType: 'audio/webm;codecs=opus' } : {};
+    const mr = new MediaRecorder(stream, _drillRecOpts);
     _drill.mr = mr;
     mr.ondataavailable = e => { if (e.data.size > 0) _drill.chunks.push(e.data); };
     mr.onstop = () => {
-      _drill.myBlob = new Blob(_drill.chunks, { type: 'audio/webm' });
+      _drill.myBlob = new Blob(_drill.chunks, { type: mr.mimeType || 'audio/webm' });
       if (_drill.myAudioUrl) URL.revokeObjectURL(_drill.myAudioUrl);
       _drill.myAudioUrl = URL.createObjectURL(_drill.myBlob);
       // [1] 비교 화면은 0:00부터 새로 듣기 — currentTime만 초기화, 객체·src 유지
@@ -1812,6 +1823,7 @@ function _completeOverlay() {
 
 // ===== RESULT MODEL VOICE COMPARISON =====
 let _lastRecordingBlob = null;
+let _lastRecordingUrl  = null;
 let _cmp = { active: false, audio: null, timeout: null, myUrl: null };
 let _rvcModelAudio = null;   // 결과 화면 모델 음성 Audio 객체
 let _rvcMyAudio    = null;   // 결과 화면 내 녹음 Audio 객체
@@ -1863,6 +1875,7 @@ async function playModelVoice() {
   if (!url) { showToast('모델 음성 없음'); return; }
   if (_rvcModelAudio) { _rvcModelAudio.pause(); }
   _rvcModelAudio = new Audio(url);
+  _rvcModelAudio.setAttribute('playsinline', '');
   if (btn) btn.textContent = '⏸ 일시정지';
   _rvcAttachScrub(_rvcModelAudio, 'rvc-model-scrub', 'rvc-model-time', 'btn-play-model');
   _rvcModelAudio.play().catch(()=>{});
@@ -1879,15 +1892,16 @@ function playMyRecording() {
   if (_rvcMyAudio && _rvcMyAudio.paused) {
     _rvcMyAudio.play().catch(()=>{}); if (btn) btn.textContent = '⏸ 일시정지'; return;
   }
-  if (!_lastRecordingBlob) { showToast('녹음 파일 없음'); return; }
-  if (_cmp.myUrl) { URL.revokeObjectURL(_cmp.myUrl); }
-  const url = URL.createObjectURL(_lastRecordingBlob);
-  _cmp.myUrl = url;
-  _rvcMyAudio = new Audio(url);
+  if (!_lastRecordingUrl) { showToast('녹음 파일 없음'); return; }
+  _rvcMyAudio = new Audio(_lastRecordingUrl);
+  _rvcMyAudio.setAttribute('playsinline', '');
   if (btn) btn.textContent = '⏸ 일시정지';
   _rvcAttachScrub(_rvcMyAudio, 'rvc-my-scrub', 'rvc-my-time', 'btn-play-my');
   _rvcMyAudio.onended = () => { if (btn) btn.textContent = '▶ 재생'; };
-  _rvcMyAudio.play().catch(()=>{});
+  _rvcMyAudio.play().catch(e => {
+    console.error('[내음성] 재생 오류:', e);
+    showToast('재생 실패. 브라우저 설정을 확인해주세요.', 'error');
+  });
   console.log('[완료] 내 녹음 재생');
 }
 
@@ -1919,14 +1933,11 @@ function _cmpCycle() {
     _cmp.timeout = setTimeout(() => {
       if (!_cmp.active) return;
       $('compare-status-text').textContent = '🎤 내 녹음 재생 중...';
-      const myUrl = URL.createObjectURL(_lastRecordingBlob);
-      _cmp.myUrl = myUrl;
-      const b = new Audio(myUrl);
+      const b = new Audio(_lastRecordingUrl);
+      b.setAttribute('playsinline', '');
       _cmp.audio = b;
       b.play().catch(() => {});
       b.onended = () => {
-        URL.revokeObjectURL(myUrl);
-        _cmp.myUrl = null;
         if (!_cmp.active) return;
         _cmp.timeout = setTimeout(_cmpCycle, 1000);
       };
@@ -2987,15 +2998,28 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
 
   const sharedRules = `언어: ${langName} | ${gradeRule}
 
-[채점 시 관대하게 처리할 항목]
-• [목적지][편명][공항] 등 변수 자리 단어
-• 선택 문안 중 하나만 말한 경우
-• 같은 의미를 살짝 다르게 표현한 경우
+[채점 전 필수 확인 — 문안 완주 여부]
+1. AI 인식 텍스트가 원문의 70% 이상 커버하는가?
+   - 원문 단어 수 대비 인식된 단어 수 비율 계산
+   - 70% 미만이면 유창성·문안숙지 항목 대폭 감점
+   - 50% 미만이면 전체 점수 60점 초과 불가
+2. 원문에 없는 내용이 인식되었는가?
+   - 전혀 다른 내용이 인식된 경우 심각한 오류로 판단
+   - 이 경우 missedKeywords에 '방송문과 다른 내용이 녹음되었습니다' 포함
+3. 방송이 중간에 끊겼는가?
+   - 원문 후반부가 인식되지 않으면 미완성 방송으로 판단
+   - 유창성·문안숙지에서 최소 3점 감점
 
-[점수 기준]
-• 70점 = 전반적으로 무난한 방송 수준
-• 80점 = 자연스럽고 듣기 좋음
-• 90점 = 우수한 방송 수준
+[관대하게 처리할 항목 — 아래 경우에만 허용]
+• [목적지][편명][공항] 등 변수 자리 단어 대체
+• 선택 문안 중 하나만 말한 경우
+• 같은 의미를 살짝 다르게 표현한 경우 (단, 원문 70% 이상 커버 시)
+
+[점수 기준 — 관대한 채점 금지, 실제 평가 수준 적용]
+• 방송문을 정확히 완주하고 자연스러운 경우: 75~85점
+• 일부 실수가 있지만 전반적으로 양호한 경우: 60~75점
+• 방송문을 완주하지 못하거나 크게 틀린 경우: 60점 미만
+• 원문과 전혀 다른 내용인 경우: 40점 이하
 
 ${criteria}
 ${cpText}
@@ -3094,7 +3118,7 @@ ${sharedJson}`;
         model: 'gemini-2.5-flash',
         contents: [{
           parts: [
-            { inline_data: { mime_type: 'audio/webm', data: base64Audio } },
+            { inline_data: { mime_type: audioBlob.type || 'audio/webm', data: base64Audio } },
             { text: audioPrompt }
           ]
         }]
@@ -3151,9 +3175,7 @@ function renderAiResult(ai, isAdmin) {
   const gradeColor = isKoEn
     ? (grade === 'A' ? '#16a34a' : grade === 'B' ? '#2563eb' : grade === 'C' ? '#d97706' : '#dc2626')
     : (grade === 'PASS' ? '#16a34a' : '#dc2626');
-  const emojiGrade = isKoEn
-    ? (score >= 90 ? '✨ 훌륭해요' : score >= 75 ? '👍 잘했어요' : score >= 60 ? '🌱 성장 중' : '💪 더 연습해요')
-    : (score >= 85 ? '✨ 훌륭해요' : score >= 70 ? '👍 잘했어요' : score >= 55 ? '🌱 성장 중' : '💪 더 연습해요');
+  const emojiGrade = score >= 85 ? '✨ 잘하셨어요!' : score >= 70 ? '👍 계속 연습해요' : '💪 더 연습이 필요해요';
 
   const maxScores = isJaCa
     ? { fluency: 25, atmosphere: 25, intonation: 25, pronunciation: 25 }
@@ -3173,8 +3195,8 @@ function renderAiResult(ai, isAdmin) {
       ${isAdmin ? `<span class="ai-score-chip">${score}점</span>` : ''}
     </div>`;
 
-  // 잘한 점 박스
-  const goodPointsHtml = ai.goodPoints?.length
+  // 잘한 점 박스 — 70점 미만 미완주 시 숨김
+  const goodPointsHtml = (ai.goodPoints?.length && score >= 70)
     ? `<div class="ai-good-points-box">
         <div class="ai-good-points-label">👏 잘하셨어요!</div>
         ${ai.goodPoints.map(p => `<div class="ai-good-point-item">✓ ${escHtml(p)}</div>`).join('')}
@@ -3216,7 +3238,8 @@ function renderAiResult(ai, isAdmin) {
   // 누락 키워드
   const missedHtml = ai.missedKeywords?.length
     ? `<div class="ai-missed-box">
-        <div class="ai-missed-label">⚠️ 누락된 핵심 키워드</div>
+        <div class="ai-missed-label">⚠️ 누락된 핵심 내용</div>
+        <div class="ai-missed-subtitle">아래 내용이 방송에 포함되지 않았습니다</div>
         <div class="ai-missed-list">${ai.missedKeywords.map(k => `<span class="ai-missed-item">${escHtml(k)}</span>`).join('')}</div>
       </div>` : '';
 
@@ -3864,7 +3887,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('btn-drill-record').addEventListener('click', _drillStartRec);
   $('btn-drill-play-my').addEventListener('click', () => {
-    if (_drill.myAudioUrl) new Audio(_drill.myAudioUrl).play().catch(() => {});
+    if (!_drill.myAudioUrl) return;
+    const a = new Audio(_drill.myAudioUrl);
+    a.setAttribute('playsinline', '');
+    a.play().catch(e => { console.error('[드릴] 내음성 재생 오류:', e); showToast('음성 재생에 실패했습니다.', 'error'); });
   });
   $('btn-drill-redo').addEventListener('click', () => {
     if (_drill.myAudioUrl) { URL.revokeObjectURL(_drill.myAudioUrl); _drill.myAudioUrl = null; }

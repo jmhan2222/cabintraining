@@ -1623,10 +1623,11 @@ html, body {
 .ai-pron-detail-item { font-size: 12px; color: var(--color-primary); background: #EEF2FF; border-radius: var(--radius-sm); padding: 5px 10px; line-height: 1.5; }
 
 /* 누락 키워드 */
-.ai-missed-box   { background: #fff7ed; border: 1.5px solid #fed7aa; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 14px; }
-.ai-missed-label { font-size: 12px; font-weight: 700; color: #c2410c; margin-bottom: 6px; }
-.ai-missed-list  { display: flex; flex-wrap: wrap; gap: 6px; }
-.ai-missed-item  { background: #fee2e2; color: #9f1239; font-size: 12px; padding: 3px 9px; border-radius: 6px; }
+.ai-missed-box      { background: #FFF0F0; border: 1.5px solid #fca5a5; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 14px; }
+.ai-missed-label    { font-size: 13px; font-weight: 800; color: #b91c1c; margin-bottom: 3px; }
+.ai-missed-subtitle { font-size: 11px; color: #9f1239; margin-bottom: 8px; }
+.ai-missed-list     { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-missed-item     { background: #fee2e2; color: #9f1239; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; border: 1px solid #fca5a5; }
 
 /* 다음 연습 핵심 목표 — 네이비+흰색+오렌지 왼쪽 border */
 .ai-next-focus-box {
