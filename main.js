@@ -1179,8 +1179,28 @@ function updatePrepContent() {
     caReadings: s?.caReadings
   });
 
-  if (_langCode === 'ja' || _langCode === 'ca') {
-    renderScriptForLang(s, _langCode, prepTextEl);
+  if (_langCode === 'ja') {
+    const readings = s?.jaReadings;
+    console.log('[ja readings]', readings?.length, readings?.[0]);
+    if (readings?.length > 0) {
+      prepTextEl.innerHTML = readings.map(item =>
+        `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
+        `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
+      ).join('');
+    } else {
+      prepTextEl.innerHTML = renderBilingualScript(lang.text, _langCode);
+    }
+  } else if (_langCode === 'ca') {
+    const readings = s?.caReadings;
+    console.log('[ca readings]', readings?.length, readings?.[0]);
+    if (readings?.length > 0) {
+      prepTextEl.innerHTML = readings.map(item =>
+        `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
+        `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
+      ).join('');
+    } else {
+      prepTextEl.innerHTML = renderBilingualScript(lang.text, _langCode);
+    }
   } else {
     prepTextEl.innerHTML = renderClickableScript(lang.text, _langCode);
   }
@@ -1931,24 +1951,35 @@ async function _loadChineseReadingsFromFirestore(scriptText, firestoreId, target
   }
 }
 
-// ─── 통합 독음 Firestore 로더 (jaReadings + caReadings + chineseReadings) ────
+// ─── 통합 독음 로더: MANUAL_READINGS 우선, Firestore가 있으면 덮어씀 ─────────
 async function _loadScriptReadings(firestoreId) {
   if (firestoreId in _scriptReadingsCache) return _scriptReadingsCache[firestoreId];
-  if (!_db) return null;
-  try {
-    const doc = await _db.collection('scripts').doc(firestoreId).get();
-    if (!doc.exists) { _scriptReadingsCache[firestoreId] = null; return null; }
-    const d = doc.data();
-    const r = {};
-    if (d.jaReadings?.length)      r.jaReadings      = d.jaReadings;
-    if (d.caReadings?.length)      r.caReadings      = d.caReadings;
-    if (d.chineseReadings?.length) r.chineseReadings = d.chineseReadings;
-    _scriptReadingsCache[firestoreId] = r;
-    return r;
-  } catch (e) {
-    console.warn('[독음 로드] Firestore 오류:', e.message);
-    return null;
+
+  // MANUAL_READINGS를 베이스로 세팅 (오프라인/Firestore 미연결 시에도 동작)
+  const manual = MANUAL_READINGS[firestoreId] || {};
+  const r = {};
+  if (manual.jaReadings?.length)      r.jaReadings      = manual.jaReadings;
+  if (manual.caReadings?.length)      r.caReadings      = manual.caReadings;
+  if (manual.chineseReadings?.length) r.chineseReadings = manual.chineseReadings;
+
+  if (_db) {
+    try {
+      const doc = await _db.collection('scripts').doc(firestoreId).get();
+      if (doc.exists) {
+        const d = doc.data();
+        // Firestore 데이터가 있으면 MANUAL_READINGS를 덮어씀
+        if (d.jaReadings?.length)      r.jaReadings      = d.jaReadings;
+        if (d.caReadings?.length)      r.caReadings      = d.caReadings;
+        if (d.chineseReadings?.length) r.chineseReadings = d.chineseReadings;
+      }
+    } catch (e) {
+      console.warn('[독음 로드] Firestore 오류:', e.message);
+    }
   }
+
+  const result = Object.keys(r).length ? r : null;
+  _scriptReadingsCache[firestoreId] = result;
+  return result;
 }
 
 // ─── 요소에 독음 비동기 적용 (ja: jaReadings / ca: caReadings → chineseReadings) ─
@@ -2003,14 +2034,41 @@ async function startStudyMode() {
     caReadings: s?.caReadings
   });
 
-  // ja/ca: script 객체에 이미 readings가 부착돼 있으면 즉시 렌더
-  if ((langCode === 'ja' || langCode === 'ca') && $('study-script-text')) {
-    renderScriptForLang(s, langCode, $('study-script-text'));
-    // 아직 readings 미로드면 비동기 부착 후 재렌더
-    if (!s.jaReadings && !s.caReadings && !s.chineseReadings) {
+  if (langCode === 'ja' && $('study-script-text')) {
+    const readings = s?.jaReadings;
+    console.log('[ja readings]', readings?.length, readings?.[0]);
+    if (readings?.length > 0) {
+      $('study-script-text').innerHTML = readings.map(item =>
+        `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
+        `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
+      ).join('');
+    } else {
+      $('study-script-text').innerHTML = renderBilingualScript(lang.text, langCode);
       _loadAndAttachReadings(s).then(() => {
-        if (state.currentScript === s && $('study-script-text')) {
-          renderScriptForLang(s, langCode, $('study-script-text'));
+        if (state.currentScript === s && $('study-script-text') && s.jaReadings?.length > 0) {
+          $('study-script-text').innerHTML = s.jaReadings.map(item =>
+            `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
+            `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
+          ).join('');
+        }
+      });
+    }
+  } else if (langCode === 'ca' && $('study-script-text')) {
+    const readings = s?.caReadings;
+    console.log('[ca readings]', readings?.length, readings?.[0]);
+    if (readings?.length > 0) {
+      $('study-script-text').innerHTML = readings.map(item =>
+        `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
+        `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
+      ).join('');
+    } else {
+      $('study-script-text').innerHTML = renderBilingualScript(lang.text, langCode);
+      _loadAndAttachReadings(s).then(() => {
+        if (state.currentScript === s && $('study-script-text') && s.caReadings?.length > 0) {
+          $('study-script-text').innerHTML = s.caReadings.map(item =>
+            `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
+            `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
+          ).join('');
         }
       });
     }
@@ -2154,23 +2212,49 @@ ${scriptText}
 
 중요: 방송문이 영어/일본어/중국어이더라도 학습 가이드(summary, breakPoints 설명, speedGuide, intonationGuide, tips)는 반드시 한국어로 작성하세요. 단, emphasisWords와 intonationDetails의 phrase, breakPoints의 실제 방송문 구간은 원어 그대로 표시하고 설명만 한국어로 작성하세요.
 
-끊어읽기 표시 규칙:
-breakPoints 배열에서 각 문장의 끊어읽기를 아래 기호로 표시하세요:
-- ,(반박자): 살짝 쉬는 곳 (쉼표 정도의 짧은 끊김)
-- |(한박자): 충분히 쉬는 곳 (숨 한 번 쉬는 긴 끊김)
-예시: '손님 여러분,| 보조배터리,(반박자) 전자담배,(반박자) 라이터는| 선반에 보관할 수 없으며,'
+끊어읽기 가이드 작성 규칙:
+1. 각 문장마다 끊어읽기 기호를 삽입한 텍스트를 text 필드에 제공
+   - ∙(반박자): 0.3초 짧게 쉬기 (쉼표 정도)
+   - /(한박자): 0.7초 충분히 쉬기 (숨 한 번)
+   예) '손님 여러분∙ 에어카페를/ 시작하겠습니다.'
+2. 기호가 삽입된 각 위치마다 marks 배열에 position·type·reason 포함
+   혼합 사용 시 각 기호의 위치와 이유를 개별 항목으로 설명
+3. 절대 금지: '끊어읽기가 필요합니다' 같은 막연한 표현
+
+억양 가이드 작성 규칙:
+1. 문장 전체가 아닌 구간별로 억양 방향 표시 (markedText에 ↗↘→ 기호 직접 삽입)
+   예) '구매를 원하는 분은↗ 승무원에게 말씀해 주세요.↘'
+2. 각 구간의 억양 이유를 segments 배열에 개별 설명
+3. 한국어 기준: 문장 끝 (~니다/~세요) 반드시 ↘, 나열 중간은 ↗, 강조 단어 앞 ↗
+4. 영어 기준: 내용어 강세 ↑, 평서문 끝 ↘, 나열 마지막 ↘
 
 ${langSpecific[langCode] || langSpecific.ko}
 
 반환 형식:
 {
   "summary": "이 방송문의 핵심 특징 1-2문장 (한국어)",
-  "breakPoints": ["방송문 구간에 , | 기호 표시 후 한국어 설명", "..."],
+  "breakPoints": [
+    {
+      "text": "방송문 구간에 ∙ / 기호 삽입 (원어)",
+      "marks": [
+        { "position": "기호 앞 단어/구 (원어)", "type": "half 또는 full", "reason": "이유 (한국어)" }
+      ]
+    }
+  ],
   "emphasisWords": ["강조할 단어/구1 (원어)", "..."],
   "speedGuide": "속도 가이드 (한국어)",
   "intonationGuide": "전체 억양 개요 (한국어)",
   "intonationDetails": [
-    { "phrase": "실제 방송문 구간 (원어)", "direction": "up 또는 down 또는 flat", "symbol": "↗ 또는 ↘ 또는 →", "guide": "구체적 연출 방법 (한국어)" }
+    {
+      "markedText": "방송문 구간에 ↗↘→ 기호 삽입 (원어)",
+      "phrase": "기호 없는 원문 구간 (원어)",
+      "direction": "up 또는 down 또는 flat 또는 mixed",
+      "symbol": "↗ 또는 ↘ 또는 → 또는 ↗↘",
+      "guide": "전체 연출 요약 (한국어)",
+      "segments": [
+        { "text": "구간 텍스트 (원어)", "direction": "up 또는 down 또는 flat", "reason": "이유 (한국어)" }
+      ]
+    }
   ],
   "tips": ["실전 팁 1 (한국어)", "..."],
   "chineseReadings": [{"original":"중국어 원문 줄","reading":"한글 독음"}]
@@ -2230,20 +2314,45 @@ async function _loadGuideFromFirestore(scriptId, langCode) {
 }
 
 // ─── 끊어읽기 텍스트 기호 변환 ────────────────────────────────────────────
-// ,(반박자) → ∙(가운데점)  |(한박자) → /(굵은 사선) — 둘 다 진한 주황
+// 신형: ∙(반박자→초록) /(한박자→파랑)  구형: ,(반박자) |(한박자) 호환
 function _colorizeBreakText(text) {
-  return escHtml(String(text || '')).replace(/,\(반박자\)|\|\(한박자\)|,|\|/g, m => {
+  return escHtml(String(text || '')).replace(/,\(반박자\)|\|\(한박자\)|∙|\/|,|\|/g, m => {
     if (m === ',(반박자)') return '<span class="sg-bp-short">∙<small>(반박자)</small></span>';
     if (m === '|(한박자)') return '<span class="sg-bp-long">/<small>(한박자)</small></span>';
+    if (m === '∙')         return '<span class="sg-bp-short">∙</span>';
+    if (m === '/')         return '<span class="sg-bp-long">/</span>';
     if (m === ',')         return '<span class="sg-bp-short">∙</span>';
     if (m === '|')         return '<span class="sg-bp-long">/</span>';
     return m;
   });
 }
 
-// ─── 끊어읽기 항목 렌더: 방송문 줄 / 가이드 줄 분리 ─────────────────────
-// 데이터 형식: "방송문(기호 포함) — 한국어 설명" 또는 줄바꿈 구분
+// ─── 억양 markedText 기호 착색 (↗→빨강, ↘→파랑, →→초록) ──────────────
+function _colorizeIntonText(text) {
+  return escHtml(String(text || '')).replace(/↗|↘|→/g, m => {
+    if (m === '↗') return '<sup class="sg-inton-arrow sg-inton-up">↗</sup>';
+    if (m === '↘') return '<sup class="sg-inton-arrow sg-inton-down">↘</sup>';
+    if (m === '→') return '<sup class="sg-inton-arrow sg-inton-flat">→</sup>';
+    return m;
+  });
+}
+
+// ─── 끊어읽기 항목 렌더 ───────────────────────────────────────────────────
+// 신형: { text, marks:[{position,type,reason}] }
+// 구형: "방송문 — 설명" 문자열 (하위 호환)
 function _renderBreakItem(b) {
+  // 신형 object 포맷
+  if (b && typeof b === 'object') {
+    const scriptHtml = _colorizeBreakText(b.text || '');
+    const marksHtml = (b.marks || []).map(m => {
+      const badge = m.type === 'half'
+        ? `<span class="sg-bp-short">∙ 반박자</span>`
+        : `<span class="sg-bp-long">/ 한박자</span>`;
+      return `<div class="break-guide-line">${badge} <strong>${escHtml(m.position)}</strong> — ${escHtml(m.reason)}</div>`;
+    }).join('');
+    return `<div class="break-script-line">${scriptHtml}</div>${marksHtml}`;
+  }
+  // 구형 string 포맷
   const text = String(b || '');
   let scriptPart = text;
   let guidePart  = '';
@@ -2276,9 +2385,13 @@ async function _saveEditedGuide() {
   // summary
   const sumEl = document.querySelector('.sg-edit-summary');
   if (sumEl) guide.summary = sumEl.value.trim();
-  // breakPoints
+  // breakPoints (object 또는 string 모두 처리)
   const bpEls = document.querySelectorAll('.sg-edit-bp');
-  if (bpEls.length) guide.breakPoints = Array.from(bpEls).map(t => t.value.trim()).filter(Boolean);
+  if (bpEls.length) guide.breakPoints = Array.from(bpEls).map(t => {
+    const val = t.value.trim();
+    if (!val) return null;
+    try { return JSON.parse(val); } catch (e) { return val; }
+  }).filter(Boolean);
   // emphasisWords
   const ewEl = document.querySelector('.sg-edit-ew');
   if (ewEl) guide.emphasisWords = ewEl.value.split(',').map(w => w.trim()).filter(Boolean);
@@ -2318,7 +2431,10 @@ function _renderStudyGuide(guide) {
         <div class="sg-section-header">
           <span class="sg-section-title">끊어읽기 포인트</span>${editBtn('break')}
         </div>
-        <div class="sg-bp-legend"><span class="sg-bp-short">∙(반박자)</span> 짧게 쉬기&nbsp;&nbsp;<span class="sg-bp-long">/(한박자)</span> 충분히 쉬기</div>
+        <div class="sg-bp-legend">
+          <span><span class="sg-bp-short">∙</span> 반박자 — 짧게 쉬기 (0.3초)</span>
+          <span><span class="sg-bp-long">/</span> 한박자 — 충분히 쉬기 (0.7초)</span>
+        </div>
         <div id="sg-body-break">
           ${guide.breakPoints.map(b => `<div class="sg-break-item">${_renderBreakItem(b)}</div>`).join('')}
         </div>
@@ -2332,19 +2448,42 @@ function _renderStudyGuide(guide) {
         <div id="sg-body-emphasis" class="sg-emphasis-wrap">${guide.emphasisWords.map(w => `<span class="sg-emphasis-badge">${esc(w)}</span>`).join('')}</div>
        </div>` : '';
 
-  // [3] 억양 — intonationDetails 표시 (기호 색상 + 2행 레이아웃)
+  // [3] 억양 — markedText+segments(신형) 또는 phrase+guide(구형) 렌더
   const _dirSymbol = { up: '↗', down: '↘', flat: '→' };
   const intonDetailHtml = (guide.intonationDetails?.length)
     ? guide.intonationDetails.map((d) => {
         const dir = d.direction || 'flat';
         const sym = d.symbol || _dirSymbol[dir] || '→';
-        return `<div class="sg-inton-detail">
-          <div class="sg-inton-detail-top">
-            <span class="sg-inton-symbol sg-inton-${dir}">${esc(sym)}</span>
-            <span class="sg-inton-phrase">${esc(d.phrase)}</span>
-          </div>
-          <span class="sg-inton-guide">${esc(d.guide)}</span>
-        </div>`;
+
+        // 신형: markedText (↗↘→ 기호 포함 텍스트)
+        const textRow = d.markedText
+          ? `<div class="sg-inton-marked-text">${_colorizeIntonText(d.markedText)}</div>`
+          : `<div class="sg-inton-detail-top">
+               <span class="sg-inton-symbol sg-inton-${dir}">${esc(sym)}</span>
+               <span class="sg-inton-phrase">${esc(d.phrase || '')}</span>
+             </div>`;
+
+        // 신형: segments 구간별 설명
+        const segmentsHtml = d.segments?.length
+          ? `<div class="sg-inton-segments">${d.segments.map(seg => {
+              const sd = seg.direction || 'flat';
+              const sa = _dirSymbol[sd] || '→';
+              return `<div class="sg-inton-segment">
+                <span class="sg-inton-symbol sg-inton-${sd}">${sa}</span>
+                <div class="sg-inton-seg-content">
+                  <span class="sg-inton-phrase">${esc(seg.text || '')}</span>
+                  <span class="sg-inton-guide">${esc(seg.reason || '')}</span>
+                </div>
+              </div>`;
+            }).join('')}</div>`
+          : (d.guide ? `<span class="sg-inton-guide">${esc(d.guide)}</span>` : '');
+
+        // segments + guide 둘 다 있으면 guide는 전체 요약으로
+        const overallGuide = d.segments?.length && d.guide
+          ? `<div class="sg-inton-overall-guide">💬 ${esc(d.guide)}</div>`
+          : '';
+
+        return `<div class="sg-inton-detail">${textRow}${segmentsHtml}${overallGuide}</div>`;
       }).join('') : '';
   console.log('[완료] 억양 표시 색상 및 레이아웃 강화');
 
@@ -2406,8 +2545,10 @@ function _sgToggleEdit(section) {
 
   let html = '';
   if (section === 'break') {
-    html = (guide.breakPoints || []).map(b =>
-      `<textarea class="sg-edit-bp sg-edit-area">${esc(b)}</textarea>`).join('');
+    html = (guide.breakPoints || []).map(b => {
+      const val = (b && typeof b === 'object') ? JSON.stringify(b, null, 2) : String(b || '');
+      return `<textarea class="sg-edit-bp sg-edit-area">${esc(val)}</textarea>`;
+    }).join('');
   } else if (section === 'emphasis') {
     html = `<input class="sg-edit-ew sg-edit-input" value="${esc((guide.emphasisWords || []).join(', '))}">
             <div class="sg-edit-hint">쉼표(,)로 구분</div>`;
@@ -2415,8 +2556,8 @@ function _sgToggleEdit(section) {
     html = `${guide.speedGuide !== undefined ? `<div class="sg-edit-label">속도</div><textarea class="sg-edit-speed sg-edit-area">${esc(guide.speedGuide)}</textarea>` : ''}
             ${guide.intonationGuide !== undefined ? `<div class="sg-edit-label">억양 개요</div><textarea class="sg-edit-inton sg-edit-area">${esc(guide.intonationGuide)}</textarea>` : ''}
             ${(guide.intonationDetails || []).map((d, i) =>
-              `<div class="sg-edit-label">${esc(d.symbol)} ${esc(d.phrase)}</div>
-               <textarea class="sg-edit-id-guide sg-edit-area" data-idx="${i}">${esc(d.guide)}</textarea>`
+              `<div class="sg-edit-label">${esc(d.symbol || '')} ${esc(d.markedText || d.phrase || '')}</div>
+               <textarea class="sg-edit-id-guide sg-edit-area" data-idx="${i}">${esc(d.guide || '')}</textarea>`
             ).join('')}`;
   } else if (section === 'tips') {
     html = (guide.tips || []).map(t =>
