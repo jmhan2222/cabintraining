@@ -568,6 +568,19 @@
         </div>
       </section>
 
+      <!-- 교범 독음 업로드 섹션 -->
+      <section class="admin-section">
+        <div class="admin-section-title">📚 교범 독음 업로드</div>
+        <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">
+          main.js의 <code>MANUAL_READINGS</code> 상수 데이터를 Firestore <code>scripts</code> 컬렉션에 일괄 업로드합니다.<br>
+          각 방송문 문서에 <code>jaReadings</code> / <code>caReadings</code> 필드가 추가됩니다.
+        </div>
+        <div class="admin-row-btns">
+          <button class="btn-primary" id="btn-admin-upload-readings" style="background:#0369a1">📚 교범 독음 업로드</button>
+        </div>
+        <div id="admin-upload-readings-status" style="margin-top:8px;font-size:13px"></div>
+      </section>
+
       <!-- 중국어 독음 관리 섹션 -->
       <section class="admin-section">
         <div class="admin-section-title">🈳 중국어 독음 관리 (관리자용)</div>

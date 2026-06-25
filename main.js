@@ -709,87 +709,87 @@ function renderScriptText(text) {
 }
 
 // ja·ca 독음(한글) + 원문 쌍 렌더링
-function renderBilingualScript(text, langCode) {
+// readings: [{reading, original}] 배열 전달 시 명시적 map 기반 렌더 (jaReadings/caReadings)
+function renderBilingualScript(text, langCode, readings = null) {
   if (langCode !== 'ja' && langCode !== 'ca') return renderScriptText(text);
 
-  const RS = 'margin:0;padding:0;line-height:1.3;font-size:11px;color:#AEAEB2;display:block';
-  const OS = 'margin:0 0 8px 0;padding:0;line-height:1.6;font-size:15px;display:block';
-  const rdiv = content => `<div class="bilingual-reading" style="${RS}">${content}</div>`;
-  const odiv = content => `<div class="bilingual-original" style="${OS}">${content}</div>`;
+  const RS  = 'margin:0;padding:0;line-height:1.3;font-size:11px;color:#AEAEB2;display:block';
+  const OS  = 'margin:0 0 8px 0;padding:0;line-height:1.6;font-size:15px;display:block';
+  const rdiv = c => `<div class="bilingual-reading" style="${RS}">${c}</div>`;
+  const odiv = c => `<div class="bilingual-original" style="${OS}">${c}</div>`;
+  const SEP  = '<div class="bilingual-sep" style="height:4px;margin:0;padding:0"></div>';
+  const PAIR = c => `<div class="bilingual-pair" style="margin:0;padding:0">${c}</div>`;
+  const hv   = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
+  const isSec = s => /^\[[^\]]+\]$/.test(s.trim()) && !/[぀-ヿ一-鿿]/.test(s);
 
-  // 중국어: 독음은 _loadChineseReadingsFromFirestore가 처리 → 여기선 원문만 표시
-  if (langCode === 'ca') {
-    const hv = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
+  // ── readings 배열 있으면 map 기반 렌더 (ja/ca 공통) ──────────────────────
+  if (readings?.length) {
+    const rMap = new Map(
+      readings.filter(r => r.original && r.reading).map(r => [r.original.trim(), r.reading.trim()])
+    );
     const html = text.split('\n').map(rawLine => {
       const line = rawLine.trim();
-      if (!line) return '<div class="bilingual-sep" style="height:4px;margin:0;padding:0"></div>';
-      return `<div class="bilingual-pair" style="margin:0;padding:0">${odiv(hv(line))}</div>`;
+      if (!line) return SEP;
+      if (isSec(line)) return `<div class="bilingual-header">${hv(line)}</div>`;
+      const r = rMap.get(line);
+      return PAIR((r ? rdiv(hv(r)) : '') + odiv(hv(line)));
+    }).join('');
+    console.log('[완료] 이중언어 렌더링 (readings 배열 기반)');
+    return `<div class="script-text-rendered">${html}</div>`;
+  }
+
+  // ── readings 없으면 텍스트 자동 판단 방식 ────────────────────────────────
+  const hasJapanese = s => /[぀-ヿ]/.test(s);
+  const hasKorean   = s => /[가-힣ㄱ-ㆎ]/.test(s);
+
+  // 중국어: readings 없으면 원문만 (독음은 _applyReadingsToElement가 비동기 적용)
+  if (langCode === 'ca') {
+    const html = text.split('\n').map(rawLine => {
+      const line = rawLine.trim();
+      if (!line) return SEP;
+      return PAIR(odiv(hv(line)));
     }).join('');
     console.log('[완료] 중국어 원문 초기 렌더 (독음은 별도 로드)');
     return `<div class="script-text-rendered">${html}</div>`;
   }
 
-  // 히라가나+가타카나만 (한자 제외) — 한자는 한중일 공통이라 제외
-  const hasJapanese  = s => /[぀-ヿ]/.test(s);
-  // 완성형 한글(AC00-D7A3) + 자모(3131-318E) 포함 여부
-  const hasKorean    = s => /[가-힣ㄱ-ㆎ]/.test(s);
-  const isSectionHeader = s => /^\[[^\]]+\]$/.test(s.trim()) && !hasJapanese(s);
-  const hv = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
-
+  // 일본어: 한글 독음 줄 + 일본어 원문 줄 짝 맞추기
   const lines = text.split('\n');
   lines.forEach((line, i) => {
     console.log(`[줄${i}]`, JSON.stringify(line.substring(0, 20)), 'Korean:', hasKorean(line), 'Japanese:', hasJapanese(line));
   });
-  let html = '';
 
-  // ja: 각 줄을 독립적으로 판단 — 한글 포함 → 독음, 히라가나 포함 → 원문
+  let html = '';
   let pendingReading = null;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
     if (!line) {
-      if (pendingReading !== null) {
-        html += `<div class="bilingual-pair" style="margin:0;padding:0">${rdiv(hv(pendingReading))}</div>`;
-        pendingReading = null;
-      }
-      html += '<div class="bilingual-sep" style="height:4px;margin:0;padding:0"></div>';
+      if (pendingReading !== null) { html += PAIR(rdiv(hv(pendingReading))); pendingReading = null; }
+      html += SEP;
       continue;
     }
-
-    if (isSectionHeader(line)) {
-      if (pendingReading !== null) {
-        html += `<div class="bilingual-pair" style="margin:0;padding:0">${rdiv(hv(pendingReading))}</div>`;
-        pendingReading = null;
-      }
+    if (isSec(line)) {
+      if (pendingReading !== null) { html += PAIR(rdiv(hv(pendingReading))); pendingReading = null; }
       html += `<div class="bilingual-header">${hv(line)}</div>`;
       continue;
     }
-
     if (hasKorean(line) && !hasJapanese(line)) {
-      if (pendingReading !== null) {
-        html += `<div class="bilingual-pair" style="margin:0;padding:0">${rdiv(hv(pendingReading))}</div>`;
-      }
+      if (pendingReading !== null) html += PAIR(rdiv(hv(pendingReading)));
       pendingReading = line;
     } else if (hasJapanese(line)) {
       if (pendingReading !== null) {
-        html += `<div class="bilingual-pair" style="margin:0;padding:0">${rdiv(hv(pendingReading))}${odiv(hv(line))}</div>`;
+        html += PAIR(rdiv(hv(pendingReading)) + odiv(hv(line)));
         pendingReading = null;
       } else {
-        html += `<div class="bilingual-pair" style="margin:0;padding:0">${odiv(hv(line))}</div>`;
+        html += PAIR(odiv(hv(line)));
       }
     } else {
-      if (pendingReading !== null) {
-        html += `<div class="bilingual-pair" style="margin:0;padding:0">${rdiv(hv(pendingReading))}</div>`;
-        pendingReading = null;
-      }
-      html += `<div class="bilingual-pair" style="margin:0;padding:0">${odiv(hv(line))}</div>`;
+      if (pendingReading !== null) { html += PAIR(rdiv(hv(pendingReading))); pendingReading = null; }
+      html += PAIR(odiv(hv(line)));
     }
   }
-
-  if (pendingReading !== null) {
-    html += `<div class="bilingual-pair" style="margin:0;padding:0">${rdiv(hv(pendingReading))}</div>`;
-  }
+  if (pendingReading !== null) html += PAIR(rdiv(hv(pendingReading)));
 
   console.log('[완료] 이중언어 방송문 렌더링 (자동 판단 방식)');
   return `<div class="script-text-rendered">${html}</div>`;
@@ -1135,14 +1135,10 @@ function updatePrepContent() {
 
   const prepTextEl = $('prep-text');
   if (state.selectedLang === 'ja' || state.selectedLang === 'ca') {
-    // ja/ca: 이중언어 렌더 (원문만 먼저)
+    // 원문 즉시 렌더 후 독음 비동기 로드
     prepTextEl.innerHTML = renderBilingualScript(lang.text, state.selectedLang);
-    // ca: Firestore 저장 독음만 사용 (Gemini API 자동 호출 제거)
-    if (state.selectedLang === 'ca') {
-      const caText = lang.text;
-      const firestoreId = s.id.replace(/\./g, '-');
-      _loadChineseReadingsFromFirestore(caText, firestoreId, prepTextEl);
-    }
+    const firestoreId = s.id.replace(/\./g, '-');
+    _applyReadingsToElement(lang.text, state.selectedLang, firestoreId, prepTextEl);
   } else {
     prepTextEl.innerHTML = renderClickableScript(lang.text, state.selectedLang);
   }
@@ -1401,8 +1397,24 @@ function tierScore(ratio, maxPt) {
 }
 
 // ===== STUDY MODE =====
-const _studyGuideCache = {};   // key: `${scriptId}_${lang}`
-const _readingsCache   = {};   // key: `${scriptId}_ca_readings`
+const _studyGuideCache    = {};  // key: `${scriptId}_${lang}`
+const _readingsCache      = {};  // key: `${scriptId}_ca_readings`
+const _scriptReadingsCache = {}; // key: firestoreId → { jaReadings, caReadings, chineseReadings }
+
+// ===== 교범 독음 데이터 (관리자 업로드용) =====
+// "2-1-1" 형식 Firestore 문서 ID → jaReadings / caReadings 배열
+// 각 항목: { reading: "한글독음", original: "원문줄" }
+const MANUAL_READINGS = {
+  // 예시 (실제 데이터로 교체):
+  // "2-1-1": {
+  //   jaReadings: [
+  //     { reading: "레이디스 앤 젠틀맨", original: "ご搭乗の皆様、" }
+  //   ],
+  //   caReadings: [
+  //     { reading: "뉘스먼 셴셩먼", original: "女士们、先生们，" }
+  //   ]
+  // }
+};
 
 // ─── 학습 화면 방송문 텍스트 렌더 ─────────────────────────────────────────
 // ja/ca: renderBilingualScript 활용 | ko/en: 빈 줄 압축 + 줄 단위 div 렌더
@@ -1488,6 +1500,47 @@ async function _loadChineseReadingsFromFirestore(scriptText, firestoreId, target
     }
   } catch (e) {
     console.warn('[중국어독음] Firestore 로드 실패:', e.message);
+  }
+}
+
+// ─── 통합 독음 Firestore 로더 (jaReadings + caReadings + chineseReadings) ────
+async function _loadScriptReadings(firestoreId) {
+  if (firestoreId in _scriptReadingsCache) return _scriptReadingsCache[firestoreId];
+  if (!_db) return null;
+  try {
+    const doc = await _db.collection('scripts').doc(firestoreId).get();
+    if (!doc.exists) { _scriptReadingsCache[firestoreId] = null; return null; }
+    const d = doc.data();
+    const r = {};
+    if (d.jaReadings?.length)      r.jaReadings      = d.jaReadings;
+    if (d.caReadings?.length)      r.caReadings      = d.caReadings;
+    if (d.chineseReadings?.length) r.chineseReadings = d.chineseReadings;
+    _scriptReadingsCache[firestoreId] = r;
+    return r;
+  } catch (e) {
+    console.warn('[독음 로드] Firestore 오류:', e.message);
+    return null;
+  }
+}
+
+// ─── 요소에 독음 비동기 적용 (ja: jaReadings / ca: caReadings → chineseReadings) ─
+async function _applyReadingsToElement(text, langCode, firestoreId, targetEl) {
+  const r = await _loadScriptReadings(firestoreId);
+  if (!r) return;
+
+  if (langCode === 'ja' && r.jaReadings?.length) {
+    targetEl.innerHTML = renderBilingualScript(text, 'ja', r.jaReadings);
+    console.log('[완료] 일본어 독음 표시 (jaReadings)');
+    return;
+  }
+
+  if (langCode === 'ca') {
+    const readings = r.caReadings?.length ? r.caReadings : r.chineseReadings;
+    if (readings?.length) {
+      _renderChineseScriptWithReadings(text, readings, targetEl);
+      _readingsCache[`${firestoreId}_ca_readings`] = readings; // 기존 캐시와 동기화
+      console.log('[완료] 중국어 독음 표시 (caReadings/chineseReadings)');
+    }
   }
 }
 
@@ -1579,15 +1632,12 @@ async function startStudyMode() {
 
   console.log('[study] langCode 확인:', langCode);
 
-  // 중국어: 가이드 생성과 무관하게 즉시 독음 자동 로드
-  if (langCode === 'ca') {
-    console.log('[study] 중국어 독음 로드 시작');
-    const scriptText = s.langs?.ca?.text || '';
-    const scriptId   = s.id || '';
-    if (scriptText && scriptId) {
-      _autoLoadChineseReadings(scriptText, scriptId);
-    } else {
-      console.warn('[study] ca 텍스트 또는 ID 없음', { scriptText: !!scriptText, scriptId });
+  // ja/ca: 독음 비동기 로드 (jaReadings / caReadings → chineseReadings 순)
+  if (langCode === 'ja' || langCode === 'ca') {
+    const el = $('study-script-text');
+    if (el && lang.text && s.id) {
+      const firestoreId = s.id.replace(/\./g, '-');
+      _applyReadingsToElement(lang.text, langCode, firestoreId, el);
     }
   }
 
@@ -3900,6 +3950,48 @@ async function generateAllChineseReadings() {
   }
 }
 
+// ===== 교범 독음 Firestore 일괄 업로드 (MANUAL_READINGS → jaReadings/caReadings) =====
+async function uploadManualReadings() {
+  if (!_db) { alert('Firebase 연결이 필요합니다.'); return; }
+  const keys = Object.keys(MANUAL_READINGS);
+  if (!keys.length) { alert('MANUAL_READINGS가 비어 있습니다. main.js에 데이터를 추가해주세요.'); return; }
+
+  const btn = $('btn-admin-upload-readings');
+  const statusEl = $('admin-upload-readings-status');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 업로드 중...'; }
+  if (statusEl) { statusEl.textContent = `⏳ 총 ${keys.length}개 업로드 준비 중...`; statusEl.style.color = '#6366f1'; }
+
+  let success = 0, fail = 0;
+  for (let i = 0; i < keys.length; i++) {
+    const docId = keys[i]; // "2-1-1" 형식 그대로 Firestore 문서 ID
+    const data  = MANUAL_READINGS[docId];
+    if (btn) btn.textContent = `⏳ ${i + 1}/${keys.length}`;
+    if (statusEl) statusEl.textContent = `⏳ ${i + 1}/${keys.length} 업로드 중: ${docId}`;
+
+    const payload = {};
+    if (data.jaReadings?.length) payload.jaReadings = data.jaReadings;
+    if (data.caReadings?.length) payload.caReadings = data.caReadings;
+    if (!Object.keys(payload).length) { console.warn('[교범독음] 데이터 없음 스킵:', docId); continue; }
+
+    try {
+      await _db.collection('scripts').doc(docId).set(payload, { merge: true });
+      // 메모리 캐시 갱신
+      _scriptReadingsCache[docId] = { ..._scriptReadingsCache[docId], ...payload };
+      success++;
+      console.log('[완료] 교범 독음 업로드:', docId, Object.keys(payload));
+    } catch (e) {
+      fail++;
+      console.error('[교범독음 업로드]', docId, '실패:', e.message);
+    }
+  }
+
+  const msg = `✅ ${success}개 완료${fail ? ` · ❌ ${fail}개 실패` : ''}`;
+  if (statusEl) { statusEl.textContent = msg; statusEl.style.color = fail ? '#dc2626' : '#16a34a'; }
+  if (btn) { btn.disabled = false; btn.textContent = '📚 교범 독음 업로드'; }
+  showToast('교범 독음 업로드 완료!', 3000);
+  console.log('[완료] 교범 독음 업로드:', success, '성공,', fail, '실패');
+}
+
 // ===== 관리자 중국어 독음 생성 (선택 방송문 단건) =====
 async function _adminGenerateChineseReadings() {
   const select = $('admin-cn-script');
@@ -4572,6 +4664,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===== 관리자 패널 =====
   $('btn-open-admin').addEventListener('click', openAdminScreen);
   $('btn-admin-back').addEventListener('click', () => { showScreen('screen-home'); loadAndRenderHome(); });
+  if ($('btn-admin-upload-readings')) $('btn-admin-upload-readings').addEventListener('click', () => requireEditAuth(uploadManualReadings));
   if ($('btn-admin-gen-cn-all')) $('btn-admin-gen-cn-all').addEventListener('click', () => requireEditAuth(generateAllChineseReadings));
   if ($('btn-admin-gen-cn-readings')) $('btn-admin-gen-cn-readings').addEventListener('click', () => requireEditAuth(_adminGenerateChineseReadings));
   if ($('btn-admin-scan-mv')) $('btn-admin-scan-mv').addEventListener('click', _scanLocalModelVoices);
