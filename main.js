@@ -1130,13 +1130,60 @@ function updatePrepContent() {
   if ($('prep-title-bar')) $('prep-title-bar').textContent = s.title;
 
   const prepTextEl = $('prep-text');
-  if (state.selectedLang === 'ja' || state.selectedLang === 'ca') {
-    // 원문 즉시 렌더 후 독음 비동기 로드
-    prepTextEl.innerHTML = renderBilingualScript(lang.text, state.selectedLang);
-    const firestoreId = s.id.replace(/\./g, '-');
-    _applyReadingsToElement(lang.text, state.selectedLang, firestoreId, prepTextEl);
+  const _langCode  = state.selectedLang;
+  const _fid       = s.id.replace(/\./g, '-');
+
+  console.log('[언어전환] langCode:', _langCode, '| firestoreId:', _fid);
+
+  if (_langCode === 'ja' || _langCode === 'ca') {
+    // 독음 렌더 헬퍼: caReadings → chineseReadings 우선순위
+    const _renderPrepReadings = (r) => {
+      if (!r) return false;
+      if (_langCode === 'ja' && r.jaReadings?.length) {
+        prepTextEl.innerHTML = renderBilingualScript(lang.text, 'ja', r.jaReadings);
+        console.log('[완료] 일본어 독음 표시 (준비 화면)', r.jaReadings.length, '항목');
+        return true;
+      }
+      if (_langCode === 'ca') {
+        if (r.caReadings?.length) {
+          prepTextEl.innerHTML = renderBilingualScript(lang.text, 'ca', r.caReadings);
+          console.log('[완료] 중국어 독음 표시 (준비 화면, caReadings)', r.caReadings.length, '항목');
+          return true;
+        }
+        if (r.chineseReadings?.length) {
+          _renderChineseScriptWithReadings(lang.text, r.chineseReadings, prepTextEl);
+          console.log('[완료] 중국어 독음 표시 (준비 화면, chineseReadings)', r.chineseReadings.length, '항목');
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // 1) 동기 캐시 우선 확인
+    const cached = _scriptReadingsCache[_fid];
+    const cacheStatus = _fid in _scriptReadingsCache
+      ? (cached ? Object.keys(cached).join(',') : 'null')
+      : '미캐시';
+    console.log('[언어전환] 캐시 상태:', cacheStatus);
+
+    if (_renderPrepReadings(cached)) {
+      // 캐시로 즉시 렌더 완료
+    } else {
+      // 2) 캐시 없음 → 원문 즉시 렌더 후 Firestore 비동기 로드
+      prepTextEl.innerHTML = renderBilingualScript(lang.text, _langCode);
+      console.log('[언어전환] Firestore 비동기 로드 시작');
+      const token = ++_prepRenderToken;
+      _loadScriptReadings(_fid).then(r => {
+        console.log('[언어전환] Firestore 로드 완료:', r ? Object.keys(r).join(',') : 'null');
+        if (_prepRenderToken !== token) {
+          console.log('[언어전환] 렌더 취소 (stale token)');
+          return;
+        }
+        _renderPrepReadings(r);
+      });
+    }
   } else {
-    prepTextEl.innerHTML = renderClickableScript(lang.text, state.selectedLang);
+    prepTextEl.innerHTML = renderClickableScript(lang.text, _langCode);
   }
 
   // 준비 화면 — 모델 음성 플레이어 제거됨, 드릴/학습은 각 화면에서 관리
@@ -1396,6 +1443,7 @@ function tierScore(ratio, maxPt) {
 const _studyGuideCache    = {};  // key: `${scriptId}_${lang}`
 const _readingsCache      = {};  // key: `${scriptId}_ca_readings`
 const _scriptReadingsCache = {}; // key: firestoreId → { jaReadings, caReadings, chineseReadings }
+let _prepRenderToken = 0;        // stale async 렌더 방지용 토큰
 
 // ===== 교범 독음 데이터 (관리자 업로드용) =====
 // "2-1-1" 형식 Firestore 문서 ID → jaReadings / caReadings 배열
@@ -1953,12 +2001,36 @@ async function startStudyMode() {
 
   console.log('[study] langCode 확인:', langCode);
 
-  // ja/ca: 독음 비동기 로드 (jaReadings / caReadings → chineseReadings 순)
+  // ja/ca: 독음 로드 (캐시 동기 우선 → 없으면 Firestore)
   if (langCode === 'ja' || langCode === 'ca') {
     const el = $('study-script-text');
     if (el && lang.text && s.id) {
       const firestoreId = s.id.replace(/\./g, '-');
-      _applyReadingsToElement(lang.text, langCode, firestoreId, el);
+      const _renderStudyReadings = (r) => {
+        if (!r) return false;
+        if (langCode === 'ja' && r.jaReadings?.length) {
+          el.innerHTML = renderBilingualScript(lang.text, 'ja', r.jaReadings);
+          console.log('[완료] 일본어 독음 표시 (학습 화면)', r.jaReadings.length, '항목');
+          return true;
+        }
+        if (langCode === 'ca') {
+          if (r.caReadings?.length) {
+            el.innerHTML = renderBilingualScript(lang.text, 'ca', r.caReadings);
+            console.log('[완료] 중국어 독음 표시 (학습 화면, caReadings)', r.caReadings.length, '항목');
+            return true;
+          }
+          if (r.chineseReadings?.length) {
+            _renderChineseScriptWithReadings(lang.text, r.chineseReadings, el);
+            console.log('[완료] 중국어 독음 표시 (학습 화면, chineseReadings)', r.chineseReadings.length, '항목');
+            return true;
+          }
+        }
+        return false;
+      };
+      const cached = _scriptReadingsCache[firestoreId];
+      if (!_renderStudyReadings(cached)) {
+        _loadScriptReadings(firestoreId).then(_renderStudyReadings);
+      }
     }
   }
 
