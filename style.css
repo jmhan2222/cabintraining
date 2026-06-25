@@ -1449,12 +1449,21 @@ html, body {
 #screen-prep { position: relative; }
 
 /* ===== BILINGUAL (JA 독음 + 원문) ===== */
-.bilingual-pair    { margin-bottom: 4px; }
-.bilingual-reading { font-size: 12px; color: var(--color-text-tertiary); line-height: 1.4; letter-spacing: 0.02em; margin-bottom: 2px; margin-top: 0; }
-.bilingual-original { font-size: 15px; color: var(--color-text-primary); line-height: 1.6; margin-top: 0; margin-bottom: 0; }
+.bilingual-pair    { margin: 0 !important; padding: 0 !important; }
+.bilingual-reading { font-size: 11px !important; color: #AEAEB2 !important; line-height: 1.3 !important; margin: 0 !important; padding: 0 !important; display: block !important; }
+.bilingual-original { font-size: 15px !important; color: #1D1D1F !important; line-height: 1.6 !important; margin: 0 0 8px 0 !important; padding: 0 !important; display: block !important; }
+.bilingual-group,
+.script-line-group { margin: 0 !important; padding: 0 !important; }
 .bilingual-header  { display: inline-block; font-size: 12px; font-weight: 700; color: var(--color-text-secondary);
                      background: var(--color-bg); border-radius: 5px; padding: 2px 8px; margin: 8px 0 4px; }
-.bilingual-sep     { height: 8px; }
+.bilingual-sep     { height: 4px !important; margin: 0 !important; padding: 0 !important; }
+.section-tag       { margin: 4px 0 !important; padding: 2px 6px !important; }
+#prep-text,
+#study-script-text { line-height: 1.6 !important; }
+#prep-text .bilingual-reading  { font-size: 11px !important; color: #AEAEB2 !important; line-height: 1.3 !important; margin: 0 !important; }
+#prep-text .bilingual-original { font-size: 15px !important; color: #1D1D1F !important; line-height: 1.6 !important; margin: 0 0 8px 0 !important; }
+#prep-text .bilingual-pair     { margin: 0 !important; }
+#prep-text .bilingual-sep      { height: 4px !important; margin: 0 !important; }
 
 /* ===== AI RESULT SECTION ===== */
 .ai-result-section { margin-top: 0; }
@@ -2156,33 +2165,15 @@ html, body {
   font-size: 15px; line-height: 1.8; margin-bottom: 8px; padding: 0;
 }
 .study-script-sep { height: 8px; margin-bottom: 0; }
-/* 이중 언어(ja/ca) 학습 화면 전용 오버라이드 — !important로 전역 스타일 완전 차단 */
-#study-script-text { line-height: 1.6 !important; }
-#study-script-text .bilingual-reading {
-  font-size: 12px !important;
-  color: #AEAEB2 !important;
-  line-height: 1.4 !important;
-  margin-bottom: 1px !important;
-  margin-top: 0 !important;
-}
-#study-script-text .bilingual-original {
-  font-size: 15px !important;
-  color: #1D1D1F !important;
-  line-height: 1.6 !important;
-  margin-bottom: 10px !important;
-  margin-top: 0 !important;
-}
-#study-script-text .bilingual-pair { margin-bottom: 0 !important; }
-#study-script-text .bilingual-sep  { height: 6px !important; margin: 0 !important; }
-/* 클래스 선택자 fallback (id 없는 경우 대비) */
-.study-script-text .bilingual-reading {
-  font-size: 12px; color: #AEAEB2; line-height: 1.4; margin-bottom: 1px; margin-top: 0;
-}
-.study-script-text .bilingual-original {
-  font-size: 15px; color: #1D1D1F; line-height: 1.6; margin-bottom: 10px; margin-top: 0;
-}
-.study-script-text .bilingual-pair { margin-bottom: 0; }
-.study-script-text .bilingual-sep  { height: 6px; }
+/* 이중 언어(ja/ca) 학습 화면 전용 오버라이드 */
+#study-script-text .bilingual-reading  { font-size: 11px !important; color: #AEAEB2 !important; line-height: 1.3 !important; margin: 0 !important; }
+#study-script-text .bilingual-original { font-size: 15px !important; color: #1D1D1F !important; line-height: 1.6 !important; margin: 0 0 8px 0 !important; }
+#study-script-text .bilingual-pair { margin: 0 !important; }
+#study-script-text .bilingual-sep  { height: 4px !important; margin: 0 !important; }
+.study-script-text .bilingual-reading  { font-size: 11px; color: #AEAEB2; line-height: 1.3; margin: 0; }
+.study-script-text .bilingual-original { font-size: 15px; color: #1D1D1F; line-height: 1.6; margin: 0 0 8px 0; }
+.study-script-text .bilingual-pair { margin: 0; }
+.study-script-text .bilingual-sep  { height: 4px; }
 /* 중국어 독음 로딩 인디케이터 */
 .cn-reading-loading {
   font-size: 12px; color: #8E8E93; text-align: center;

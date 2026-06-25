@@ -568,6 +568,31 @@
         </div>
       </section>
 
+      <!-- 중국어 독음 관리 섹션 -->
+      <section class="admin-section">
+        <div class="admin-section-title">🈳 중국어 독음 관리 (관리자용)</div>
+        <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">
+          아래에서 방송문을 선택하고 버튼을 누르면 Gemini로 한글 독음을 생성해 Firestore에 저장합니다.<br>
+          일반 사용자는 저장된 독음만 표시됩니다 (API 자동 호출 없음).
+        </div>
+        <div class="admin-row-btns" style="margin-bottom:10px">
+          <button class="btn-primary" id="btn-admin-gen-cn-all" style="background:#7c3aed">🈳 중국어 독음 전체 생성</button>
+        </div>
+        <div style="color:var(--gray-400);font-size:12px;margin-bottom:12px">독음 없는 방송문만 자동 필터링 후 순차 생성 (500ms 딜레이)</div>
+        <div style="border-top:1px solid var(--color-border);padding-top:12px;margin-top:4px">
+          <div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">단건 생성 (방송문 선택 후)</div>
+          <div class="admin-row-btns" style="margin-bottom:10px">
+            <select id="admin-cn-script" class="admin-input" style="flex:1;max-width:360px">
+              <option value="">-- 방송문 선택 --</option>
+            </select>
+          </div>
+          <div class="admin-row-btns">
+            <button class="btn-primary" id="btn-admin-gen-cn-readings" style="background:#dc2626">🈳 선택 방송문 독음 생성</button>
+          </div>
+        </div>
+        <div id="admin-cn-readings-status" style="margin-top:8px;font-size:13px"></div>
+      </section>
+
       <!-- 모델 음성 관리 섹션 -->
       <section class="admin-section">
         <div class="admin-section-title">🎙 모델 음성 관리</div>
