@@ -660,15 +660,14 @@ function splitSentences(text) {
 }
 
 function renderClickableScript(text, langCode) {
-  // 테이블 포함 스크립트는 기존 방식 유지
+  // ko/en: 단락 구분 렌더링
+  if (langCode !== 'ja' && langCode !== 'ca') return _renderKoEnText(text);
+  // ja/ca 테이블 포함: 기존 방식 유지
   if (text.includes('|')) return renderBilingualScript(text, langCode);
   const sentences = splitSentences(text);
   if (!sentences.length) return renderBilingualScript(text, langCode);
   return sentences.map((s, i) => {
-    const inner = (langCode === 'ja' || langCode === 'ca')
-      ? renderBilingualScript(s, langCode)
-      : escHtml(s);
-    return `<span class="script-sentence" data-idx="${i}">${inner}</span>`;
+    return `<span class="script-sentence" data-idx="${i}">${renderBilingualScript(s, langCode)}</span>`;
   }).join(' ');
 }
 
@@ -701,7 +700,11 @@ function _renderKoEnText(text) {
       tableRows.push(tr.slice(1,-1).split('|').map(c=>c.trim()));
     } else {
       flushTable();
-      html += escHtml(line) + '\n';
+      if (!tr) {
+        html += '<div style="height:8px"></div>';
+      } else {
+        html += `<p style="margin:0 0 8px 0;line-height:1.8;">${escHtml(tr)}</p>`;
+      }
     }
   }
   flushTable();
@@ -1140,7 +1143,7 @@ function renderScriptText(script, langCode, targetEl) {
   } else if (langCode === 'ja' || langCode === 'ca') {
     targetEl.innerHTML = renderBilingualScript(text, langCode);
   } else {
-    targetEl.innerHTML = renderClickableScript(text, langCode);
+    targetEl.innerHTML = _renderKoEnText(text);
   }
   console.log('[완료] renderScriptText 통일');
 }
@@ -3472,7 +3475,7 @@ async function openEditModal(id, source) {
 
 function closeCustomModal() { $('custom-modal').classList.add('hidden'); }
 
-function saveScriptFromModal() {
+async function saveScriptFromModal() {
   const title = document.getElementById('custom-title').value.trim();
   if (!title) { alert('방송 제목을 입력해 주세요.'); document.getElementById('custom-title').focus(); return; }
   const koText = document.getElementById('custom-text-ko').value.trim();
@@ -3546,12 +3549,15 @@ function saveScriptFromModal() {
         if (payload.caReadings) _builtinScript.caReadings = payload.caReadings;
       }
       if (Object.keys(payload).length) {
-        _db.collection('scripts').doc(firestoreId).set(payload, { merge: true })
-          .then(() => {
-            _scriptReadingsCache[firestoreId] = { ..._scriptReadingsCache[firestoreId], ...payload };
-            console.log('[완료] 독음 Firestore 저장:', firestoreId, Object.keys(payload));
-          })
-          .catch(e => console.warn('[독음 저장 실패]', firestoreId, e.message));
+        console.log('[저장] Firestore 저장 시작:', firestoreId);
+        try {
+          await _db.collection('scripts').doc(firestoreId).set(payload, { merge: true });
+          _scriptReadingsCache[firestoreId] = { ..._scriptReadingsCache[firestoreId], ...payload };
+          console.log('[저장] Firestore 저장 성공:', firestoreId);
+        } catch(e) {
+          console.error('[저장] Firestore 저장 실패:', e);
+          showToast('저장 실패: ' + e.message, 3000);
+        }
       }
     }
 
