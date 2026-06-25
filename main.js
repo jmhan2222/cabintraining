@@ -678,7 +678,7 @@ console.log('[완료] 문구 클릭 기능 제거');
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-function renderScriptText(text) {
+function _renderKoEnText(text) {
   const lines = text.split('\n');
   let html = '';
   let tableRows = [];
@@ -711,14 +711,12 @@ function renderScriptText(text) {
 // ja·ca 독음(한글) + 원문 쌍 렌더링
 // readings: [{reading, original}] 배열 전달 시 명시적 map 기반 렌더 (jaReadings/caReadings)
 function renderBilingualScript(text, langCode, readings = null) {
-  if (langCode !== 'ja' && langCode !== 'ca') return renderScriptText(text);
+  if (langCode !== 'ja' && langCode !== 'ca') return _renderKoEnText(text);
 
-  const RS  = 'margin:0;padding:0;line-height:1.3;font-size:11px;color:#AEAEB2;display:block';
-  const OS  = 'margin:0 0 8px 0;padding:0;line-height:1.6;font-size:15px;display:block';
-  const rdiv = c => `<div class="bilingual-reading" style="${RS}">${c}</div>`;
-  const odiv = c => `<div class="bilingual-original" style="${OS}">${c}</div>`;
-  const SEP  = '<div class="bilingual-sep" style="height:4px;margin:0;padding:0"></div>';
-  const PAIR = c => `<div class="bilingual-pair" style="margin:0;padding:0">${c}</div>`;
+  const rdiv = c => `<div class="bilingual-reading">${c}</div>`;
+  const odiv = c => `<div class="bilingual-original">${c}</div>`;
+  const SEP  = '<div class="bilingual-sep"></div>';
+  const PAIR = c => `<div class="bilingual-pair">${c}</div>`;
   const hv   = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
   const isSec = s => /^\[[^\]]+\]$/.test(s.trim()) && !/[぀-ヿ一-鿿]/.test(s);
 
@@ -1013,6 +1011,14 @@ function selectScript(id) {
   _renderDetailLangTabs(s);
   _renderDetailContent(s, _detailLang);
 
+  // readings 로드 후 재렌더 (다른 스크립트로 이동했으면 무시)
+  _loadAndAttachReadings(s).then(() => {
+    if (_selectedScriptId === id) {
+      renderScriptText(s, _detailLang, $('detail-script-box'));
+      console.log('[detail] readings 재렌더링 완료');
+    }
+  });
+
   // 모바일: 사이드바 닫기
   if (window.innerWidth <= 768) closeSidebar();
 }
@@ -1033,7 +1039,7 @@ function _renderDetailContent(s, lang) {
   const langData = s.langs[lang];
   if (!langData) return;
 
-  $('detail-script-box').innerHTML = renderBilingualScript(langData.text || '', lang);
+  renderScriptText(s, lang, $('detail-script-box'));
 
   // 체크포인트
   const cpEl = $('detail-checkpoints');
@@ -1120,6 +1126,25 @@ function renderScriptForLang(script, langCode, targetEl) {
   targetEl.innerHTML = renderBilingualScript(lang.text, langCode);
 }
 
+// ─── 통합 방송문 렌더링 함수: jaReadings/caReadings 우선, fallback은 renderBilingualScript ─
+function renderScriptText(script, langCode, targetEl) {
+  if (!targetEl) return;
+  const text = script?.langs?.[langCode]?.text || '';
+
+  if (langCode === 'ja' && script?.jaReadings?.length > 0) {
+    targetEl.innerHTML = renderBilingualScript(text, 'ja', script.jaReadings);
+  } else if (langCode === 'ca' && script?.caReadings?.length > 0) {
+    targetEl.innerHTML = renderBilingualScript(text, 'ca', script.caReadings);
+  } else if (langCode === 'ca' && script?.chineseReadings?.length > 0) {
+    _renderChineseScriptWithReadings(text, script.chineseReadings, targetEl);
+  } else if (langCode === 'ja' || langCode === 'ca') {
+    targetEl.innerHTML = renderBilingualScript(text, langCode);
+  } else {
+    targetEl.innerHTML = renderClickableScript(text, langCode);
+  }
+  console.log('[완료] renderScriptText 통일');
+}
+
 // ===== PREP =====
 function startPrep(script, lang) {
   state.currentScript = script;
@@ -1173,37 +1198,7 @@ function updatePrepContent() {
   const prepTextEl = $('prep-text');
   const _langCode  = state.selectedLang;
 
-  console.log('[readings확인]', {
-    id: s?.id,
-    jaReadings: s?.jaReadings,
-    caReadings: s?.caReadings
-  });
-
-  if (_langCode === 'ja') {
-    const readings = s?.jaReadings;
-    console.log('[ja readings]', readings?.length, readings?.[0]);
-    if (readings?.length > 0) {
-      prepTextEl.innerHTML = readings.map(item =>
-        `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
-        `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
-      ).join('');
-    } else {
-      prepTextEl.innerHTML = renderBilingualScript(lang.text, _langCode);
-    }
-  } else if (_langCode === 'ca') {
-    const readings = s?.caReadings;
-    console.log('[ca readings]', readings?.length, readings?.[0]);
-    if (readings?.length > 0) {
-      prepTextEl.innerHTML = readings.map(item =>
-        `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
-        `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
-      ).join('');
-    } else {
-      prepTextEl.innerHTML = renderBilingualScript(lang.text, _langCode);
-    }
-  } else {
-    prepTextEl.innerHTML = renderClickableScript(lang.text, _langCode);
-  }
+  renderScriptText(s, _langCode, prepTextEl);
 
   // 준비 화면 — 모델 음성 플레이어 제거됨, 드릴/학습은 각 화면에서 관리
 
@@ -1254,7 +1249,7 @@ async function startRecording() {
   $('record-title').textContent = `${state.currentScript.title} · ${{ ko:'한국어', en:'English', ja:'日本語', ca:'中文' }[state.selectedLang]}`;
   $('record-timer').textContent = '00:00';
   $('live-text').textContent = '말씀해 주세요...';
-  $('script-peek-text').innerHTML = renderBilingualScript(lang.text, state.selectedLang);
+  renderScriptText(state.currentScript, state.selectedLang, $('script-peek-text'));
   $('script-peek-text').classList.add('hidden');
   showScreen('screen-record');
 
@@ -1905,9 +1900,6 @@ function _renderChineseScriptWithReadings(text, chineseReadings, targetEl = null
   const hasCJK = s => /[一-鿿]/.test(s);
   const isSectionHeader = s => /^\[[^\]]+\]$/.test(s.trim()) && !hasCJK(s);
 
-  const RS = 'margin:0;padding:0;line-height:1.3;font-size:11px;color:#AEAEB2;display:block';
-  const OS = 'margin:0 0 8px 0;padding:0;line-height:1.6;font-size:15px;display:block';
-
   const readingMap = new Map();
   chineseReadings.forEach(r => {
     if (r.original && r.reading) readingMap.set(r.original.trim(), r.reading.trim());
@@ -1916,13 +1908,13 @@ function _renderChineseScriptWithReadings(text, chineseReadings, targetEl = null
   let html = '';
   for (const line of text.split('\n')) {
     const t = line.trim();
-    if (!t) { html += '<div class="bilingual-sep" style="height:4px;margin:0;padding:0"></div>'; continue; }
+    if (!t) { html += '<div class="bilingual-sep"></div>'; continue; }
     if (isSectionHeader(t)) { html += `<div class="bilingual-header">${escHtml(t)}</div>`; continue; }
     if (hasCJK(t)) {
       const reading = readingMap.get(t);
-      html += `<div class="bilingual-pair" style="margin:0;padding:0">${reading ? `<div class="bilingual-reading" style="${RS}">${escHtml(reading)}</div>` : ''}<div class="bilingual-original" style="${OS}">${escHtml(t)}</div></div>`;
+      html += `<div class="bilingual-pair">${reading ? `<div class="bilingual-reading">${escHtml(reading)}</div>` : ''}<div class="bilingual-original">${escHtml(t)}</div></div>`;
     } else {
-      html += `<div class="bilingual-pair" style="margin:0;padding:0"><div class="bilingual-original" style="${OS}">${escHtml(t)}</div></div>`;
+      html += `<div class="bilingual-pair"><div class="bilingual-original">${escHtml(t)}</div></div>`;
     }
   }
   el.innerHTML = `<div class="script-text-rendered">${html}</div>`;
@@ -2028,53 +2020,22 @@ async function startStudyMode() {
   $('study-title-bar').textContent = s.title;
   const langCode = state.selectedLang;
 
-  console.log('[readings확인]', {
-    id: s?.id,
-    jaReadings: s?.jaReadings,
-    caReadings: s?.caReadings
-  });
-
-  if (langCode === 'ja' && $('study-script-text')) {
-    const readings = s?.jaReadings;
-    console.log('[ja readings]', readings?.length, readings?.[0]);
+  if ((langCode === 'ja' || langCode === 'ca') && $('study-script-text')) {
+    const readings = langCode === 'ja' ? s?.jaReadings : s?.caReadings;
     if (readings?.length > 0) {
-      $('study-script-text').innerHTML = readings.map(item =>
-        `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
-        `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
-      ).join('');
+      renderScriptText(s, langCode, $('study-script-text'));
     } else {
       $('study-script-text').innerHTML = renderBilingualScript(lang.text, langCode);
       _loadAndAttachReadings(s).then(() => {
-        if (state.currentScript === s && $('study-script-text') && s.jaReadings?.length > 0) {
-          $('study-script-text').innerHTML = s.jaReadings.map(item =>
-            `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
-            `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
-          ).join('');
-        }
-      });
-    }
-  } else if (langCode === 'ca' && $('study-script-text')) {
-    const readings = s?.caReadings;
-    console.log('[ca readings]', readings?.length, readings?.[0]);
-    if (readings?.length > 0) {
-      $('study-script-text').innerHTML = readings.map(item =>
-        `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
-        `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
-      ).join('');
-    } else {
-      $('study-script-text').innerHTML = renderBilingualScript(lang.text, langCode);
-      _loadAndAttachReadings(s).then(() => {
-        if (state.currentScript === s && $('study-script-text') && s.caReadings?.length > 0) {
-          $('study-script-text').innerHTML = s.caReadings.map(item =>
-            `<div style="font-size:12px;color:#AEAEB2;margin:0 0 2px 0;line-height:1.4;">${escHtml(item.reading)}</div>` +
-            `<div style="font-size:15px;color:#1D1D1F;margin:0 0 10px 0;line-height:1.6;">${escHtml(item.original)}</div>`
-          ).join('');
+        if (state.currentScript === s && $('study-script-text')) {
+          renderScriptText(s, langCode, $('study-script-text'));
         }
       });
     }
   } else {
     _renderStudyScriptText(lang.text, langCode);
   }
+  console.log('[완료] renderScriptText 통일');
 
   ['M', 'F'].forEach(g => {
     const btn = $(`study-gender-${g.toLowerCase()}`);
@@ -3522,6 +3483,9 @@ function saveScriptFromModal() {
   const difficultyClass = { '기본':'', '중급':'medium', '고급':'hard' }[difficulty] || '';
   const cpStr = document.getElementById('custom-checkpoints-ko').value;
 
+  const _savedEditId = _modalState.editId;
+  console.log('[저장시작]', _savedEditId || '(새 방송문)');
+
   if (_modalState.mode === 'edit' && _modalState.editSource === 'builtin') {
     // 기본 방송문 편집 → override에 저장
     const base = _allScripts.find(s => s.id === _modalState.editId);
@@ -3543,9 +3507,19 @@ function saveScriptFromModal() {
     overrides[_modalState.editId] = { title, icon, difficulty, difficultyClass, langs: newLangs };
     saveOverrides(overrides);
 
+    // _allScripts 즉시 반영 (override 적용)
+    {
+      const _bIdx = _allScripts.findIndex(s => s.id === _modalState.editId);
+      if (_bIdx !== -1) {
+        const _eff = getEffectiveScript(_modalState.editId);
+        if (_eff) _allScripts[_bIdx] = _eff;
+      }
+    }
+
     // 독음 Firestore 저장 (jaReadings / caReadings 자동 생성)
     if (_db) {
       const firestoreId = _modalState.editId.replace(/\./g, '-');
+      const _builtinEditId = _modalState.editId;
       const payload = {};
       const jaText = document.getElementById('custom-text-ja')?.value.trim();
       const jaReadingText = document.getElementById('custom-reading-ja')?.value;
@@ -3564,6 +3538,12 @@ function saveScriptFromModal() {
         if (caLines.length && caReadingLines.length) {
           payload.caReadings = caLines.map((original, i) => ({ original, reading: caReadingLines[i] || '' }));
         }
+      }
+      // 낙관적 업데이트: Firestore 완료 전에 script 객체에 즉시 부착
+      const _builtinScript = _allScripts.find(s => s.id === _builtinEditId);
+      if (_builtinScript) {
+        if (payload.jaReadings) _builtinScript.jaReadings = payload.jaReadings;
+        if (payload.caReadings) _builtinScript.caReadings = payload.caReadings;
       }
       if (Object.keys(payload).length) {
         _db.collection('scripts').doc(firestoreId).set(payload, { merge: true })
@@ -3588,6 +3568,9 @@ function saveScriptFromModal() {
     });
     arr[idx] = { ...arr[idx], title, icon, difficulty, difficultyClass, langs };
     saveCustomScripts(arr);
+    // _allScripts 즉시 반영
+    const _cIdx = _allScripts.findIndex(s => s.id === _modalState.editId);
+    if (_cIdx !== -1) _allScripts[_cIdx] = arr[idx];
 
   } else {
     // 새 방송문 추가
@@ -3622,8 +3605,18 @@ function saveScriptFromModal() {
     saveCustomScripts(arr);
   }
 
+  // detail 패널 즉시 재렌더링 (편집 모드일 때만)
+  if (_modalState.mode === 'edit' && _savedEditId && _selectedScriptId === _savedEditId) {
+    const _updated = _allScripts.find(s => s.id === _savedEditId);
+    if (_updated) {
+      _renderDetailContent(_updated, _detailLang);
+      console.log('[저장완료] 캐시+화면 갱신:', _savedEditId);
+    }
+  }
+
   closeCustomModal();
   renderHome();
+  console.log('[저장완료]', _savedEditId || '(새 방송문)');
 }
 
 // PDF 파싱 결과 임시 저장 (import 시 활용)
@@ -4974,6 +4967,15 @@ document.addEventListener('DOMContentLoaded', () => {
       _detailLang = tab.dataset.lang;
       $('detail-lang-tabs').querySelectorAll('.detail-lang-tab').forEach(t => t.classList.toggle('active', t.dataset.lang===_detailLang));
       _renderDetailContent(s, _detailLang);
+      // readings 로드 후 재렌더 (탭/스크립트가 바뀌었으면 무시)
+      const capturedId = _selectedScriptId;
+      const capturedLang = _detailLang;
+      _loadAndAttachReadings(s).then(() => {
+        if (_selectedScriptId === capturedId && _detailLang === capturedLang) {
+          renderScriptText(s, capturedLang, $('detail-script-box'));
+          console.log('[detail] readings 재렌더링 완료');
+        }
+      });
     });
   });
 
