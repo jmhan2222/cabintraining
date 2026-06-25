@@ -841,6 +841,7 @@ async function loadAndRenderHome() {
   if (cached && cached.announcements && (Date.now()-cached.ts < 3600000)) {
     firestoreScripts = _mapAnnouncementsToScripts(cached.announcements);
     if ($('rev-badge')) $('rev-badge').textContent = cached.rev || 'OPIc 방식';
+    console.log('[초기로딩] 소스: localStorage cache, 방송문 수:', cached.announcements.length);
   } else if (initFirebase()) {
     try {
       const latest = await firestoreLoadLatest();
@@ -850,6 +851,7 @@ async function loadAndRenderHome() {
           rev: latest.revVersion, announcements: latest.announcements, ts: Date.now()
         }));
         if ($('rev-badge')) $('rev-badge').textContent = latest.revVersion || 'OPIc 방식';
+        console.log('[초기로딩] 소스: cabinManual/latest, 방송문 수:', latest.announcements.length);
       }
     } catch {}
   }
@@ -985,7 +987,7 @@ function _sidebarItemHtml(s) {
 
 function selectScript(id) {
   _selectedScriptId = id;
-  const s = _allScripts.find(x => x.id === id);
+  const s = getEffectiveScript(id);  // override 적용
   if (!s) return;
 
   // 사이드바 선택 표시
@@ -3559,7 +3561,33 @@ async function saveScriptFromModal() {
           showToast('저장 실패: ' + e.message, 3000);
         }
       }
+
+      // cabinManual/latest 내 해당 방송문도 업데이트 (새로고침 후에도 반영)
+      const capturedEditId = _modalState.editId;
+      try {
+        const latestDoc = await _db.collection('cabinManual').doc('latest').get();
+        if (latestDoc.exists) {
+          const announcements = latestDoc.data().announcements || [];
+          const aIdx = announcements.findIndex(a => (a.id || a.section) === capturedEditId);
+          if (aIdx !== -1) {
+            const a = { ...announcements[aIdx] };
+            if (newLangs.ko?.text) a.ko = newLangs.ko.text;
+            if (newLangs.en?.text) a.en = newLangs.en.text;
+            if (newLangs.ja?.text) a.ja = newLangs.ja.text;
+            if (newLangs.ca?.text) a.ca = newLangs.ca.text;
+            if (newLangs.ko?.checkpoints?.length) a.checkpoints = newLangs.ko.checkpoints;
+            announcements[aIdx] = a;
+            await _db.collection('cabinManual').doc('latest').update({ announcements });
+            console.log('[저장] cabinManual/latest 업데이트:', capturedEditId);
+          }
+        }
+      } catch(e) {
+        console.warn('[저장] cabinManual/latest 업데이트 실패:', e.message);
+      }
     }
+
+    // 로컬 캐시 무효화 (다음 로딩 시 Firestore 재조회)
+    localStorage.removeItem('cabinvoice_scripts_cache');
 
   } else if (_modalState.mode === 'edit' && _modalState.editSource === 'custom') {
     // 커스텀 방송문 편집 → 배열 내 수정
@@ -4968,7 +4996,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('detail-lang-tabs').querySelectorAll('.detail-lang-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       if (!_selectedScriptId) return;
-      const s = _allScripts.find(x => x.id === _selectedScriptId);
+      const s = getEffectiveScript(_selectedScriptId);
       if (!s || !s.langs[tab.dataset.lang]?.text) return;
       _detailLang = tab.dataset.lang;
       $('detail-lang-tabs').querySelectorAll('.detail-lang-tab').forEach(t => t.classList.toggle('active', t.dataset.lang===_detailLang));
@@ -4988,7 +5016,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 상세 패널 버튼들
   $('detail-start-btn').addEventListener('click', () => {
     if (!_selectedScriptId) return;
-    const s = _allScripts.find(x => x.id === _selectedScriptId);
+    const s = getEffectiveScript(_selectedScriptId);
     if (s) { state.selectedLang = _detailLang; startPrep(s, _detailLang); }
   });
   // detail-voice-btn 제거됨 — 모델 음성은 학습 화면(screen-study)에서 재생
