@@ -1933,73 +1933,6 @@ async function _applyReadingsToElement(text, langCode, firestoreId, targetEl) {
 }
 
 // ─── 중국어 독음 독립 API (가이드 생성과 독립적으로 즉시 호출) ──────────────
-async function generateChineseReadings(scriptText, scriptId) {
-  const cacheKey = `${scriptId}_ca_readings`;
-  if (_readingsCache[cacheKey]) return _readingsCache[cacheKey];
-
-  // Firestore에 저장된 readings 우선 확인
-  if (_db) {
-    try {
-      const snap = await _db.collection('scripts').doc(scriptId).get();
-      console.log('[중국어독음] Firestore 조회:', snap.exists, snap.data()?.chineseReadings?.length);
-      const saved = snap.exists ? snap.data()?.chineseReadings : null;
-      if (saved?.length) {
-        _readingsCache[cacheKey] = saved;
-        return saved;
-      }
-    } catch (e) { console.warn('[중국어독음] generateChineseReadings Firestore 오류:', e.message); }
-  }
-
-  const prompt = `아래 중국어 방송문의 각 문장(줄)에 한글 발음 독음을 달아줘.
-
-규칙:
-- 성조 번호 없이 한국어 화자가 읽기 쉬운 한국어 발음으로만 표기
-- 각 단어 사이 띄어쓰기 유지
-- 한자가 포함된 줄만 독음 처리 (빈 줄, 섹션 태그 제외)
-- 원문과 독음을 쌍으로 JSON 배열 반환
-
-반환 형식 (JSON 배열만, 설명 없이):
-[
-  {"original": "各位旅客，", "reading": "거웨이 뤼커,"},
-  {"original": "飞机遇有不稳定气流，", "reading": "페이지 위요우 부원딩 치리우,"}
-]
-
-중국어 방송문:
-${scriptText}`;
-
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(), 60000);
-  let readings = null;
-  try {
-    const res = await fetchWithRetry('/api/gemini', {
-      signal: controller.signal,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }] })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
-    console.log('[중국어독음] API raw:', raw?.substring(0, 300));
-    const m = raw.match(/\[[\s\S]*\]/);
-    if (m) readings = JSON.parse(m[0]);
-  } catch (e) {
-    console.warn('[중국어 독음] API 오류:', e.message);
-    return null;
-  } finally { clearTimeout(tid); }
-
-  if (readings?.length) {
-    _readingsCache[cacheKey] = readings;
-    // Firestore 캐싱 (실패 무시)
-    if (_db) {
-      _db.collection('scripts').doc(scriptId)
-        .set({ chineseReadings: readings }, { merge: true })
-        .catch(e => console.warn('[중국어 독음 저장 실패]', e.message));
-    }
-    console.log('[완료] 중국어 독음 생성 및 캐싱');
-  }
-  return readings;
-}
 
 // 중국어 독음 자동 로드 (Firestore 전용 — Gemini API 자동 호출 없음)
 async function _autoLoadChineseReadings(scriptText, scriptId) {
@@ -3282,6 +3215,10 @@ function _resetModal() {
     const ta = document.getElementById(`custom-text-${l}`);
     if (ta) ta.value = '';
   });
+  ['ja','ca'].forEach(l => {
+    const ra = document.getElementById(`custom-reading-${l}`);
+    if (ra) ra.value = '';
+  });
   document.getElementById('custom-checkpoints-ko').value = '';
   document.querySelectorAll('.modal-lang-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.modal-lang-panel').forEach(p => p.classList.remove('active'));
@@ -3318,7 +3255,7 @@ function openAddModal() {
 // 하위 호환성 alias
 const openCustomModal = openAddModal;
 
-function openEditModal(id, source) {
+async function openEditModal(id, source) {
   _modalState.mode = 'edit'; _modalState.editId = id; _modalState.editSource = source;
   _resetModal();
 
@@ -3326,7 +3263,6 @@ function openEditModal(id, source) {
   if (source === 'builtin') {
     script = getEffectiveScript(id);
     $('modal-title-text').textContent = '✏️ 기본 방송문 편집';
-    // 원본과 다를 경우 복원 버튼 표시
     const isModified = !!loadOverrides()[id];
     $('modal-restore').classList.toggle('hidden', !isModified);
   } else {
@@ -3360,6 +3296,20 @@ function openEditModal(id, source) {
   });
   $('modal-save').textContent = '수정 저장';
   $('custom-modal').classList.remove('hidden');
+
+  // builtin 스크립트: Firestore에서 독음 로드 후 textarea에 채우기
+  if (source === 'builtin') {
+    const firestoreId = id.replace(/\./g, '-');
+    const r = await _loadScriptReadings(firestoreId);
+    if (r?.jaReadings?.length) {
+      const raJa = document.getElementById('custom-reading-ja');
+      if (raJa) raJa.value = r.jaReadings.map(x => x.reading || '').join('\n');
+    }
+    if (r?.caReadings?.length) {
+      const raCa = document.getElementById('custom-reading-ca');
+      if (raCa) raCa.value = r.caReadings.map(x => x.reading || '').join('\n');
+    }
+  }
 }
 
 function closeCustomModal() { $('custom-modal').classList.add('hidden'); }
@@ -3395,6 +3345,38 @@ function saveScriptFromModal() {
     });
     overrides[_modalState.editId] = { title, icon, difficulty, difficultyClass, langs: newLangs };
     saveOverrides(overrides);
+
+    // 독음 Firestore 저장 (jaReadings / caReadings 자동 생성)
+    if (_db) {
+      const firestoreId = _modalState.editId.replace(/\./g, '-');
+      const payload = {};
+      const jaText = document.getElementById('custom-text-ja')?.value.trim();
+      const jaReadingText = document.getElementById('custom-reading-ja')?.value;
+      if (jaText && jaReadingText?.trim()) {
+        const jaLines = jaText.split('\n').filter(l => l.trim());
+        const jaReadingLines = jaReadingText.split('\n').filter(l => l.trim());
+        if (jaLines.length && jaReadingLines.length) {
+          payload.jaReadings = jaLines.map((original, i) => ({ original, reading: jaReadingLines[i] || '' }));
+        }
+      }
+      const caText = document.getElementById('custom-text-ca')?.value.trim();
+      const caReadingText = document.getElementById('custom-reading-ca')?.value;
+      if (caText && caReadingText?.trim()) {
+        const caLines = caText.split('\n').filter(l => l.trim());
+        const caReadingLines = caReadingText.split('\n').filter(l => l.trim());
+        if (caLines.length && caReadingLines.length) {
+          payload.caReadings = caLines.map((original, i) => ({ original, reading: caReadingLines[i] || '' }));
+        }
+      }
+      if (Object.keys(payload).length) {
+        _db.collection('scripts').doc(firestoreId).set(payload, { merge: true })
+          .then(() => {
+            _scriptReadingsCache[firestoreId] = { ..._scriptReadingsCache[firestoreId], ...payload };
+            console.log('[완료] 독음 Firestore 저장:', firestoreId, Object.keys(payload));
+          })
+          .catch(e => console.warn('[독음 저장 실패]', firestoreId, e.message));
+      }
+    }
 
   } else if (_modalState.mode === 'edit' && _modalState.editSource === 'custom') {
     // 커스텀 방송문 편집 → 배열 내 수정
@@ -4234,8 +4216,6 @@ function renderAiResult(ai, isAdmin) {
 }
 
 // ===== ADMIN =====
-let _adminParsedScripts = [];
-
 function openAdminScreen() {
   requireEditAuth(() => {
     initFirebase();
@@ -4274,99 +4254,43 @@ function _setupAdminMvSection() {
 }
 
 // ===== 관리자 중국어 독음 전체 일괄 생성 =====
-async function generateAllChineseReadings() {
+// ===== 교범 독음 JSON 파일 → Firestore 일괄 업로드 =====
+async function uploadReadingsJson() {
   if (!_db) { alert('Firebase 연결이 필요합니다.'); return; }
+  const fileInput = $('admin-readings-json-input');
+  const file = fileInput?.files?.[0];
+  if (!file) { alert('JSON 파일을 먼저 선택해주세요.'); return; }
 
-  const btn = $('btn-admin-gen-cn-all');
-  const statusEl = $('admin-cn-readings-status');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 확인 중...'; }
-  if (statusEl) { statusEl.textContent = '⏳ Firestore 독음 현황 확인 중...'; statusEl.style.color = '#6366f1'; }
-
+  let data;
   try {
-    const caScripts = _allScripts.filter(s => s.langs?.ca?.text);
-    if (!caScripts.length) { showToast('중국어 방송문이 없습니다.'); return; }
+    data = JSON.parse(await file.text());
+  } catch { alert('JSON 파싱 오류: 올바른 JSON 파일인지 확인해주세요.'); return; }
 
-    // Firestore에서 독음 없는 문서 필터링
-    const missing = [];
-    for (const s of caScripts) {
-      const firestoreId = s.id.replace(/\./g, '-');
-      const cacheKey = `${firestoreId}_ca_readings`;
-      if (_readingsCache[cacheKey]) continue;
-      try {
-        const doc = await _db.collection('scripts').doc(firestoreId).get();
-        if (!doc.exists || !doc.data()?.chineseReadings?.length) missing.push({ s, firestoreId });
-      } catch { missing.push({ s, firestoreId }); }
-    }
+  const keys = Object.keys(data);
+  if (!keys.length) { alert('JSON 데이터가 비어 있습니다.'); return; }
 
-    if (!missing.length) {
-      if (statusEl) { statusEl.textContent = `✅ 전체 ${caScripts.length}개 방송문 독음 이미 완료`; statusEl.style.color = '#16a34a'; }
-      showToast('모든 방송문에 독음이 이미 저장되어 있습니다.', 3000);
-      return;
-    }
-
-    showToast(`총 ${missing.length}개 방송문 독음 생성 시작`);
-    let success = 0, fail = 0;
-
-    for (let i = 0; i < missing.length; i++) {
-      const { s, firestoreId } = missing[i];
-      if (btn) btn.textContent = `⏳ ${i + 1}/${missing.length}`;
-      if (statusEl) { statusEl.textContent = `⏳ ${i + 1}/${missing.length} 처리 중: ${firestoreId}`; statusEl.style.color = '#6366f1'; }
-
-      try {
-        const readings = await generateChineseReadings(s.langs.ca.text, firestoreId);
-        if (readings?.length) {
-          success++;
-          console.log('[완료] 중국어 독음 전체 생성:', firestoreId, `(${readings.length}개)`);
-        } else {
-          fail++;
-          console.warn('[전체생성] readings 없음:', firestoreId);
-        }
-      } catch (e) {
-        fail++;
-        console.error('[전체생성]', firestoreId, '실패:', e.message);
-      }
-
-      if (i < missing.length - 1) await new Promise(r => setTimeout(r, 500));
-    }
-
-    const msg = `✅ ${success}개 완료${fail ? ` · ❌ ${fail}개 실패` : ''}`;
-    if (statusEl) { statusEl.textContent = msg; statusEl.style.color = fail ? '#dc2626' : '#16a34a'; }
-    showToast('중국어 독음 전체 생성 완료!', 3000);
-    console.log('[완료] 중국어 독음 전체 생성:', success, '성공,', fail, '실패');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🈳 중국어 독음 전체 생성'; }
-  }
-}
-
-// ===== 교범 독음 Firestore 일괄 업로드 (MANUAL_READINGS → jaReadings/caReadings) =====
-async function uploadManualReadings() {
-  if (!_db) { alert('Firebase 연결이 필요합니다.'); return; }
-  const keys = Object.keys(MANUAL_READINGS);
-  if (!keys.length) { alert('MANUAL_READINGS가 비어 있습니다. main.js에 데이터를 추가해주세요.'); return; }
-
-  const btn = $('btn-admin-upload-readings');
-  const statusEl = $('admin-upload-readings-status');
+  const btn = $('btn-admin-upload-json');
+  const statusEl = $('admin-readings-json-status');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 업로드 중...'; }
   if (statusEl) { statusEl.textContent = `⏳ 총 ${keys.length}개 업로드 준비 중...`; statusEl.style.color = '#6366f1'; }
 
   let success = 0, fail = 0;
   for (let i = 0; i < keys.length; i++) {
-    const docId = keys[i]; // "2-1-1" 형식 그대로 Firestore 문서 ID
-    const data  = MANUAL_READINGS[docId];
+    const docId = keys[i];
+    const entry = data[docId];
     if (btn) btn.textContent = `⏳ ${i + 1}/${keys.length}`;
     if (statusEl) statusEl.textContent = `⏳ ${i + 1}/${keys.length} 업로드 중: ${docId}`;
 
     const payload = {};
-    if (data.jaReadings?.length) payload.jaReadings = data.jaReadings;
-    if (data.caReadings?.length) payload.caReadings = data.caReadings;
-    if (!Object.keys(payload).length) { console.warn('[교범독음] 데이터 없음 스킵:', docId); continue; }
+    if (Array.isArray(entry.jaReadings) && entry.jaReadings.length) payload.jaReadings = entry.jaReadings;
+    if (Array.isArray(entry.caReadings) && entry.caReadings.length) payload.caReadings = entry.caReadings;
+    if (!Object.keys(payload).length) { console.warn('[교범독음] 스킵:', docId); continue; }
 
     try {
       await _db.collection('scripts').doc(docId).set(payload, { merge: true });
-      // 메모리 캐시 갱신
       _scriptReadingsCache[docId] = { ..._scriptReadingsCache[docId], ...payload };
       success++;
-      console.log('[완료] 교범 독음 업로드:', docId, Object.keys(payload));
+      console.log('[완료] 교범 독음 업로드:', docId);
     } catch (e) {
       fail++;
       console.error('[교범독음 업로드]', docId, '실패:', e.message);
@@ -4375,63 +4299,10 @@ async function uploadManualReadings() {
 
   const msg = `✅ ${success}개 완료${fail ? ` · ❌ ${fail}개 실패` : ''}`;
   if (statusEl) { statusEl.textContent = msg; statusEl.style.color = fail ? '#dc2626' : '#16a34a'; }
-  if (btn) { btn.disabled = false; btn.textContent = '📚 교범 독음 업로드'; }
+  if (btn) { btn.disabled = false; btn.textContent = '📥 Firestore에 업로드'; }
+  if (fileInput) fileInput.value = '';
   showToast('교범 독음 업로드 완료!', 3000);
-  console.log('[완료] 교범 독음 업로드:', success, '성공,', fail, '실패');
-}
-
-// ===== 관리자 중국어 독음 생성 (선택 방송문 단건) =====
-async function _adminGenerateChineseReadings() {
-  const select = $('admin-cn-script');
-  const scriptId = select?.value;
-  if (!scriptId) { alert('방송문을 먼저 선택하세요.'); return; }
-  const s = _allScripts.find(x => x.id === scriptId);
-  if (!s?.langs?.ca?.text) { alert('선택한 방송문에 중국어(ca) 텍스트가 없습니다.'); return; }
-
-  const btn = $('btn-admin-gen-cn-readings');
-  const statusEl = $('admin-cn-readings-status');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 생성 중...'; }
-  if (statusEl) { statusEl.textContent = '⏳ Gemini API로 독음 생성 중...'; statusEl.style.color = '#6366f1'; }
-
-  try {
-    const scriptText = s.langs.ca.text;
-    const firestoreId = scriptId.replace(/\./g, '-');
-    const cacheKey = `${firestoreId}_ca_readings`;
-    delete _readingsCache[cacheKey];
-
-    const prompt = `아래 중국어 방송문의 각 문장(줄)에 한글 발음 독음을 달아줘.
-규칙:
-- 성조 번호 없이 한국어 화자가 읽기 쉬운 한국어 발음으로만 표기
-- 각 단어 사이 띄어쓰기 유지
-- 한자가 포함된 줄만 독음 처리 (빈 줄, 섹션 태그 제외)
-반환 형식 (JSON 배열만, 설명 없이):
-[{"original":"각위뤼커","reading":"거웨이 뤼커"},{"original":"...","reading":"..."}]
-중국어 방송문:
-${scriptText}`;
-
-    const res = await fetchWithRetry('/api/gemini', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }] })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
-    const m = raw.match(/\[[\s\S]*\]/);
-    if (!m) throw new Error('JSON 파싱 실패');
-    const readings = JSON.parse(m[0]);
-    if (!readings?.length) throw new Error('독음 데이터 없음');
-
-    await _db.collection('scripts').doc(firestoreId).set({ chineseReadings: readings }, { merge: true });
-    _readingsCache[cacheKey] = readings;
-    if (statusEl) { statusEl.textContent = `✅ ${readings.length}개 문장 독음 생성 완료 · Firestore 저장됨`; statusEl.style.color = '#16a34a'; }
-    console.log('[완료] 관리자 중국어 독음 생성:', readings.length, '개');
-  } catch (e) {
-    if (statusEl) { statusEl.textContent = `❌ 오류: ${e.message}`; statusEl.style.color = '#dc2626'; }
-    console.error('[관리자 중국어 독음] 오류:', e);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🈳 중국어 독음 생성'; }
-  }
+  console.log('[완료] 교범 독음 JSON 업로드:', success, '성공,', fail, '실패');
 }
 
 // 로컬 모델 음성 자동 스캔 → Firestore scripts/{id}.modelFiles 저장
@@ -4565,184 +4436,6 @@ function _refreshAdminVersionList() {
       });
     });
   });
-}
-
-async function handleAdminPdf(file) {
-  if (!file || file.type !== 'application/pdf') { _showAdminError('PDF 파일만 지원합니다.'); return; }
-
-  $('admin-pdf-drop-zone').classList.add('hidden');
-  $('admin-pdf-error').classList.add('hidden');
-  $('admin-pdf-preview').classList.add('hidden');
-  $('admin-pdf-parsing').classList.remove('hidden');
-  $('admin-parsing-msg').textContent = 'PDF 이미지 변환 중...';
-  $('admin-parsing-sub').textContent = file.name;
-
-  try {
-    if (!window.pdfjsLib) throw new Error('PDF.js 라이브러리를 불러오지 못했습니다.');
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-    const total = pdf.numPages;
-    $('admin-parsing-msg').textContent = `Gemini AI로 ${total}페이지 분석 중...`;
-
-    const ADMIN_PROMPT = `항공사 기내방송 교범 PDF 페이지들입니다. 각 페이지를 순서대로 분석하여 JSON 배열로만 반환하세요.
-
-각 페이지에 대해:
-방송문 없는 페이지(표지·목차·빈 페이지): {"skip":true}
-방송문 있음: {"lang":"ko","num":"2.1.1","title":"방송 제목","text":"방송 본문"}
-
-규칙:
-- 언어 코드: ko(한국어), en(영어), ja(일본어)
-- 일본어: 한글 독음(읽는 법)이 있으면 반드시 포함. 형식: 한글독음 줄 바로 다음에 히라가나/가타카나 원문 줄 (쌍). 예) "미나사마\nみなさま"
-- 헤더(객실승무원 방송교범, 제N장...), 푸터(제정일자, REV.XX, 페이지번호) 제외
-- [목적지] [편명] 같은 변수 그대로 유지
-- 조건부 문안(General/수하물 과다 반입 등 표 구조)은 본문에 포함
-
-반환: JSON 배열만 (예: [{"skip":true},{"lang":"ko",...}]) — 설명 없이`;
-
-    const CHUNK_SIZE = 10;
-    const pageResults = [];
-    for (let start = 1; start <= total; start += CHUNK_SIZE) {
-      const end = Math.min(start + CHUNK_SIZE - 1, total);
-      $('admin-parsing-sub').textContent = `${start} – ${end} / ${total} 페이지...`;
-
-      const images = await _renderPdfPages(pdf, start, end);
-      const results = await callGeminiVisionChunk(images, ADMIN_PROMPT);
-      pageResults.push(...results);
-
-      if (end < total) await new Promise(r => setTimeout(r, 2000));
-    }
-
-    // 페이지 결과를 방송문별로 묶기
-    const scriptMap = new Map();
-    const order = [];
-    for (const r of pageResults) {
-      if (!r.num) continue;
-      if (!scriptMap.has(r.num)) {
-        scriptMap.set(r.num, { num: r.num, title: r.title||r.num, ko:'', en:'', ja:'' });
-        order.push(r.num);
-      }
-      const s = scriptMap.get(r.num);
-      if (r.title && !s.title) s.title = r.title;
-      if (['ko','en','ja'].includes(r.lang)) s[r.lang] = (r.text||'').trim();
-    }
-    _adminParsedScripts = order.map(k => scriptMap.get(k)).filter(s => s.ko||s.en||s.ja);
-
-    if (!_adminParsedScripts.length) { _showAdminError('방송문을 인식하지 못했습니다.'); return; }
-
-    $('admin-pdf-parsing').classList.add('hidden');
-    $('admin-pdf-preview').classList.remove('hidden');
-    $('admin-preview-info').textContent = `${_adminParsedScripts.length}개 방송문 인식됨`;
-
-    const LANG_LABELS = { ko:'🇰🇷 KO', en:'🇺🇸 EN', ja:'🇯🇵 JA' };
-    $('admin-script-list').innerHTML = _adminParsedScripts.map((s, i) => {
-      const activeLang = ['ko','en','ja'].find(l=>s[l])||'ko';
-      const tabs = ['ko','en','ja'].map(l =>
-        `<button class="pdf-lang-tab${l===activeLang?' active':''}" data-lang="${l}"${!s[l]?' style="opacity:.4"':''}>${LANG_LABELS[l]}</button>`
-      ).join('');
-      const panels = ['ko','en','ja'].map(l =>
-        `<textarea class="pdf-field-textarea${l!==activeLang?' hidden':''}" data-field="${l}" rows="3">${(s[l]||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`
-      ).join('');
-      return `
-      <div class="pdf-script-item selected" data-idx="${i}">
-        <input type="checkbox" class="pdf-script-check" checked>
-        <div class="pdf-script-fields">
-          <div class="pdf-script-num-title">
-            <span class="pdf-script-num">${s.num}</span>
-            <input class="pdf-field-input" data-field="title" value="${(s.title||'').replace(/"/g,'&quot;')}" placeholder="방송 제목">
-          </div>
-          <div class="pdf-lang-tabs">${tabs}</div>
-          ${panels}
-        </div>
-      </div>`;
-    }).join('');
-
-    $('admin-script-list').querySelectorAll('.pdf-script-check').forEach(cb => {
-      cb.addEventListener('change', () => cb.closest('.pdf-script-item').classList.toggle('selected', cb.checked));
-    });
-    $('admin-script-list').querySelectorAll('.pdf-lang-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        const item = tab.closest('.pdf-script-item');
-        item.querySelectorAll('.pdf-lang-tab').forEach(t=>t.classList.remove('active'));
-        item.querySelectorAll('.pdf-field-textarea').forEach(ta=>ta.classList.add('hidden'));
-        tab.classList.add('active');
-        item.querySelector(`[data-field="${tab.dataset.lang}"]`).classList.remove('hidden');
-      });
-    });
-  } catch(e) {
-    $('admin-pdf-parsing').classList.add('hidden');
-    _showAdminError(`오류: ${e.message}`);
-  }
-}
-
-function _showAdminError(msg) {
-  $('admin-pdf-drop-zone').classList.remove('hidden');
-  $('admin-pdf-parsing').classList.add('hidden');
-  $('admin-pdf-preview').classList.add('hidden');
-  $('admin-pdf-error').classList.remove('hidden');
-  $('admin-error-msg').textContent = msg;
-}
-
-async function deployToFirestore() {
-  const rev = $('admin-rev-version').value.trim();
-  if (!rev) { alert('개정번호를 입력해주세요 (예: Rev.23)'); return; }
-
-  const items = $('admin-script-list').querySelectorAll('.pdf-script-item');
-  const announcements = [];
-  items.forEach(item => {
-    const cb = item.querySelector('.pdf-script-check');
-    if (!cb.checked) return;
-    const idx = parseInt(item.dataset.idx);
-    const meta = _adminParsedScripts[idx]||{};
-    const title = item.querySelector('[data-field="title"]').value.trim()||'방송문';
-    const langs = {};
-    ['ko','en','ja'].forEach(l => {
-      const ta = item.querySelector(`[data-field="${l}"]`);
-      const text = ta?ta.value.trim():'';
-      if (text) langs[l] = text;
-    });
-    if (!Object.keys(langs).length) return;
-
-    // num을 파싱해서 chapter 추출
-    const numParts = (meta.num||'').split('.');
-    const chapter = parseInt(numParts[0])||0;
-    announcements.push({
-      id: meta.num||`item-${idx}`,
-      chapter,
-      chapterName: '',
-      section: meta.num||'',
-      title,
-      ko: langs.ko||'',
-      en: langs.en||'',
-      ja: langs.ja||'',
-      checkpoints: [],
-      icon: '✈'
-    });
-  });
-
-  if (!announcements.length) { alert('배포할 항목이 없습니다.'); return; }
-  if (!confirm(`${announcements.length}개 방송문을 ${rev}로 Firestore에 배포하시겠습니까?`)) return;
-
-  const btn = $('btn-admin-deploy');
-  btn.disabled = true; btn.textContent = '배포 중...';
-  try {
-    if (!_db) { initFirebase(); }
-    if (!_db) throw new Error('Firebase 연결에 실패했습니다.');
-    await firestoreSaveLatest({
-      revVersion: rev,
-      updatedAt: firebase.firestore.Timestamp.now(),
-      announcements
-    });
-    alert(`${rev} 배포 완료! (${announcements.length}개 방송문)`);
-    _refreshAdminVersion();
-    _refreshAdminVersionList();
-    // 캐시 갱신
-    localStorage.setItem('cabinvoice_scripts_cache', JSON.stringify({ rev, announcements, ts: Date.now() }));
-  } catch(e) {
-    alert(`배포 실패: ${e.message}`);
-  } finally {
-    btn.disabled = false; btn.textContent = '🚀 Firestore에 배포하기';
-  }
 }
 
 async function deployJsonToFirestore() {
@@ -5052,9 +4745,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===== 관리자 패널 =====
   $('btn-open-admin').addEventListener('click', openAdminScreen);
   $('btn-admin-back').addEventListener('click', () => { showScreen('screen-home'); loadAndRenderHome(); });
-  if ($('btn-admin-upload-readings')) $('btn-admin-upload-readings').addEventListener('click', () => requireEditAuth(uploadManualReadings));
-  if ($('btn-admin-gen-cn-all')) $('btn-admin-gen-cn-all').addEventListener('click', () => requireEditAuth(generateAllChineseReadings));
-  if ($('btn-admin-gen-cn-readings')) $('btn-admin-gen-cn-readings').addEventListener('click', () => requireEditAuth(_adminGenerateChineseReadings));
   if ($('btn-admin-scan-mv')) $('btn-admin-scan-mv').addEventListener('click', _scanLocalModelVoices);
   if ($('btn-admin-reset-scan-mv')) $('btn-admin-reset-scan-mv').addEventListener('click', _resetAndRescanModelVoices);
   if ($('btn-save-firebase-cfg')) $('btn-save-firebase-cfg').addEventListener('click', () => {
@@ -5063,16 +4753,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) el.textContent = ok ? '✅ Firebase 연결됨' : '❌ 연결 실패';
     if (ok) { _refreshAdminVersion(); _refreshAdminVersionList(); }
   });
-  $('admin-pdf-input').addEventListener('change', e => { if (e.target.files[0]) handleAdminPdf(e.target.files[0]); });
-  const adminDropZone = $('admin-pdf-drop-zone');
-  adminDropZone.addEventListener('dragover', e => { e.preventDefault(); adminDropZone.classList.add('drag-over'); });
-  adminDropZone.addEventListener('dragleave', () => adminDropZone.classList.remove('drag-over'));
-  adminDropZone.addEventListener('drop', e => { e.preventDefault(); adminDropZone.classList.remove('drag-over'); const f=e.dataTransfer.files[0]; if(f) handleAdminPdf(f); });
-  $('btn-admin-deploy').addEventListener('click', deployToFirestore);
-  $('btn-admin-json-deploy').addEventListener('click', deployJsonToFirestore);
-  $('admin-select-all').addEventListener('click', () => $('admin-script-list').querySelectorAll('.pdf-script-check').forEach(cb=>{cb.checked=true;cb.closest('.pdf-script-item').classList.add('selected');}));
-  $('admin-deselect-all').addEventListener('click', () => $('admin-script-list').querySelectorAll('.pdf-script-check').forEach(cb=>{cb.checked=false;cb.closest('.pdf-script-item').classList.remove('selected');}));
-  $('admin-retry-btn').addEventListener('click', () => { $('admin-pdf-error').classList.add('hidden'); $('admin-pdf-drop-zone').classList.remove('hidden'); });
+  if ($('btn-admin-json-deploy')) $('btn-admin-json-deploy').addEventListener('click', deployJsonToFirestore);
+  if ($('btn-admin-upload-json')) $('btn-admin-upload-json').addEventListener('click', () => requireEditAuth(uploadReadingsJson));
 
   // ===== 사이드바 =====
   $('btn-toggle-sidebar').addEventListener('click', openSidebar);
