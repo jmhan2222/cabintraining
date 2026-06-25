@@ -3477,6 +3477,32 @@ async function openEditModal(id, source) {
 
 function closeCustomModal() { $('custom-modal').classList.add('hidden'); }
 
+function _previewReadings(lang) {
+  const textEl    = document.getElementById(`custom-text-${lang}`);
+  const readingEl = document.getElementById(`custom-reading-${lang}`);
+  const previewEl = document.getElementById(`preview-${lang}`);
+  if (!textEl || !readingEl || !previewEl) return;
+
+  const origLines    = textEl.value.split('\n').map(l => l.trim()).filter(Boolean);
+  const readingLines = readingEl.value.split('\n').map(l => l.trim());
+
+  if (!origLines.length) {
+    previewEl.innerHTML = '<div class="preview-label">미리보기</div><div style="font-size:12px;color:#8E8E93">원문을 먼저 입력해 주세요.</div>';
+    previewEl.classList.remove('hidden');
+    return;
+  }
+
+  const pairs = origLines.map((orig, i) => {
+    const reading = readingLines[i] || '';
+    return `<div class="preview-pair">${
+      reading ? `<div class="bilingual-reading">${escHtml(reading)}</div>` : ''
+    }<div class="bilingual-original">${escHtml(orig)}</div></div>`;
+  }).join('');
+
+  previewEl.innerHTML = `<div class="preview-label">미리보기 (${origLines.length}줄)</div>${pairs}`;
+  previewEl.classList.remove('hidden');
+}
+
 async function saveScriptFromModal() {
   const title = document.getElementById('custom-title').value.trim();
   if (!title) { alert('방송 제목을 입력해 주세요.'); document.getElementById('custom-title').focus(); return; }
@@ -3639,9 +3665,16 @@ async function saveScriptFromModal() {
     saveCustomScripts(arr);
   }
 
+  // readings 캐시 초기화 (저장된 독음이 즉시 반영되도록)
+  if (_savedEditId) {
+    const _fid = _savedEditId.replace(/\./g, '-');
+    delete _scriptReadingsCache[_fid];
+    delete _readingsCache[`${_fid}_ca_readings`];
+  }
+
   // detail 패널 즉시 재렌더링 (편집 모드일 때만)
   if (_modalState.mode === 'edit' && _savedEditId && _selectedScriptId === _savedEditId) {
-    const _updated = _allScripts.find(s => s.id === _savedEditId);
+    const _updated = getEffectiveScript(_savedEditId);
     if (_updated) {
       _renderDetailContent(_updated, _detailLang);
       console.log('[저장완료] 캐시+화면 갱신:', _savedEditId);
@@ -4752,6 +4785,10 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById(`modal-lang-${tab.dataset.lang}`).classList.add('active');
     });
   });
+
+  // 독음 미리보기 버튼
+  document.getElementById('btn-preview-ja')?.addEventListener('click', () => _previewReadings('ja'));
+  document.getElementById('btn-preview-ca')?.addEventListener('click', () => _previewReadings('ca'));
 
   // PDF 모달 이벤트
   $('pdf-modal-close').addEventListener('click', closePdfModal);

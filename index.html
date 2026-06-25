@@ -361,7 +361,9 @@
             <label>한글 독음 <span class="optional">(원문과 같은 줄 수로 입력)</span></label>
             <textarea id="custom-reading-ja" rows="6" placeholder="미나사마&#10;토-키와 제주코-쿠-&#10;..."></textarea>
             <div style="font-size:12px;color:var(--gray-400);margin-top:4px">💡 독음은 원문과 같은 줄 수로 입력. 저장 시 jaReadings 배열로 자동 변환됩니다.</div>
+            <button type="button" class="btn-preview-readings" id="btn-preview-ja">👁 미리보기</button>
           </div>
+          <div id="preview-ja" class="readings-preview hidden"></div>
         </div>
         <div id="modal-lang-ca" class="modal-lang-panel">
           <div class="modal-field">
@@ -372,7 +374,9 @@
             <label>병음 독음 <span class="optional">(원문과 같은 줄 수로 입력)</span></label>
             <textarea id="custom-reading-ca" rows="6" placeholder="gèwèilǚkè&#10;nínhǎo..."></textarea>
             <div style="font-size:12px;color:var(--gray-400);margin-top:4px">💡 독음은 원문과 같은 줄 수로 입력. 저장 시 caReadings 배열로 자동 변환됩니다.</div>
+            <button type="button" class="btn-preview-readings" id="btn-preview-ca">👁 미리보기</button>
           </div>
+          <div id="preview-ca" class="readings-preview hidden"></div>
         </div>
 
         <!-- 모델 음성 섹션 (언어별) -->
