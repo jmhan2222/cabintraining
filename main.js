@@ -2109,22 +2109,16 @@ async function startStudyMode() {
   $('study-title-bar').textContent = s.title;
   const langCode = state.selectedLang;
 
-  if ((langCode === 'ja' || langCode === 'ca') && $('study-script-text')) {
-    const readings = langCode === 'ja' ? s?.jaReadings : s?.caReadings;
-    if (readings?.length > 0) {
-      renderScriptText(s, langCode, $('study-script-text'));
-    } else {
-      $('study-script-text').innerHTML = renderBilingualScript(lang.text, langCode);
-      _loadAndAttachReadings(s).then(() => {
-        if (state.currentScript === s && $('study-script-text')) {
-          renderScriptText(s, langCode, $('study-script-text'));
-        }
-      });
+  const studyEl = $('study-script-text');
+  if (studyEl) renderScriptText(s, langCode, studyEl);
+
+  // readings 로드 완료 후 학습 화면 재렌더링 (ja/ca 독음 반영)
+  _loadAndAttachReadings(s).then(() => {
+    if (state.currentScript === s) {
+      const el = $('study-script-text');
+      if (el) renderScriptText(s, state.selectedLang, el);
     }
-  } else {
-    _renderStudyScriptText(lang.text, langCode);
-  }
-  console.log('[완료] renderScriptText 통일');
+  });
 
   ['M', 'F'].forEach(g => {
     const btn = $(`study-gender-${g.toLowerCase()}`);
