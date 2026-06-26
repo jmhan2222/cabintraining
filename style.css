@@ -1430,8 +1430,8 @@ html, body {
   box-shadow: var(--shadow-sm);
 }
 .script-var {
-  background: #fef3c7; color: #92400e; padding: 1px 4px; border-radius: 4px;
-  font-weight: 600;
+  background: #FFF3CD; color: #856404; padding: 1px 6px; border-radius: 4px;
+  font-size: 0.9em; font-weight: 600;
 }
 
 .detail-checkpoints { margin-bottom: 16px; }

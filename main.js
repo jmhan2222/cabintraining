@@ -678,7 +678,10 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 function _renderKoEnText(text) {
-  const hv = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
+  const hv = s => escHtml(s).replace(/\[([^\]]+)\]/g, (match, inner) => {
+    if (/^(General|수하물|필요|생략|군사)/.test(inner)) return match;
+    return `<span class="script-var">[${inner}]</span>`;
+  });
   const lines = text.split('\n');
   let html = '';
   let tableRows = [];  // markdown pipe tables
@@ -768,17 +771,50 @@ function renderBilingualScript(text, langCode, readings = null) {
   const odiv = c => `<div class="bilingual-original">${c}</div>`;
   const SEP  = '<div class="bilingual-sep"></div>';
   const PAIR = c => `<div class="bilingual-pair">${c}</div>`;
-  const hv   = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
+  const hv   = s => escHtml(s).replace(/\[([^\]]+)\]/g, (match, inner) => {
+    if (/^(General|수하물|필요|생략|군사)/.test(inner)) return match;
+    return `<span class="script-var">[${inner}]</span>`;
+  });
   const isSec = s => /^\[[^\]]+\]$/.test(s.trim()) && !/[぀-ヿ一-鿿]/.test(s);
 
   // ── readings 배열 있으면 순차 렌더 (교범 독음 데이터 기반, map 매칭 없음) ──
   if (readings?.length) {
-    const html = readings.map(({reading, original}) => {
+    let html = '';
+    let taggedGroup = [];
+
+    const flushTaggedGroup = () => {
+      if (!taggedGroup.length) return;
+      if (taggedGroup.length === 1) {
+        const { tag, reading: r, content } = taggedGroup[0];
+        html += `<div class="script-section-card"><span class="tag-cell">${escHtml(tag)}</span><span>${r ? `<div class="bilingual-reading">${hv(r)}</div>` : ''}${content ? `<div class="bilingual-original">${hv(content)}</div>` : ''}</span></div>`;
+      } else {
+        html += '<table class="script-section-table">';
+        for (const { tag, reading: r, content } of taggedGroup) {
+          html += `<tr><td class="tag-cell">${escHtml(tag)}</td><td>${r ? `<div class="bilingual-reading">${hv(r)}</div>` : ''}${content ? `<div class="bilingual-original">${hv(content)}</div>` : ''}</td></tr>`;
+        }
+        html += '</table>';
+      }
+      taggedGroup = [];
+    };
+
+    for (const item of readings) {
+      const { reading, original, tag, content } = item;
       const line = (original || '').trim();
-      if (!line) return SEP;
-      if (isSec(line)) return `<div class="bilingual-header">${hv(line)}</div>`;
-      return PAIR((reading ? rdiv(hv(reading)) : '') + odiv(hv(line)));
-    }).join('');
+      if (!line) {
+        flushTaggedGroup();
+        html += SEP;
+      } else if (tag) {
+        taggedGroup.push(item);
+      } else if (isSec(line)) {
+        flushTaggedGroup();
+        html += `<div class="bilingual-header">${hv(line)}</div>`;
+      } else {
+        flushTaggedGroup();
+        html += PAIR((reading ? rdiv(hv(reading)) : '') + odiv(hv(line)));
+      }
+    }
+    flushTaggedGroup();
+
     console.log('[완료] 이중언어 렌더링 (readings 순차 방식, ' + readings.length + '항목)');
     return `<div class="script-text-rendered">${html}</div>`;
   }
@@ -3540,14 +3576,39 @@ function _previewReadings(lang) {
     return;
   }
 
-  const pairs = origLines.map((orig, i) => {
-    const reading = readingLines[i] || '';
-    return `<div class="preview-pair">${
-      reading ? `<div class="bilingual-reading">${escHtml(reading)}</div>` : ''
-    }<div class="bilingual-original">${escHtml(orig)}</div></div>`;
-  }).join('');
+  let pairsHtml = '';
+  let taggedGroupPrev = [];
 
-  previewEl.innerHTML = `<div class="preview-label">미리보기 (${origLines.length}줄)</div>${pairs}`;
+  const flushPrevTagged = () => {
+    if (!taggedGroupPrev.length) return;
+    if (taggedGroupPrev.length === 1) {
+      const { tag, reading: r, content } = taggedGroupPrev[0];
+      pairsHtml += `<div class="script-section-card"><span class="tag-cell">${escHtml(tag)}</span><span>${r ? `<div class="bilingual-reading">${escHtml(r)}</div>` : ''}${content ? `<div class="bilingual-original">${escHtml(content)}</div>` : ''}</span></div>`;
+    } else {
+      pairsHtml += '<table class="script-section-table">';
+      for (const { tag, reading: r, content } of taggedGroupPrev) {
+        pairsHtml += `<tr><td class="tag-cell">${escHtml(tag)}</td><td>${r ? `<div class="bilingual-reading">${escHtml(r)}</div>` : ''}${content ? `<div class="bilingual-original">${escHtml(content)}</div>` : ''}</td></tr>`;
+      }
+      pairsHtml += '</table>';
+    }
+    taggedGroupPrev = [];
+  };
+
+  origLines.forEach((orig, i) => {
+    const reading = readingLines[i] || '';
+    const tagMatch = orig.match(/^\[([^\]]+)\]\s*(.*)/);
+    if (tagMatch) {
+      taggedGroupPrev.push({ tag: tagMatch[1], content: tagMatch[2], reading });
+    } else {
+      flushPrevTagged();
+      pairsHtml += `<div class="preview-pair">${
+        reading ? `<div class="bilingual-reading">${escHtml(reading)}</div>` : ''
+      }<div class="bilingual-original">${escHtml(orig)}</div></div>`;
+    }
+  });
+  flushPrevTagged();
+
+  previewEl.innerHTML = `<div class="preview-label">미리보기 (${origLines.length}줄)</div>${pairsHtml}`;
   previewEl.classList.remove('hidden');
 }
 
@@ -3603,19 +3664,29 @@ async function saveScriptFromModal() {
       const jaText = document.getElementById('custom-text-ja')?.value.trim();
       const jaReadingText = document.getElementById('custom-reading-ja')?.value;
       if (jaText && jaReadingText?.trim()) {
-        const jaLines = jaText.split('\n').filter(l => l.trim());
-        const jaReadingLines = jaReadingText.split('\n').filter(l => l.trim());
-        if (jaLines.length && jaReadingLines.length) {
-          payload.jaReadings = jaLines.map((original, i) => ({ original, reading: jaReadingLines[i] || '' }));
+        const origLines = jaText.split('\n').filter(l => l.trim());
+        const readLines = jaReadingText.split('\n').filter(l => l.trim());
+        if (origLines.length && readLines.length) {
+          payload.jaReadings = origLines.map((orig, idx) => {
+            const read = readLines[idx] || '';
+            const tagMatch = orig.match(/^\[([^\]]+)\]\s*(.*)/);
+            if (tagMatch) return { original: orig, reading: read, tag: tagMatch[1], content: tagMatch[2] };
+            return { original: orig, reading: read };
+          });
         }
       }
       const caText = document.getElementById('custom-text-ca')?.value.trim();
       const caReadingText = document.getElementById('custom-reading-ca')?.value;
       if (caText && caReadingText?.trim()) {
-        const caLines = caText.split('\n').filter(l => l.trim());
-        const caReadingLines = caReadingText.split('\n').filter(l => l.trim());
-        if (caLines.length && caReadingLines.length) {
-          payload.caReadings = caLines.map((original, i) => ({ original, reading: caReadingLines[i] || '' }));
+        const origLines = caText.split('\n').filter(l => l.trim());
+        const readLines = caReadingText.split('\n').filter(l => l.trim());
+        if (origLines.length && readLines.length) {
+          payload.caReadings = origLines.map((orig, idx) => {
+            const read = readLines[idx] || '';
+            const tagMatch = orig.match(/^\[([^\]]+)\]\s*(.*)/);
+            if (tagMatch) return { original: orig, reading: read, tag: tagMatch[1], content: tagMatch[2] };
+            return { original: orig, reading: read };
+          });
         }
       }
       // 낙관적 업데이트: Firestore 완료 전에 script 객체에 즉시 부착
@@ -3629,10 +3700,14 @@ async function saveScriptFromModal() {
         try {
           await _db.collection('scripts').doc(firestoreId).set(payload, { merge: true });
           _scriptReadingsCache[firestoreId] = { ..._scriptReadingsCache[firestoreId], ...payload };
-          console.log('[저장] Firestore 저장 성공:', firestoreId);
+          console.log('[저장] Firestore 성공:', firestoreId);
         } catch(e) {
-          console.error('[저장] Firestore 저장 실패:', e);
-          showToast('저장 실패: ' + e.message, 3000);
+          console.error('[저장] Firestore 실패:', e.code, e.message);
+          if (e.code === 'permission-denied') {
+            showToast('Firebase 권한 오류. 관리자에게 문의하세요.', 4000);
+          } else {
+            showToast('저장 실패: ' + e.message, 3000);
+          }
         }
       }
 
