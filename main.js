@@ -678,36 +678,84 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 function _renderKoEnText(text) {
+  const hv = s => escHtml(s).replace(/\[([^\]]+)\]/g, '<span class="script-var">[$1]</span>');
   const lines = text.split('\n');
   let html = '';
-  let tableRows = [];
+  let tableRows = [];  // markdown pipe tables
+  let taggedRows = []; // [TAG] content section lines
+
   const flushTable = () => {
     if (!tableRows.length) return;
     let t = '<table class="script-table"><thead><tr>';
-    t += tableRows[0].map(c=>`<th>${escHtml(c)}</th>`).join('');
+    t += tableRows[0].map(c => `<th>${escHtml(c)}</th>`).join('');
     t += '</tr></thead><tbody>';
     for (let i = 1; i < tableRows.length; i++) {
-      t += '<tr>' + tableRows[i].map(c=>`<td>${escHtml(c)}</td>`).join('') + '</tr>';
+      t += '<tr>' + tableRows[i].map(c => `<td>${escHtml(c)}</td>`).join('') + '</tr>';
     }
     t += '</tbody></table>';
     html += t;
     tableRows = [];
   };
+
+  const flushTaggedRows = () => {
+    if (!taggedRows.length) return;
+    if (taggedRows.length === 1) {
+      const { tag, content } = taggedRows[0];
+      html += `<div class="script-section-card"><span class="tag-cell">${escHtml(tag)}</span><span>${content ? hv(content) : ''}</span></div>`;
+    } else {
+      let t = '<table class="script-section-table">';
+      for (const { tag, content } of taggedRows) {
+        t += `<tr><td class="tag-cell">${escHtml(tag)}</td><td>${hv(content)}</td></tr>`;
+      }
+      t += '</table>';
+      html += t;
+    }
+    taggedRows = [];
+  };
+
   for (const line of lines) {
     const tr = line.trim();
+
+    // Markdown pipe table (existing feature)
     if (/^\|.+\|$/.test(tr)) {
-      if (/^\|[\s\-|:]+\|$/.test(tr)) continue; // markdown separator
-      tableRows.push(tr.slice(1,-1).split('|').map(c=>c.trim()));
-    } else {
+      flushTaggedRows();
+      if (/^\|[\s\-|:]+\|$/.test(tr)) continue;
+      tableRows.push(tr.slice(1, -1).split('|').map(c => c.trim()));
+      continue;
+    }
+
+    // Section tag line: [TAG] content  OR  [TAG] alone on line
+    const tagMatch = tr.match(/^\[([^\]]+)\]\s+(.*)/);
+    const soloTagMatch = !tagMatch && tr.match(/^\[([^\]]+)\]$/);
+
+    if (tagMatch || soloTagMatch) {
       flushTable();
-      if (!tr) {
-        html += '<div style="height:8px"></div>';
+      const tag = tagMatch ? tagMatch[1] : soloTagMatch[1];
+      const content = tagMatch ? tagMatch[2] : '';
+      if (tag === '생략 가능') {
+        flushTaggedRows();
+        html += `<div class="script-optional"><span class="script-section-badge">생략 가능</span>${content ? hv(content) : ''}</div>`;
+      } else if (tag === '필요 시') {
+        flushTaggedRows();
+        html += `<div class="script-conditional"><span class="script-section-badge">필요 시</span>${content ? hv(content) : ''}</div>`;
       } else {
-        html += `<p style="margin:0 0 8px 0;line-height:1.8;">${escHtml(tr)}</p>`;
+        taggedRows.push({ tag, content });
       }
+      continue;
+    }
+
+    // Regular text line
+    flushTable();
+    flushTaggedRows();
+    if (!tr) {
+      html += '<div style="height:8px"></div>';
+    } else {
+      html += `<p style="margin:0 0 8px 0;line-height:1.8;">${hv(tr)}</p>`;
     }
   }
+
   flushTable();
+  flushTaggedRows();
   return `<div class="script-text-rendered">${html}</div>`;
 }
 
@@ -4195,6 +4243,31 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
 • [목적지][편명][공항] 등 변수 자리 단어 대체
 • 선택 문안 중 하나만 말한 경우
 • 같은 의미를 살짝 다르게 표현한 경우 (단, 완주율 70% 이상 시)
+
+[선택 문안 처리 규칙 - 매우 중요]
+방송문에 아래 패턴의 선택지가 있으면 승무원이 그 중 하나만 골라 읽는 것이 정상:
+
+① [General] / [수하물 과다 반입] 등 상황별 선택
+   → 어떤 것을 선택했든 감점 없음
+   → 선택하지 않은 섹션을 missedKeywords에 포함하지 말 것
+
+② [기내 수하물이 많아 / 만석으로] 같은 슬래시 선택지
+   → 하나만 읽어도 정상
+   → 나머지를 누락으로 처리하지 말 것
+
+③ [생략 가능] 태그가 붙은 문장
+   → 읽지 않아도 정상, 절대 감점하지 말 것
+   → missedKeywords에 포함하지 말 것
+
+④ [필요 시] 태그가 붙은 문장
+   → 읽지 않아도 감점 없음
+
+⑤ [10분 초과 지연 시] 등 조건부 문장
+   → 해당 조건이 아니면 읽지 않는 것이 정상
+
+채점 시 위 패턴을 제외한 반드시 읽어야 하는 핵심 내용만 완주 여부 체크.
+피드백에서 선택 문안 누락 언급 금지.
+단, 핵심 안전 키워드([목적지], 편명, 실제 안전 지시사항)는 여전히 체크.
 
 ${criteria}
 ${cpText}
