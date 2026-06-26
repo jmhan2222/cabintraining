@@ -1245,19 +1245,27 @@ function startPrep(script, lang) {
   _loadAndAttachReadings(script);
 }
 
-// readings를 Firestore에서 불러와 script 객체에 직접 부착 후 prep 화면 재렌더
+// readings를 Firestore에서 불러와 script 객체에 직접 부착 후 prep/study 화면 재렌더
 async function _loadAndAttachReadings(script) {
   const fid = script.id.replace(/\./g, '-');
-  // 이미 부착됐거나 캐시에 없는 경우 Firestore 조회
   const r = await _loadScriptReadings(fid);
   if (!r) return;
   if (r.jaReadings?.length)      script.jaReadings      = r.jaReadings;
   if (r.caReadings?.length)      script.caReadings      = r.caReadings;
   if (r.chineseReadings?.length) script.chineseReadings = r.chineseReadings;
-  // 아직 이 스크립트가 선택돼 있고 ja/ca 탭이면 재렌더
-  if (state.currentScript === script &&
+  if (state.currentScript !== script) return;
+  // prep 화면이 활성이면 prep 재렌더
+  if ($('screen-prep')?.classList.contains('active') &&
       (state.selectedLang === 'ja' || state.selectedLang === 'ca')) {
     updatePrepContent();
+  }
+  // study 화면이 활성이면 study-script-text 재렌더
+  if ($('screen-study')?.classList.contains('active')) {
+    const el = $('study-script-text');
+    if (el) {
+      renderScriptText(script, state.selectedLang, el);
+      console.log('[학습모드] readings 로드 후 재렌더링:', script.id, state.selectedLang);
+    }
   }
 }
 
@@ -2110,15 +2118,13 @@ async function startStudyMode() {
   const langCode = state.selectedLang;
 
   const studyEl = $('study-script-text');
-  if (studyEl) renderScriptText(s, langCode, studyEl);
+  if (studyEl) {
+    renderScriptText(s, langCode, studyEl);
+    console.log('[학습모드 방송문]', { id: s.id, lang: langCode, text: lang.text?.substring(0, 50) });
+  }
 
-  // readings 로드 완료 후 학습 화면 재렌더링 (ja/ca 독음 반영)
-  _loadAndAttachReadings(s).then(() => {
-    if (state.currentScript === s) {
-      const el = $('study-script-text');
-      if (el) renderScriptText(s, state.selectedLang, el);
-    }
-  });
+  // readings 로드 후 재렌더링은 _loadAndAttachReadings 내부에서 처리
+  _loadAndAttachReadings(s);
 
   ['M', 'F'].forEach(g => {
     const btn = $(`study-gender-${g.toLowerCase()}`);
@@ -2140,7 +2146,7 @@ async function startStudyMode() {
   if (_studyGuideCache[cacheKey]) {
     const cached = _studyGuideCache[cacheKey];
     _renderStudyGuide(cached);
-    if (state.selectedLang === 'ca' && cached.chineseReadings?.length) {
+    if (state.selectedLang === 'ca' && cached.chineseReadings?.length && !s.caReadings?.length) {
       _renderChineseScriptWithReadings(lang.text, cached.chineseReadings);
     }
     $('btn-gen-guide').textContent = '✅ 가이드 완성';
@@ -2155,7 +2161,7 @@ async function startStudyMode() {
       if (saved) {
         _studyGuideCache[cacheKey] = saved;
         _renderStudyGuide(saved);
-        if (state.selectedLang === 'ca' && saved.chineseReadings?.length) {
+        if (state.selectedLang === 'ca' && saved.chineseReadings?.length && !s.caReadings?.length) {
           _renderChineseScriptWithReadings(lang.text, saved.chineseReadings);
         }
         $('btn-gen-guide').textContent = '✅ 가이드 완성';
