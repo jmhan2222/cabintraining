@@ -2119,6 +2119,9 @@ async function startStudyMode() {
 
   const studyEl = $('study-script-text');
   if (studyEl) {
+    // 가이드 없는 초기 상태: 라벨 표시 + 기본 renderScriptText
+    const _lbl = document.querySelector('.study-script-label');
+    if (_lbl) _lbl.style.display = '';
     renderScriptText(s, langCode, studyEl);
     console.log('[학습모드 방송문]', { id: s.id, lang: langCode, text: lang.text?.substring(0, 50) });
   }
@@ -2576,6 +2579,135 @@ function _renderStudyGuide(guide) {
     ${saveBtn}
   `;
   el.classList.remove('hidden');
+
+  // 마스터 방송문 카드 갱신
+  const _ms = state.currentScript;
+  if (_ms) _renderMasterScript(_ms, state.selectedLang, guide);
+}
+
+// ─── 마스터 방송문 합성 (ko/en) ───────────────────────────────────────────
+function buildMasterScript(text, guide) {
+  let work = String(text || '');
+
+  // 1. breakPoints: ∙ / 기호 삽입된 text로 원본 구간 교체
+  (guide.breakPoints || []).forEach(bp => {
+    if (typeof bp !== 'object' || !bp.text) return;
+    const marked = bp.text;
+    const clean = marked.replace(/[∙\/,|]/g, '').replace(/\s{2,}/g, ' ').trim();
+    if (clean && work.includes(clean)) work = work.replace(clean, marked);
+  });
+
+  // 2. intonationDetails: markedText(↗↘→) 삽입
+  (guide.intonationDetails || []).forEach(item => {
+    if (!item.markedText || !item.phrase) return;
+    if (work.includes(item.phrase)) work = work.replace(item.phrase, item.markedText);
+  });
+
+  const emphasis = (guide.emphasisWords || []).filter(Boolean);
+
+  return work.split('\n').map(rawLine => {
+    const t = rawLine.trim();
+    if (!t) return '<div style="height:8px"></div>';
+
+    // 섹션 태그 처리
+    const soloTag = t.match(/^\[([^\]]+)\]$/);
+    const tagLine  = !soloTag && t.match(/^\[([^\]]+)\]\s+(.*)/);
+    if (soloTag) {
+      return `<div style="display:inline-block;font-size:12px;font-weight:700;color:#6E6E73;background:#F2F2F7;border-radius:5px;padding:2px 8px;margin:6px 0 2px">${escHtml(soloTag[1])}</div>`;
+    }
+    const prefix = tagLine
+      ? `<span style="font-size:11px;font-weight:700;color:#6E6E73;background:#F2F2F7;border-radius:4px;padding:1px 5px;margin-right:5px">[${escHtml(tagLine[1])}]</span>`
+      : '';
+    const content = tagLine ? tagLine[2] : t;
+
+    let html = escHtml(content);
+    emphasis.forEach(w => {
+      if (!w) return;
+      const ew = escHtml(w);
+      html = html.split(ew).join(`<strong style="color:#FF6B00;">${ew}</strong>`);
+    });
+    html = html
+      .replace(/∙/g, '<span style="color:#22C55E;font-weight:800;">∙</span>')
+      .replace(/\//g, '<span style="color:#3B82F6;font-weight:800;">/</span>')
+      .replace(/↗/g, '<span style="color:#EF4444;font-weight:700;">↗</span>')
+      .replace(/↘/g, '<span style="color:#3B82F6;font-weight:700;">↘</span>')
+      .replace(/→/g, '<span style="color:#22C55E;font-weight:700;">→</span>');
+    return `<p style="margin:0 0 6px;line-height:2.0">${prefix}${html}</p>`;
+  }).join('');
+}
+
+// ─── 마스터 방송문 카드 렌더링 ────────────────────────────────────────────
+function _renderMasterScript(script, langCode, guide) {
+  const el = $('study-script-text');
+  if (!el) return;
+  const lang = script.langs[langCode];
+  if (!lang?.text) return;
+
+  const isJaCa = langCode === 'ja' || langCode === 'ca';
+
+  // 마스터(annotated) HTML
+  let masterHtml = '';
+  if (isJaCa) {
+    const tmp = document.createElement('div');
+    renderScriptText(script, langCode, tmp);
+    masterHtml = tmp.innerHTML;
+  } else {
+    masterHtml = buildMasterScript(lang.text, guide);
+  }
+
+  // 원본(toggle) HTML — ja/ca: 원문만, ko/en: renderScriptText
+  let origHtml = '';
+  if (isJaCa) {
+    const plainLines = lang.text.split('\n').map(l => {
+      const t = l.trim();
+      if (!t) return '<div class="bilingual-sep"></div>';
+      if (/^\[[^\]]+\]$/.test(t)) return `<div class="bilingual-header">${escHtml(t)}</div>`;
+      return `<div class="bilingual-pair"><div class="bilingual-original">${escHtml(t)}</div></div>`;
+    }).join('');
+    origHtml = `<div class="script-text-rendered">${plainLines}</div>`;
+  } else {
+    const tmpO = document.createElement('div');
+    renderScriptText(script, langCode, tmpO);
+    origHtml = tmpO.innerHTML;
+  }
+
+  const subtitle = isJaCa ? '' : '<div class="master-script-subtitle">끊어읽기 · 억양 · 강조가 표시됩니다</div>';
+  const legend   = isJaCa ? '' : `
+    <div class="master-script-legend">
+      <span><span style="color:#22C55E;">∙</span> 반박자</span>
+      <span><span style="color:#3B82F6;">/</span> 한박자</span>
+      <span><span style="color:#EF4444;">↗</span> 올림</span>
+      <span><span style="color:#3B82F6;">↘</span> 내림</span>
+      <span><span style="color:#FF6B00;font-weight:700;">단어</span> 강조</span>
+    </div>`;
+
+  el.innerHTML = `
+    <div class="master-script-card" id="master-script-card">
+      <div class="master-script-header">
+        <span class="master-script-title">🗒️ 핵심 포인트 통합 방송문</span>
+        <button class="master-toggle-btn" id="btn-master-toggle" onclick="toggleMasterView()">🔄 원본 보기</button>
+      </div>
+      ${subtitle}
+      <div id="master-script-body" class="master-script-body">${masterHtml}</div>
+      <div id="master-script-original" class="master-script-body hidden">${origHtml}</div>
+      ${legend}
+    </div>`;
+  // 라벨("📄 방송문") 숨김 — 카드 자체 타이틀이 대신함
+  const _lbl = document.querySelector('.study-script-label');
+  if (_lbl) _lbl.style.display = 'none';
+  console.log('[완료] 마스터방송문');
+}
+
+// 마스터 방송문 / 원본 토글
+function toggleMasterView() {
+  const body = $('master-script-body');
+  const orig = $('master-script-original');
+  const btn  = $('btn-master-toggle');
+  if (!body || !orig || !btn) return;
+  const showingMaster = !body.classList.contains('hidden');
+  body.classList.toggle('hidden');
+  orig.classList.toggle('hidden');
+  btn.textContent = showingMaster ? '🗒️ 마스터 보기' : '🔄 원본 보기';
 }
 
 // ─── 관리자 인라인 편집 토글 ──────────────────────────────────────────────
