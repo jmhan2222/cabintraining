@@ -1562,68 +1562,236 @@ let _prepRenderToken = 0;        // stale async 렌더 방지용 토큰
 const MANUAL_READINGS = {
   "2-1-1": {
     "jaReadings": [
-      {"reading":"미나사마","original":"みなさま、"},
-      {"reading":"토-키와 제주코-쿠- 편명빈 목적지 유키데고자이마스","original":"とうきは チェジュこうくう []びん [] ゆきでございます。"},
-      {"reading":"오테니모츠와 마에노 자세키노 시타 마타와 슈-노-다나오 고리요-쿠다사이","original":"おてにもつは まえの ざせきの した、 または しゅうのうだなを ごりようください。"},
-      {"reading":"혼지츠와 키나이노 오테니모츠가 오-이타메 / 만세키토낫떼오리 슈-노-다나노 스페-스부소쿠가 요소-사레마스 치이사나 오테니모츠마타와 코와레야스이 오테니모츠와 마에노 자세키노 시타니 오이레쿠다사이","original":"ほんじつは [きないの おてにもつが おおいため / まんせきとなっており] しゅうのうだなの スぺースぶそくが よそうされます。 ちいさな おてにもつ、または こわれやすい おてにもつは まえの ざせきの したに おいれください。"},
-      {"reading":"마타스베떼노 덴시키키와 키나이모-도니 셋떼-스루카","original":"また、すべての でんしききは きないモードに せっていするか、"},
-      {"reading":"덴겡오 오키리쿠다사이","original":"でんげんを おきりください。"}
+      {
+        "reading": "미나사마, 토-키와 제주코-쿠- [편명]빈 [목적지] 유키데고자이마스.",
+        "original": "みなさま、とうきは チェジュこうくう [편명]びん [목적지] ゆきでございます。"
+      },
+      {
+        "reading": "오테니모츠와 마에노 자세키노 시타, 마타와 슈-노-다나오 고리요-쿠다사이.",
+        "original": "[General] おてにもつは まえの ざせきの した、または しゅうのうだなを ごりようください。"
+      },
+      {
+        "reading": "혼지츠와 [키나이노 오테니모츠가 오-이타메 / 만세키토낫떼오리] 슈-노-다나노 스페-스부소쿠가 요소-사레마스. 치이사나 오테니모츠, 마타와 코와레야스이 오테니모츠와 마에노 자세키노 시타니 오이레쿠다사이.",
+        "original": "[수하물 과다 반입] ほんじつは [きないの おてにもつが おおいため / まんせきとなっており] しゅうのうだなの スペースぶそくが よそうされます。ちいさな おてにもつ、または こわれやすい おてにもつは まえの ざせきの したに おいれください。"
+      },
+      {
+        "reading": "마타, 스베떼노 덴시키키와 키나이모-도니 셋떼-스루카, 덴겡오 오키리쿠다사이.",
+        "original": "また、すべての でんしききは きないモードに せっていするか、でんげんを おきりください。"
+      }
     ],
     "caReadings": [
-      {"reading":"gèwèilǚkènǐmenhǎohuānyíng chéngzuò jìzhōuhángkōng","original":"各位旅客，你们好！欢迎乘坐济州航空"},
-      {"reading":"gōngsī [편명]cì hángbān qiánwǎng [목적지]","original":"公司次航班前往。"},
-      {"reading":"qǐng jiāng nínde xínglǐ fàngzài qiánpái zuòyǐxià huò shàngmiànde xínglijiànèi","original":"请将您的行李放在前排座椅下，或上面的行李架内。"},
-      {"reading":"(lìngwàiyīnwèi jīntiān mǎnkèyùjì xínglijià kōngjiān bùzú) chúle xínglixiāng yǐwàixiǎojiàn huò yìsuì wùpǐn, qǐng fàngzài qiánpái zuòyǐ xiàmiàn","original":"另外，因为今天满客，预计行李架空间不足。处了行李箱以外，小件或易碎物品,请放在前排座椅下面。"},
-      {"reading":"qǐng bǎ diànzǐ shèbèi tiáochéng wéi fēixíng móshì huò guānjī","original":"请把电子设备调成为飞行模式或关机。"},
-      {"reading":"yīnwèi [공항명]shì jūnshì jīchǎng, suǒyǒu jīchǎng qūyùnèi jìnzhǐ pāizhào qǐng bǎ zhēguāngbǎn bǎochí guānbì zhuàngtài","original":"因为是军事机场,所有机场区域内禁止拍照。请把遮光板保持关闭状态。"}
+      {
+        "reading": "gèwèilǚkè, nǐmenhǎo huānyíng chéngzuò jìzhōuhángkōng gōngsī [편명]cì hángbān qiánwǎng [목적지].",
+        "original": "各位旅客，你们好！欢迎乘坐济州航空公司[편명]次航班前往[목적지]。"
+      },
+      {
+        "reading": "qǐng jiāng nínde xínglǐ fàngzài qiánpái zuòyǐxià huò shàngmiànde xínglijiànèi.",
+        "original": "[General] 请将您的行李放在前排座椅下，或上面的行李架内。"
+      },
+      {
+        "reading": "(lìngwài, yīnwèi jīntiān mǎnkè, yùjì xínglijià kōngjiān bùzú.) chúle xínglixiāng yǐwài, xiǎojiàn huò yìsuì wùpǐn, qǐng fàngzài qiánpái zuòyǐ xiàmiàn.",
+        "original": "[수하물 과다 반입] 另外，因为今天满客，预计行李架空间不足。除了行李箱以外，小件或易碎物品，请放在前排座椅下面。"
+      },
+      {
+        "reading": "qǐng bǎ diàn z ǐ shèbèi tiáochéng wéi fēixíng móshì huò guānj ī.",
+        "original": "请把电子设备调成为飞行模式或关机。"
+      }
+    ],
+    "chineseReadings": [
+      {
+        "reading": "거웨이 뤼커, 니먼 하오! 환잉 청쭈어 지저우 항콩 궁쓰[편명]츠 항반 치엔왕[목적지].",
+        "original": "各位旅客，你们好！欢迎乘坐济州航空公司[편명]次航班前往[목적지]。"
+      },
+      {
+        "reading": "칭지앙 닌더 싱리 팡짜이 치엔파이 쭈어이 시아, 후오 상미엔 더 싱리찌아 네이.",
+        "original": "请将您的行李放在前排座椅下，或上面的行李架内。"
+      },
+      {
+        "reading": "링와이, 인웨이 진티엔 만커, 위지 싱리찌아 콩찌엔 부쭈. 추러 싱리시앙 이와이, 시아오찌엔 후오 이쑤이 우핀, 칭팡짜이 치엔파이 쭈어이 시아미엔.",
+        "original": "另外，因为今天满客，预计行李架空间不足。除了行李箱以外，小件或易碎物品，请放在前排座椅下面。"
+      },
+      {
+        "reading": "칭바 띠엔쯔 서베이 티아오청 웨이 페이싱 모스 후오 꽌지.",
+        "original": "请把电子设备调成为飞行模式或关机。"
+      }
     ]
   },
   "2-1-2": {
     "jaReadings": [
-      {"reading":"미나사마","original":"みなさま、"},
-      {"reading":"모바이루 밧테리-덴시타바코라이타-와","original":"モバイルバッテリー、でんしタバコ、ライターは"},
-      {"reading":"우에노 타나니 오이레 이타다케마센노데","original":"うえの たなに おいれ ただけませんので"},
-      {"reading":"오테모토니 오모치이타다쿠카 마타와 자세키 포켓토니 오이레쿠다사이","original":"おてもとに おもちいただくか または ざせき ポケットに おいれください。"},
-      {"reading":"마타모바이루밧테리- 오요비 덴시타바코와 키나이데노","original":"また、モバイルバッテリー および でんしタバコは きないでの"},
-      {"reading":"쥬-덴와 킨시사레테오리마스","original":"じゅうでんは きんしされております。"},
-      {"reading":"덴시키키가 자세키니 하사맛타리 아츠쿠낫타리","original":"でんしikikが ざせきに はさまったり あつくなったり、"},
-      {"reading":"후쿠란다바아이와 스구니 죠-무인니 오시라세쿠다사이","original":"ふくらんだばあいは すぐに じょうむいんに おしらせください。"}
+      {
+        "reading": "미나사마",
+        "original": "みなさま、"
+      },
+      {
+        "reading": "모바이루 밧테리-덴시타바코라이타-와",
+        "original": "モバイルバッテリー、でんしタバコ、ライターは"
+      },
+      {
+        "reading": "우에노 타나니 오이레 이타다케마센노데",
+        "original": "うえの たなに おいれ ただけませんので"
+      },
+      {
+        "reading": "오테모토니 오모치이타다쿠카 마타와 자세키 포켓토니 오이레쿠다사이",
+        "original": "おてもとに おもちいただくか または ざせき ポケットに おいれください。"
+      },
+      {
+        "reading": "마타모바이루밧테리- 오요비 덴시타바코와 키나이데노",
+        "original": "また、モバイルバッテリー および でんしタバコは きないでの"
+      },
+      {
+        "reading": "쥬-덴와 킨시사레테오리마스",
+        "original": "じゅうでんは きんしされております。"
+      },
+      {
+        "reading": "덴시키키가 자세키니 하사맛타리 아츠쿠낫타리",
+        "original": "でんしききが ざせきに はさまったり あつくなったり、"
+      },
+      {
+        "reading": "후쿠란다바아이와 스구니 죠-무인니 오시라세쿠다사이",
+        "original": "ふくらんだばあいは すぐに じょうむいんに おしらせください。"
+      }
     ],
     "caReadings": [
-      {"reading":"gèwèilǚkèchōngdiànbǎodiànzǐyān hé dǎhuǒjī jìnzhǐ bǎoguǎn zài xínglǐjià nèi","original":"各位旅客，充电宝、电子烟和打火机禁止保管在行李架内，"},
-      {"reading":"qǐng suíshēn xiédài huò bǎoguǎn zài zuòwèi qiánmiàn de kǒudài lǐ","original":"请随身携带或保管在座位前面的口袋里。"},
-      {"reading":"cǐwàiyángé jìnzhǐ chōngdiànbǎo hé diànzǐyān chōngdiàn de xíngwéi","original":"此外，严格禁止充电宝和电子烟充电的行为。"},
-      {"reading":"qǐng bìmiǎn diànzǐ shèbèi kǎ zài zuòyǐ shàng","original":"请避免电子设备卡在座椅上，"},
-      {"reading":"tóngshífārè huò gǔbāo shíqǐng lìjí gàosu chéngwùyuán","original":"同时，发热或鼓包时，请立即告诉乘务员。"}
+      {
+        "reading": "gèwèilǚkèchōngdiànbǎodiànzǐyān hé dǎhuǒjī jìnzhǐ bǎoguǎn zài xínglǐjià nèi",
+        "original": "各位旅客，充电宝、电子烟和打火机禁止保管在行李架内，"
+      },
+      {
+        "reading": "qǐng suíshēn xiédài huò bǎoguǎn zài zuòwèi qiánmiàn de kǒudài lǐ",
+        "original": "请随身携带或保管在座位前面的口袋里。"
+      },
+      {
+        "reading": "cǐwàiyángé jìnzhǐ chōngdiànbǎo hé diànzǐyān chōngdiàn de xíngwéi",
+        "original": "此外，严格禁止充电宝和电子烟充电的行为。"
+      },
+      {
+        "reading": "qǐng bìmiǎn diànzǐ shèbèi kǎ zài zuòyǐ shàng",
+        "original": "请避免电子设备卡在座椅上，"
+      },
+      {
+        "reading": "tóngshífārè huò gǔbāo shíqǐng lìjí gàosu chéngwùyuán",
+        "original": "同时，发热或鼓包时，请立即告诉乘务员。"
+      }
     ]
   },
   "2-3": {
     "jaReadings": [
-      {"reading":"토-키도아오 시메 (마모나쿠) 슛빠츠이타시마스","original":"とうき、ドアを しめ (まもなく) しゅっぱついたします。"},
-      {"reading":"안젠나 슛빠츠노타메","original":"あんぜんな しゅっぱつのため、"},
-      {"reading":"시테-사레타 오자세키니 고챠쿠세키쿠다사이","original":"していされた おざせきに ごちゃくせきください。"},
-      {"reading":"미나사마오하요-고자이마스/ 곤니치와/ 곰방와","original":"みなさま、[おはようございます。/ こんにちは。/ こんばんは。]"},
-      {"reading":"혼지츠와 고토-죠- 아리가토-고자이마스","original":"ほんじつは ごとうじょう ありがとうございます。"},
-      {"reading":"마타▶지연 사유니요리 슛빠츠가 오쿠레타텐 오와비 모시아게마스/고료-쇼-오네가이이타시마스","original":"また、[▶ ]により しゅっぱつが おくれたてん [おわび もうしあげます。/ごりょうしょうおねがいいたします。]"},
-      {"reading":"목적지 마데노 히코-지칸와","original":"[] までの ひこうじかんは"},
-      {"reading":"리리쿠고 ___지칸 ___훈(뿐)오 요테-시테오리마스","original":"りりくご ___じかん ___ふん(ぷん)を よていしております。"},
-      {"reading":"나오공항명와 군지쿠-코-토낫떼오리 가이부노 사츠에이가 스베테 킨시사레마스노데 고쿄-료쿠쿠다사이 타다이마요리마도노 히요케오 오시메 쿠다사이 마타리리쿠 쵸쿠고니 마도노 히요케오 아케루 코토가 데키마스","original":"なお、[]は ぐんじくうこうとなっており、 がいぶの さつえいが すべて きんしされますので ごきょうりょくください。 ただいまより、まどの ひよけを おしめ ください。 また、りりく ちょくごに まどの ひよけを あける ことが できます。"},
-      {"reading":"마타키나이데 죠-무인야 호카노 오캬쿠사마오 무단데 사츠에-스루 코토와 키나이노 치츠죠이지노타메오코토와리시테오리마스","original":"また、きないで じょうむいんや ほかの おきゃくさまを むだんで さつえいする ことは きないの ちつじょいじのため、おことわりしております。"},
-      {"reading":"안젠나 소라노타비노타메죠-무인카라노 안나이니 고쿄-료쿠 오네가이이타시마스아리가토-고자이마시타","original":"あんぜんな そらのたびのため、じょうむいんからの あんないに ごきょうりょく おねがいいたします。ありがとうございました。"}
+      {
+        "reading": "토-키도아오 시메 (마모나쿠) 슛빠츠이타시마스",
+        "original": "とうき、ドアを しめ (まもなく) しゅっぱついたします。"
+      },
+      {
+        "reading": "안젠나 슛빠츠노타메",
+        "original": "あんぜんな しゅっぱつのため、"
+      },
+      {
+        "reading": "시테-사레타 오자세키니 고챠쿠세키쿠다사이",
+        "original": "していされた おざせきに ごちゃくせきください。"
+      },
+      {
+        "reading": "미나사마오하요-고자이마스/ 곤니치와/ 곰방와",
+        "original": "みなさま、[おはようございます。/ こんにちは。/ こんばんは。]"
+      },
+      {
+        "reading": "혼지츠와 고토-죠- 아리가토-고자이마스",
+        "original": "ほんじつは ごとうじょう ありがとうございます。"
+      },
+      {
+        "reading": "마타▶지연 사유니요리 슛빠츠가 오쿠레타텐 오와비 모시아게마스/고료-쇼-오네가이이타시마스",
+        "original": "また、[▶ ]により しゅっぱつが おくれたてん [おわび もうしあげます。/ごりょうしょうおねがいいたします。]"
+      },
+      {
+        "reading": "목적지 마데노 히코-지칸와",
+        "original": "[] までの ひこうじかんは"
+      },
+      {
+        "reading": "리리쿠고 ___지칸 ___훈(뿐)오 요테-시테오리마스",
+        "original": "りりくご ___じかん ___ふん(ぷん)を よていしております。"
+      },
+      {
+        "reading": "나오공항명와 군지쿠-코-토낫떼오리 가이부노 사츠에이가 스베테 킨시사레마스노데 고쿄-료쿠쿠다사이 타다이마요리마도노 히요케오 오시메 쿠다사이 마타리리쿠 쵸쿠고니 마도노 히요케오 아케루 코토가 데키마스",
+        "original": "なお、[]は ぐんじくうこうとなっており、 がいぶの さつえいが すべて きんしされますので ごきょうりょくください。 ただいまより、まどの ひよけを おしめ ください。 また、りりく ちょくごに まどの ひよけを あける ことが できます。"
+      },
+      {
+        "reading": "마타키나이데 죠-무인야 호카노 오캬쿠사마오 무단데 사츠에-스루 코토와 키나이노 치츠죠이지노타메오코토와리시테오리마스",
+        "original": "また、きないで じょうむいんや ほかの おきゃくさまを むだんで さつえいする ことは きないの ちつじょいじのため、おことわりしております。"
+      },
+      {
+        "reading": "안젠나 소라노타비노타메죠-무인카라노 안나이니 고쿄-료쿠 오네가이이타시마스아리가토-고자이마시타",
+        "original": "あんぜんな そらのたびのため、じょうむいんからの あんないに ごきょうりょく おねがいいたします。ありがとうございました。"
+      }
     ],
     "caReadings": [
-      {"reading":"[shāohòu / kècāng zhǔnbèi wánbìhòu]","original":"稍后客舱准备完毕后"},
-      {"reading":"běncì hángbān cāngmén jíjiāng guānbì","original":"本次航班舱门即将关闭。"},
-      {"reading":"wèile běnjià fēijī ānquánde chūfā","original":"为了本架飞机安全的出发，"},
-      {"reading":"qǐng zài zhǐdìngde zuòwèishàng zuòhǎo","original":"请在指定的座位上坐好。"},
-      {"reading":"qīnàide lǚkèmennínhǎohuānyíng nín xuǎnchéng","original":"亲爱的旅客们，您好。欢迎您选乘"},
-      {"reading":"jìzhōuhángkōng [편명]cì hángbān qiánwǎng [목적지]","original":"济州航空次航班前往。"},
-      {"reading":"yóuyú [▶지연 사유] dānwùle nínde lǚchéng, xīwàng nín néng liàngjiě","original":"由于耽误了您的旅程,希望您能谅解。"},
-      {"reading":"dàodá [목적지]de yùjì fēixíng shíjiān shì gèxiǎoshí fēnzhōng","original":"到达的预计飞行时间是个小时分钟。"},
-      {"reading":"[공항명]shì jūnshì jīchǎng, jīchǎng qūyùnèi jìnzhǐ pāizhào érqiěQǐng bǎ zhēguāngbǎn quánbù guānhǎo Qǐfēi yǐhòunín kěyǐ dǎkāi zhēguāngbǎn","original":"是军事机场,机场区域内禁止拍照。而且，请把遮光板全部关好。起飞以后，您可以打开遮光板。"},
-      {"reading":"gēnjù zhōnghuá rénmín gònghéguó jūnshì shèshī bǎohùfǎ, qǐng lìjí bǎ zhēguāngbǎn quánbù guānhǎo yóuyú [공항]shì jūnshì jīchǎngjìnzhǐ shèyǐngpāizhào lùyīnmiáohuì děngde xíngwéi cóng dāchéng dào xiàjīde quánqījiānrúguǒ wéifǎn, jiānghuì shòudào yǒuguān fǎlǜfǎguīde chǔfá","original":"根据中华人民共和国军事设施保护法,请立即把遮光板全部关好。由于是军事机场，禁止摄影，拍照，录音，描绘等的行为。从搭乘到下机的全期间，如果违反,将会受到有关法律法规的处罚。"},
-      {"reading":"cǐwàirú zài jīcāngnèi shànzì pāishè chénwùyuán huò qítā lǚkèwéi wéihù jīcāng zhìxù kěnéng huì shòudào xiànzhì","original":"此外，如在机舱内擅自拍摄乘务员或其他旅客，为维护机舱秩序，可能会受到限制。"},
-      {"reading":"wèile ānquán fēixíngqǐng jījí xiézhù chéngwùyuánde zhǐshìxièxie!","original":"为了安全飞行，请积极协助乘务员的指示。谢谢"}
+      {
+        "reading": "[shāohòu / kècāng zhǔnbèi wánbìhòu]",
+        "original": "稍后客舱准备完毕后"
+      },
+      {
+        "reading": "běncì hángbān cāngmén jíjiāng guānbì",
+        "original": "本次航班舱门即将关闭。"
+      },
+      {
+        "reading": "wèile běnjià fēijī ānquánde chūfā",
+        "original": "为了本架飞机安全的出发，"
+      },
+      {
+        "reading": "qǐng zài zhǐdìngde zuòwèishàng zuòhǎo",
+        "original": "请在指定的座位上坐好。"
+      },
+      {
+        "reading": "qīnàide lǚkèmennínhǎohuānyíng nín xuǎnchéng",
+        "original": "亲爱的旅客们，您好。欢迎您选乘"
+      },
+      {
+        "reading": "jìzhōuhángkōng [편명]cì hángbān qiánwǎng [목적지]",
+        "original": "济州航空次航班前往。"
+      },
+      {
+        "reading": "yóuyú [▶지연 사유] dānwùle nínde lǚchéng, xīwàng nín néng liàngjiě",
+        "original": "由于耽误了您的旅程,希望您能谅解。"
+      },
+      {
+        "reading": "dàodá [목적지]de yùjì fēixíng shíjiān shì gèxiǎoshí fēnzhōng",
+        "original": "到达的预计飞行时间是个小时分钟。"
+      },
+      {
+        "reading": "[공항명]shì jūnshì jīchǎng, jīchǎng qūyùnèi jìnzhǐ pāizhào érqiěQǐng bǎ zhēguāngbǎn quánbù guānhǎo Qǐfēi yǐhòunín kěyǐ dǎkāi zhēguāngbǎn",
+        "original": "是军事机场,机场区域内禁止拍照。而且，请把遮光板全部关好。起飞以后，您可以打开遮光板。"
+      },
+      {
+        "reading": "gēnjù zhōnghuá rénmín gònghéguó jūnshì shèshī bǎohùfǎ, qǐng lìjí bǎ zhēguāngbǎn quánbù guānhǎo yóuyú [공항]shì jūnshì jīchǎngjìnzhǐ shèyǐngpāizhào lùyīnmiáohuì děngde xíngwéi cóng dāchéng dào xiàjīde quánqījiānrúguǒ wéifǎn, jiānghuì shòudào yǒuguān fǎlǜfǎguīde chǔfá",
+        "original": "根据中华人民共和国军事设施保护法,请立即把遮光板全部关好。由于是军事机场，禁止摄影，拍照，录音，描绘等的行为。从搭乘到下机的全期间，如果违反,将会受到有关法律法规的处罚。"
+      },
+      {
+        "reading": "cǐwàirú zài jīcāngnèi shànzì pāishè chénwùyuán huò qítā lǚkèwéi wéihù jīcāng zhìxù kěnéng huì shòudào xiànzhì",
+        "original": "此外，如在机舱内擅自拍摄乘务员或其他旅客，为维护机舱秩序，可能会受到限制。"
+      },
+      {
+        "reading": "wèile ānquán fēixíngqǐng jījí xiézhù chéngwùyuánde zhǐshìxièxie!",
+        "original": "为了安全飞行，请积极协助乘务员的指示。谢谢"
+      }
+    ],
+    "chineseReadings": [
+      {
+        "reading": "친아이 더 뤼커 먼, 닌하오. 환잉 닌 쉬앤청 지조우 항콩[편명] 츠 항반 치앤왕[목적지].",
+        "original": "亲爱的旅客们，您好。欢迎您选乘济州航空[편명]次航班前往[목적지]。"
+      },
+      {
+        "reading": "요우위[▶지연 사유] 단우 러 닌 더 뤼청, 시왕 닌 넝 량지에.",
+        "original": "由于[▶지연 사유]耽误了您的旅程，希望您能谅解。"
+      },
+      {
+        "reading": "다다오[목적지] 더 위지 페이싱 스지앤 스___ 거 샤오스___ 펀종.",
+        "original": "到达[목적지]的预计飞行时间是___个小时___分钟。"
+      },
+      {
+        "reading": "츠와이, 루 짜이 지창 네이 산쯔 파이서 청우위앤 후어 치타 뤼커, 웨이 웨이후 지창 즈쉬, 커넝 후이 서우다오 시앤즈.",
+        "original": "此外，如在机舱内擅自拍摄乘务员或其他旅客，为维护机舱秩序，可能会受到限制。"
+      },
+      {
+        "reading": "웨이러 안취앤 페이싱, 칭 지지 시에주 청우위앤 더 즈스. 시에시에!",
+        "original": "为了安全飞行，请积极协助乘务员的指示。谢谢！"
+      }
     ]
   },
   "2-4-1": {
@@ -1632,141 +1800,625 @@ const MANUAL_READINGS = {
   },
   "2-4-2": {
     "jaReadings": [
-      {"reading":"히죠-구치와 카나라즈 죠-무인노 시지가 아루 바아이노미","original":"ひじょうくちは かならず じょうむいんの しじが ある ばあいのみ"},
-      {"reading":"오아케쿠다사이무단데 소-사시타 바아이","original":"おあけください。むだんで そうさした ばあい、"},
-      {"reading":"사이다이 쥬-넨노10 쵸-에키니나루 카노-세-가아리마스","original":"さいだい 10ねんの ちょうえきになる かのうせいがあります。"},
-      {"reading":"마타죠-무인노 교-무보-가이코-이","original":"また、じょうむいんの ぎょうむぼうがいこうい、"},
-      {"reading":"덴시타바코오 후쿠무 키나이데노 키츠엔","original":"でんしタバコを ふくむ きないでの きつえん"},
-      {"reading":"소시테 덴시키키시요-키쥰노 이항와","original":"そして でんしikikしようきじゅんの いはんは、"},
-      {"reading":"코-쿠-호안호-니요리 쇼바츠노 타이쇼-토나리마스","original":"こうくうほあんほうにより しょばつの たいしょうとなります。"},
-      {"reading":"안젠나 운코-노타메","original":"あんぜんな うんこうのため、"},
-      {"reading":"미나사마노 고쿄-료쿠 오네가이이타시마스","original":"みなさまの ごきょうりょく おねがいいたします。"}
+      {
+        "reading": "히죠-구치와 카나라즈 죠-무인노 시지가 아루 바아이노미",
+        "original": "히죠-쿠치와 카나라즈 죠-무인노 시지가 아루 바아이노미 오아케쿠다사이。무단데 소-사시타 바아이、사이다이 10넨노 초-에키니나루 카노-세이가 아리마스"
+      },
+      {
+        "reading": "오아케쿠다사이무단데 소-사시타 바아이",
+        "original": "ひじょうくちは かならず じょうむいんの しじが ある ばあいのみ おあけください。むだんで そうさした ばあい、さいだい 10ねんの ちょうえきになる かのうせいがあります。"
+      },
+      {
+        "reading": "사이다이 쥬-넨노10 쵸-에키니나루 카노-세-가아리마스",
+        "original": "마타、죠-무인노 교-무보-가이코-이、덴시타바코오 후쿠무 키나이데노 키츠엔、소시테 덴시키키시요-키쥰노 이한와、코-쿠-호안호-니요리 쇼바츠노 타이쇼-토나리마스"
+      },
+      {
+        "reading": "마타죠-무인노 교-무보-가이코-이",
+        "original": "また、じょうむいんの ぎょうむぼうがいこうい、でんしタバコを ふくむ きないでの きつえん、そして でんしききしようきじゅんの いはんは、こうくうほあんほうにより しょばつの たいしょうとなります。"
+      },
+      {
+        "reading": "덴시타바코오 후쿠무 키나이데노 키츠엔",
+        "original": "안젠나 운코-노타메、미나사마노 고쿄-료쿠 오네가이이타시마스"
+      },
+      {
+        "reading": "소시테 덴시키키시요-키쥰노 이항와",
+        "original": "あんぜんな うんこうのため、みなさまの ごきょうりょく おねがいいたします。"
+      }
     ],
     "caReadings": [
-      {"reading":"jǐnjí chūkǒu bìxū zài chéngwùyuán zhǐshì xià cái néng kāiqǐ","original":"紧急出口必须在乘务员指示下才能开启。"},
-      {"reading":"rú shànzì cāozuòzuìgāo kě pànchǔ shí nián yǒuqī túxíng","original":"如擅自操作，最高可判处十年有期徒刑。"},
-      {"reading":"cǐwàifángài chéngwùyuán zhíxíng zhíwù","original":"此外，妨碍乘务员执行职务、"},
-      {"reading":"zài jīnèi xīyānbāokuò diànzǐyān","original":"在机内吸烟包括电子烟、"},
-      {"reading":"wéifǎn diànzǐ shèbèi shǐyòng guīdìng děng","original":"违反电子设备使用规定等，"},
-      {"reading":"jūn kě yījù hángkōng ānquánfǎ shòudào chǔfá","original":"均可依据航空安全法受到处罚。"},
-      {"reading":"wèile nínde ānquán yǔ shùnlìde fēixíngqǐng yúyǐ pèihé","original":"为了您的安全与顺利的飞行，请予以配合。"}
+      {
+        "reading": "jǐnjí chūkǒu bìxū zài chéngwùyuán zhǐshì xià cái néng kāiqǐ",
+        "original": "紧急出口必须在乘务员指示下才能开启。如擅自操作，最高可判处十年有期徒刑。"
+      },
+      {
+        "reading": "rú shànzì cāozuòzuìgāo kě pànchǔ shí nián yǒuqī túxíng",
+        "original": "此外，妨碍乘务员执行职务、在机内吸烟包括电子烟、违反电子设备使用规定等，均可依据航空安全法受到处罚。"
+      },
+      {
+        "reading": "cǐwàifángài chéngwùyuán zhíxíng zhíwù",
+        "original": "为了您的安全与顺利的飞行，请予以配合。"
+      }
+    ],
+    "chineseReadings": [
+      {
+        "reading": "진지 추커우 비쉬 짜이 청우위안 즈스 샤 차이넝 카이치.",
+        "original": "紧急出口必须在乘务员指示下才能开启。"
+      },
+      {
+        "reading": "루 샨쯔 차오쭤, 쭤이가오 커 판추 스녠 요우치 투싱.",
+        "original": "如擅自操作，最高可判处十年有期徒刑。"
+      },
+      {
+        "reading": "츠와이, 팡아이 청우위안 즈싱 즈우, 짜이 지네이 시옌 바오쿠어 뎬쯔옌, 웨이판 뎬쯔 서베이 스융 꾸이딩 등, 쥔커 이쥐 항쿵 안췐파 쇼우따오 추파.",
+        "original": "此外，妨碍乘务员执行职务、在机内吸烟包括电子烟、违反电子设备使用规定等，均可依据航空安全法受到处罚。"
+      },
+      {
+        "reading": "웨이러 닌더 안췐 위 슌리 더 페이싱, 칭 위이 페이허.",
+        "original": "为了您的安全与顺利的飞行，请予以配合。"
+      }
     ]
   },
   "2-5-1": {
     "jaReadings": [
-      {"reading":"미나사마 가소린노 니오이와 이치지테키나 겐쇼-토나리","original":"みなさま、 ガソリンの においは いちじてきな げんしょうとなり、"},
-      {"reading":"리리쿠고니와 키에마스노데 고안신쿠다사이","original":"りりくごには きえますので ごあんしんください。"}
+      {
+        "reading": "미나사마 가소린노 니오이와 이치지테키나 겐쇼-토나리",
+        "original": "みなさま、 ガソリンの においは いちじてきな げんしょうとなり、"
+      },
+      {
+        "reading": "리리쿠고니와 키에마스노데 고안신쿠다사이",
+        "original": "りりくごには きえますので ごあんしんください。"
+      }
     ],
     "caReadings": [
-      {"reading":"gèwèilǚkèkècāngnèi kěnéng huì chūxiàn yìwèi","original":"各位旅客，客舱内可能会出现异味。"},
-      {"reading":"zhèshì qǐfēi zhīqiánde zànshí xiànxiàngqǐng nín liàngjiě","original":"这是起飞之前的暂时现象，请您谅解。"}
+      {
+        "reading": "gèwèilǚkèkècāngnèi kěnéng huì chūxiàn yìwèi",
+        "original": "各位旅客，客舱内可能会出现异味。"
+      },
+      {
+        "reading": "zhèshì qǐfēi zhīqiánde zànshí xiànxiàngqǐng nín liàngjiě",
+        "original": "这是起飞之前的暂时现象，请您谅解。"
+      }
     ]
   },
   "2-5-2": {
     "jaReadings": [
-      {"reading":"미나사마 키나이노 온도와 리리쿠고 테키세츠니 쵸-세츠사레마스노데 시바라쿠 오마치쿠다사이","original":"みなさま、 きないの おんどは りりくご てきせつに ちょうせつされますので しばらく おまちください。"}
+      {
+        "reading": "미나사마 키나이노 온도와 리리쿠고 테키세츠니 쵸-세츠사레마스노데 시바라쿠 오마치쿠다사이",
+        "original": "みなさま、 きないの おんどは りりくご てきせつに ちょうせつされますので しばらく おまちください。"
+      }
     ],
     "caReadings": [
-      {"reading":"gèwèilǚkèmùqián kècāng wēndù kěnéng huì búshìyí,","original":"各位旅客，目前客舱温度可能会不适宜,"},
-      {"reading":"kècāng wēndù qǐfēi hòu huì shìdàng tiáozhěng","original":"客舱温度起飞后会适当调整。"},
-      {"reading":"qǐng nàixīn děngdài","original":"请耐心等待。"}
+      {
+        "reading": "gèwèilǚkèmùqián kècāng wēndù kěnéng huì búshìyí,",
+        "original": "各位旅客，目前客舱温度可能会不适宜,"
+      },
+      {
+        "reading": "kècāng wēndù qǐfēi hòu huì shìdàng tiáozhěng",
+        "original": "客舱温度起飞后会适当调整。"
+      },
+      {
+        "reading": "qǐng nàixīn děngdài",
+        "original": "请耐心等待。"
+      }
     ]
   },
   "2-5-3": {
     "jaReadings": [
-      {"reading":"미나사마코-쿠-키노 나카토 소토노 온도사니요리","original":"みなさま、こうくうきの なかと そとの おんどさにより、"},
-      {"reading":"시즈쿠가 오치루 바아이가 고자이마스","original":"しずくが おちる ばあいが ございます。"},
-      {"reading":"온도사니요루 이치지테키나 겐쇼-토나리마스노데","original":"おんどさによる いちじてきな げんしょうとなりますので"},
-      {"reading":"미나사마노 고료-쇼-노호도 오네가이이타시마스","original":"みなさまの ごりょうしょうのほど おねがいいたします。"},
-      {"reading":"미나사마안젠나 리리쿠니 소나에 키나이노 쇼-메이오","original":"みなさま、あんぜんな りりくに そなえ きないの しょうめいを"},
-      {"reading":"쿠라쿠 쵸-세츠이타시마스아카리노 히츠요-나 카타와","original":"くらく ちょうせついたします。あかりの ひつような かたは"},
-      {"reading":"자세키 우에노 라이토보탄오 고리요-쿠다사이","original":"ざせき うえの ライトボタンを ごりようください。"},
-      {"reading":"미나사마마모나쿠 리리쿠이타시마스시-토베루토오 오시메쿠다사이","original":"みなさま、まもなく りりくいたします。シートベルトを おしめください。"}
+      {
+        "reading": "미나사마코-쿠-키노 나카토 소토노 온도사니요리",
+        "original": "みなさま、こうくうきの なかと そとの おんどさにより、"
+      },
+      {
+        "reading": "시즈쿠가 오치루 바아이가 고자이마스",
+        "original": "しずくが おちる ばあいが ございます。"
+      },
+      {
+        "reading": "온도사니요루 이치지테키나 겐쇼-토나리마스노데",
+        "original": "おんどさによる いちじてきな げんしょうとなりますので"
+      },
+      {
+        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
+        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
+      },
+      {
+        "reading": "미나사마안젠나 리리쿠니 소나에 키나이노 쇼-메이오",
+        "original": "みなさま、あんぜんな りりくに そなえ きないの しょうめいを"
+      },
+      {
+        "reading": "쿠라쿠 쵸-세츠이타시마스아카리노 히츠요-나 카타와",
+        "original": "くらく ちょうせついたします。あかりの ひつような かたは"
+      },
+      {
+        "reading": "자세키 우에노 라이토보탄오 고리요-쿠다사이",
+        "original": "ざせき うえの ライトボタンを ごりようください。"
+      },
+      {
+        "reading": "미나사마마모나쿠 리리쿠이타시마스시-토베루토오 오시메쿠다사이",
+        "original": "みなさま、まもなく りりくいたします。シートベルトを おしめください。"
+      }
     ],
     "caReadings": [
-      {"reading":"gèwèilǚkèyóuyú jīcāng nèiwàide wēndù chāyìkècāng nèi kěnéng huì fāshēng jiélù zhèshì qǐfēi zhīqiánde zànshí xiànxiàngqǐng nín liàngjiě","original":"各位旅客，由于机舱内外的温度差异，客舱内可能会发生结露。这是起飞之前的暂时现象，请您谅解。"},
-      {"reading":"gèwèilǚkèwèile ānquánde qǐfēiwǒmen jiāng tiáoàn kècāng dēngguāng","original":"各位旅客，为了安全的起飞，我们将调暗客舱灯光。"},
-      {"reading":"zài tóudǐngshàng shèyǒu yuèdúdēngxūyàode lǚkè kěyǐ shǐyòng","original":"在头顶上设有阅读灯，需要的旅客可以使用。"},
-      {"reading":"gèwèilǚkèwǒmende fēijī jíjiāng qǐfēiqǐng jìhǎo ānquándài","original":"各位旅客，我们的飞机即将起飞，请系好安全带。"}
+      {
+        "reading": "gèwèilǚkèyóuyú jīcāng nèiwàide wēndù chāyìkècāng nèi kěnéng huì fāshēng jiélù zhèshì qǐfēi zhīqiánde zànshí xiànxiàngqǐng nín liàngjiě",
+        "original": "各位旅客，由于机舱内外的温度差异，客舱内可能会发生结露。这是起飞之前的暂时现象，请您谅解。"
+      },
+      {
+        "reading": "gèwèilǚkèwèile ānquánde qǐfēiwǒmen jiāng tiáoàn kècāng dēngguāng",
+        "original": "各位旅客，为了安全的起飞，我们将调暗客舱灯光。"
+      },
+      {
+        "reading": "zài tóudǐngshàng shèyǒu yuèdúdēngxūyàode lǚkè kěyǐ shǐyòng",
+        "original": "在头顶上设有阅读灯，需要的旅客可以使用。"
+      },
+      {
+        "reading": "gèwèilǚkèwǒmende fēijī jíjiāng qǐfēiqǐng jìhǎo ānquándài",
+        "original": "各位旅客，我们的飞机即将起飞，请系好安全带。"
+      }
     ]
   },
   "3-1": {
     "jaReadings": [
-      {"reading":"미나사마코노 빈데와 에아-카훼AIR CAFE / (오요비) 멘제-힌노","original":"みなさま、この びんでは [AIR CAFE / (および) めんぜいひん]の"}
+      {
+        "reading": "미나사마코노 빈데와 에아-카훼AIR CAFE / (오요비) 멘제-힌노",
+        "original": "みなさま、この びんでは [AIR CAFE / (および) めんぜいひん]の"
+      }
     ],
     "caReadings": []
   },
-  "3-3": {
+  "3-10": {
     "jaReadings": [
-      {"reading":"한바이오 오코낫떼오리마센","original":"はんばいを おこなっておりません。"},
-      {"reading":"고료-쇼-노호도 오네가이이타시마스","original":"ごりょうしょうのほど おねがいいたします。"},
-      {"reading":"미나사마","original":"みなさま、"}
+      {
+        "reading": "미나사마마모나쿠 챠쿠리쿠이타시마스",
+        "original": "みなさま、まもなく ちゃくりくいたします。"
+      },
+      {
+        "reading": "시-토베루토오 오시메쿠다사이자세키노 세모타레테-부루",
+        "original": "シートベルトを おしめください。ざせきの せもたれ、テーブル、"
+      },
+      {
+        "reading": "히지카케와 모또노이치니 오모도시쿠다사이 마도노 히요케와 아케타 죠-타이니 시테이타다키마스요- 오네가이이타시마스",
+        "original": "ひじかけは もとのいちに おもどしください。 まどの ひよけは あけた じょうたいに していただきますよう おねがいいたします。"
+      },
+      {
+        "reading": "안젠노타메오테니모츠가 테키세츠니 슈-노-사레테이루카 고카쿠닌쿠다사이 타다이마요리안젠나 챠쿠리쿠노타메",
+        "original": "あんぜんのため、おてにもつが てきせつに しゅうのうされているか ごかくにんください。 ただいまより、あんぜんな ちゃくりくのため"
+      },
+      {
+        "reading": "오테아라이노 고시요-오 세-겐이타시마스",
+        "original": "おてあらいの ごしようを せいげんいたします。"
+      },
+      {
+        "reading": "마타덴시키키스탄도와 모토노 이치니 모도시 쥬-덴 케-부루와 토리하즈시테쿠다사이",
+        "original": "また、でんしききスタンドは もとの いちに もどし、 じゅうでん ケーブルは とりはずしてください。"
+      },
+      {
+        "reading": "공항명와 군지쿠-코-토낫떼오리 가이부노사츠에-가 스베떼 킨시사레마스노데 고쿄-료쿠쿠다사이",
+        "original": "[]は ぐんじくうこうとなっており、 がいぶのさつえいが すべて きんしされますので ごきょうりょくください。"
+      },
+      {
+        "reading": "미나사마안젠나 챠쿠리쿠노타메 키나이노 쇼-메-오",
+        "original": "みなさま、あんぜんな ちゃくりくのため きないの しょうめいを"
+      },
+      {
+        "reading": "쿠라쿠 쵸-세츠이타시마스",
+        "original": "くらく ちょうせついたします。"
+      },
+      {
+        "reading": "아카리노 히츠요-나 카타와 자세키 우에노 라이토보탄오 고리요-쿠다사이",
+        "original": "あかりの ひつような かたは ざせき うえの ライトボタンを ごりようください。"
+      },
+      {
+        "reading": "미나사마목적지에 요-코소",
+        "original": "みなさま、[]へ ようこそ！"
+      },
+      {
+        "reading": "안젠노타메 시-토베루토 챠쿠요-노사인가 키에루마데",
+        "original": "あんぜんのため シートベルト ちゃくようのサインが きえるまで"
+      },
+      {
+        "reading": "오자세키니테 스왓떼 오마치쿠다사이",
+        "original": "おざせきにて すわって おまちください。"
+      },
+      {
+        "reading": "마타슈-노-다나오 아케루사이와 나까노 모노가 오치나이요- 고츄-이쿠다사이",
+        "original": "また、しゅうのうだなを あけるさいは なかの ものが おちないよう ごちゅういください。"
+      },
+      {
+        "reading": "나오군지시세츠노 호안 이지노타메 마도노 히요케오 오시메 쿠다사이",
+        "original": "なお、ぐんじしせつの ほあん いじのため、 まどの ひよけを おしめ ください。"
+      },
+      {
+        "reading": "아리가토-고자이마시타",
+        "original": "ありがとうございました。"
+      },
+      {
+        "reading": "미나사마타다이마 목적지니 토-챠쿠이타시마시타",
+        "original": "みなさま、ただいま []に とうちゃくいたしました。"
+      },
+      {
+        "reading": "혼지츠와 요테이요리 토-챠쿠가 오쿠레마시타코토오 오와비 모-시아게마스",
+        "original": "ほんじつは よていより とうちゃくが おくれましたことを おわび もうしあげます。"
+      },
+      {
+        "reading": "혼지츠와 ▶지연 사유니요리요테이요리 토-챠쿠가 오쿠레마시타코토오 고료-쇼-오네가이이타시마스",
+        "original": "ほんじつは [▶ ]により、よていより とうちゃくが おくれましたことを ごりょうしょうおねがいいたします。"
+      },
+      {
+        "reading": "안젠노타메시-토베루토 챠쿠요-노사인가 키에루마데",
+        "original": "あんぜんのため、シートベルト ちゃくようのサインが きえるまで"
+      },
+      {
+        "reading": "오자세키니테 스왓떼 오마치쿠다사이",
+        "original": "おざせきにて すわって おまちください。"
+      },
+      {
+        "reading": "마타슈-노-다나오 아케루사이와 나까노 모노가 오치나이요- 고츄-이쿠다사이",
+        "original": "また、しゅうのうだなを あけるさいは なかの ものが おちないよう ごちゅういください。"
+      },
+      {
+        "reading": "나오군지시세츠노 호안 이지노타메 마도노 히요케오 오시메 쿠다사이",
+        "original": "なお、ぐんじしせつの ほあん いじのため、 まどの ひよけを おしめ ください。"
+      },
+      {
+        "reading": "아리가토-고자이마시타",
+        "original": "ありがとうございました。"
+      }
     ],
     "caReadings": [
-      {"reading":"gèwèilǚkè, běncì hángbān bújìnxíng xiāoshòu","original":"各位旅客,本次航班不进行销售"},
-      {"reading":"[língshí hé gèzhǒng zhōubiān chǎnpǐn / (yǐjí) miǎnshuìpǐn]","original":"零食和各种周边产品以及免税品。"},
-      {"reading":"qǐng nín liàngjiě","original":"请您谅解。"}
+      {
+        "reading": "gèwèilǚkè, wǒmen jíjiāng dàodá [공항]",
+        "original": "各位旅客,我们即将到达。"
+      },
+      {
+        "reading": "qǐng jìhǎo ānquándàitiáozhí yǐbèi, shōuqǐ xiǎozhuōbǎn",
+        "original": "请系好安全带，调直椅背,收起小桌板，"
+      },
+      {
+        "reading": "fàngxià fúshǒubǎ zhēguāngbǎn dǎkāi",
+        "original": "放下扶手，把遮光板打开。"
+      },
+      {
+        "reading": "érqiěqǐng zàicì quèrèn nín de suíshēn xínglǐ cúnfàng zhuàngtài",
+        "original": "而且，请再次确认您的随身行李存放状态。"
+      },
+      {
+        "reading": "wèile ānquánqǐng búyào shǐyòng xǐshǒujiān",
+        "original": "为了安全，请不要使用洗手间。"
+      },
+      {
+        "reading": "tóngshí, qǐng jiāng diànzǐ shèbèi zhījià shōuhuí yuánwèi, bìng qùchú chōngdiàn diànlǎn",
+        "original": "同时,请将电子设备支架收回原位,并去除充电电缆。"
+      },
+      {
+        "reading": "[공항명]shì jūnshìjīchǎng, suǒyǒu jīchǎng qūyùnèi jìnzhǐpāizhào",
+        "original": "是军事机场,所有机场区域内禁止拍照。"
+      },
+      {
+        "reading": "lìngwài[공항]wéi jūnshìjīchǎnggēnjù zhōnghuá rénmín gònghéguó jūnshì shèshī bǎohùfǎ wèile bǎochí shèshībǎoān quánmiàn jìnzhǐ chuāngwài shèyǐng gēnjù yǒuguānguīdìng qǐng lìjí guānbì zhēguāngbǎn rúguǒ bèi jiēfā dǎkāi zhēguāngbǎnpāishèděngde wéifǎnxíngwéijiāng kěnéng bèi zhuījiū fǎlǜzérènbìxū bǎochí zhēguāngbǎnde guānbì zhuàngtài",
+        "original": "另外，为军事机场。根据中华人民共和国军事设施保护法为了保持设施保安全面禁止窗外摄影。根据有关规定请立即关闭遮光板。如果被揭发打开遮光板，拍摄等的违反行为，将可能被追究法律责任，必须保持遮光板的关闭状态。"
+      },
+      {
+        "reading": "gèwèilǚkè, wèile ānquánde zhuólùkècāng dēngguāng jiāng huìtiáoàn",
+        "original": "各位旅客,为了安全的着陆，客舱灯光将会调暗。"
+      },
+      {
+        "reading": "zài tóudǐngshàng shèyǒu yuèdúdēngxūyàode lǚkè kěyǐ shǐyòng",
+        "original": "在头顶上设有阅读灯，需要的旅客可以使用。"
+      },
+      {
+        "reading": "zūnjìngde gèwèilǚkèhuānyíng nín láidào [목적지]",
+        "original": "尊敬的各位旅客，欢迎您来到。"
+      },
+      {
+        "reading": "wèile nínde ānquánānquándài zhǐshìdēng xīmièzhīqián",
+        "original": "为了您的安全，安全带指示灯熄灭之前，"
+      },
+      {
+        "reading": "qǐng búyào líkāi zuòwèi",
+        "original": "请不要离开座位。"
+      },
+      {
+        "reading": "érqiěānquándài zhǐshìdēng xīmiè hòu, dǎkāi xínglijiàshí",
+        "original": "而且，安全带指示灯熄灭后,打开行李架时，"
+      },
+      {
+        "reading": "qǐng zhùyì lǐmiànde dōngxi diàoluò",
+        "original": "请注意里面的东西掉落。"
+      },
+      {
+        "reading": "zhù nín lǚtú yúkuàibìng qīdài yǔ nín zàicì jiànmiàn",
+        "original": "祝您旅途愉快，并期待与您再次见面。"
+      },
+      {
+        "reading": "érqiěWèile bǎochí jūnshì shèshī bǎo’ān qǐng bǎ zhēguāngbǎn quánbù guānhǎo",
+        "original": "而且，为了保持军事设施保安，请把遮光板全部关好。"
+      },
+      {
+        "reading": "xièxie",
+        "original": "谢谢。"
+      },
+      {
+        "reading": "gèwèilǚkèwǒmen dàodá [목적지]",
+        "original": "各位旅客，我们到达。"
+      },
+      {
+        "reading": "fēicháng bàoqiànfēijī bǐ yùdìngshíjiān yánchí dàodá",
+        "original": "非常抱歉，飞机比预定时间延迟到达。"
+      },
+      {
+        "reading": "yóuyú [▶지연 사유] fēijī bǐ yùdìngshíjiān yánchí dàodáqǐng nín liàngjiě",
+        "original": "由于飞机比预定时间延迟到达。请您谅解。"
+      },
+      {
+        "reading": "wèile nínde ānquán, zài ānquándài zhǐshìdēng xīmièzhīqián",
+        "original": "为了您的安全,在安全带指示灯熄灭之前"
+      },
+      {
+        "reading": "qǐng búyào líkāi zuòwèi",
+        "original": "请不要离开座位。"
+      },
+      {
+        "reading": "érqiěānquándài zhǐshìdēng xīmièhòu, dǎkāi xínglijiàshí",
+        "original": "而且，安全带指示灯熄灭后,打开行李架时，"
+      },
+      {
+        "reading": "qǐng zhùyì lǐmiànde dōngxi diàoluò",
+        "original": "请注意里面的东西掉落。"
+      },
+      {
+        "reading": "érqiěwèile bǎochí jūnshì shèshī bǎo’ān qǐng bǎ zhēguāngbǎn quánbù guānhǎo",
+        "original": "而且，为了保持军事设施保安，请把遮光板全部关好。"
+      },
+      {
+        "reading": "xièxie",
+        "original": "谢谢。"
+      }
     ]
+  },
+  "3-3": {
+    "jaReadings": [
+      {
+        "reading": "한바이오 오코낫떼오리마센",
+        "original": "はんばいを おこなっておりません。"
+      },
+      {
+        "reading": "고료-쇼-노호도 오네가이이타시마스",
+        "original": "ごりょうしょうのほど おねがいいたします。"
+      },
+      {
+        "reading": "미나사마",
+        "original": "みなさま、"
+      }
+    ],
+    "caReadings": [
+      {
+        "reading": "gèwèilǚkè, běncì hángbān bújìnxíng xiāoshòu",
+        "original": "各位旅客,本次航班不进行销售"
+      },
+      {
+        "reading": "[língshí hé gèzhǒng zhōubiān chǎnpǐn / (yǐjí) miǎnshuìpǐn]",
+        "original": "零食和各种周边产品以及免税品。"
+      },
+      {
+        "reading": "qǐng nín liàngjiě",
+        "original": "请您谅解。"
+      }
+    ]
+  },
+  "3-4-3": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "3-4-4": {
+    "jaReadings": [],
+    "caReadings": []
   },
   "3-5-1": {
     "jaReadings": [
-      {"reading":"타다이마(히죠-니) 키류-노 후안테-나 토코로오 츠-카시테오리마스","original":"ただいま、(ひじょうに) きりゅうの ふあんていな ところを つうかしております。"},
-      {"reading":"코레요리사키 (히죠-니) 키류-노 후안테-나 토코로오 츠-카스루 요테-데스","original":"これよりさき (ひじょうに) きりゅうの ふあんていな ところを つうかする よていです。"},
-      {"reading":"코레요리사키와 오테아라이노 고리요-나도자세키노 이도-와 시바라쿠고엔료쿠다사이 마타오코사마즈레노 오캬쿠사마와 오코사마노 시-토베루토모 고카쿠닌쿠다사이","original":"これよりさきは おてあらいの ごりようなど、ざせきの いどうは しばらくごえんりょください。 また、おこさまづれの おきゃくさまは おこさまの シートベルトも ごかくにんください。"},
-      {"reading":"나오오테아라이니 이랏샤루 오캬쿠사마와 치카쿠노 테스리니 오츠카마리니나리 고지신노 안젠카쿠호 오네가이이타시마스","original":"なお、おてあらいに いらっしゃる おきゃくさまは ちかくの てすりに おつかまりになり、 ごじしんの あんぜんかくほ おねがいいたします。"},
-      {"reading":"시-토베루토오 싯카리토 오시메쿠다사이","original":"シートベルトを しっかりと おしめください。"},
-      {"reading":"미나사마타다이마 (히죠-니) 키류-노 후안테-나 토코로오","original":"みなさま、ただいま (ひじょうに) きりゅうの ふあんていな ところを"},
-      {"reading":"츠-카시테이루타메히키츠즈키 히코-키가 유레테오리마스","original":"つうかしているため、ひきつづき ひこうきが ゆれております。"},
-      {"reading":"시-토베루토오 모-이치도 오타시카메쿠다사이","original":"シートベルトを もういちど おたしかめください。"},
-      {"reading":"코레요리사키와 오테아라이노 고리요-나도 자세키노 이도-와 시바라쿠 고엔료쿠다사이 마타오코사마즈레노 오캬쿠사마와 오코사마노 시-토베루토모 고카쿠닌쿠다사이","original":"これよりさきは おてあらいの ごりようなど、 ざせきの いどうは しばらく ごえんりょください。 また、おこさまづれの おきゃくさまは おこさまの シートベルトも ごかくにんください。"},
-      {"reading":"미나사마","original":"みなさま、"},
-      {"reading":"토-키와 마다 키류-노 후안테-나 토코로오 츠-카시테오리마스","original":"とうきは まだ きりゅうの ふあんていな ところを つうかしております。"},
-      {"reading":"시-토베루토 챠쿠요-노 사인가 키에루마데 오자세키니테","original":"シートベルト ちゃくようの サインが きえるまで おざせきにて"},
-      {"reading":"스왓떼 오마치쿠다사이","original":"すわって おまちください 。"},
-      {"reading":"미나사마안젠노타메","original":"みなさま、あんぜんのため"},
-      {"reading":"키나이 사-비스 가 오쿠레테오리마스/ 오 츄-단이타시마시타","original":"きない サービス [が おくれております。/ を ちゅうだんいたしました。]"},
-      {"reading":"키류-가 안테-시마시타라","original":"きりゅうが あんていしましたら、"},
-      {"reading":"사-비스오 카이시사세테 이타다키마스노데","original":"サービスを かいしさせて いただきますので、"},
-      {"reading":"미나사마노 고료-쇼-노호도 오네가이이타시마스","original":"みなさまの ごりょうしょうのほど おねがいいたします。"},
-      {"reading":"미나사마","original":"みなさま、"},
-      {"reading":"안젠노타메 / ▶비정상 상황 예문 / ▶TOD Signal 송출 시 니요리","original":"[あんぜんのため / ▶ / ▶TOD Signal ] により、"},
-      {"reading":"키나이 사-비스오 슈-료-이타시마시타","original":"きない サービスを しゅうりょういたしました。"},
-      {"reading":"미나사마노 고료-쇼-노호도 오네가이이타시마스","original":"みなさまの ごりょうしょうのほど おねがいいたします。"}
+      {
+        "reading": "타다이마(히죠-니) 키류-노 후안테-나 토코로오 츠-카시테오리마스",
+        "original": "ただいま、(ひじょうに) きりゅうの ふあんていな ところを つうかしております。"
+      },
+      {
+        "reading": "코레요리사키 (히죠-니) 키류-노 후안테-나 토코로오 츠-카스루 요테-데스",
+        "original": "これよりさき (ひじょうに) きりゅうの ふあんていな ところを つうかする よていです。"
+      },
+      {
+        "reading": "코레요리사키와 오테아라이노 고리요-나도자세키노 이도-와 시바라쿠고엔료쿠다사이 마타오코사마즈레노 오캬쿠사마와 오코사마노 시-토베루토모 고카쿠닌쿠다사이",
+        "original": "これよりさきは おてあらいの ごりようなど、ざせきの いどうは しばらくごえんりょください。 また、おこさまづれの おきゃくさまは おこさまの シートベルトも ごかくにんください。"
+      },
+      {
+        "reading": "나오오테아라이니 이랏샤루 오캬쿠사마와 치카쿠노 테스리니 오츠카마리니나리 고지신노 안젠카쿠호 오네가이이타시마스",
+        "original": "なお、おてあらいに いらっしゃる おきゃくさまは ちかくの てすりに おつかまりになり、 ごじしんの あんぜんかくほ おねがいいたします。"
+      },
+      {
+        "reading": "시-토베루토오 싯카리토 오시메쿠다사이",
+        "original": "シートベルトを しっかりと おしめください。"
+      },
+      {
+        "reading": "미나사마타다이마 (히죠-니) 키류-노 후안테-나 토코로오",
+        "original": "みなさま、ただいま (ひじょうに) きりゅうの ふあんていな ところを"
+      },
+      {
+        "reading": "츠-카시테이루타메히키츠즈키 히코-키가 유레테오리마스",
+        "original": "つうかしているため、ひきつづき ひこうきが ゆれております。"
+      },
+      {
+        "reading": "시-토베루토오 모-이치도 오타시카메쿠다사이",
+        "original": "シートベルトを もういちど おたしかめください。"
+      },
+      {
+        "reading": "코레요리사키와 오테아라이노 고리요-나도 자세키노 이도-와 시바라쿠 고엔료쿠다사이 마타오코사마즈레노 오캬쿠사마와 오코사마노 시-토베루토모 고카쿠닌쿠다사이",
+        "original": "これよりさきは おてあらいの ごりようなど、 ざせきの いどうは しばらく ごえんりょください。 また、おこさまづれの おきゃくさまは おこさまの シートベルトも ごかくにんください。"
+      },
+      {
+        "reading": "미나사마",
+        "original": "みなさま、"
+      },
+      {
+        "reading": "토-키와 마다 키류-노 후안테-나 토코로오 츠-카시테오리마스",
+        "original": "とうきは まだ きりゅうの ふあんていな ところを つうかしております。"
+      },
+      {
+        "reading": "시-토베루토 챠쿠요-노 사인가 키에루마데 오자세키니테",
+        "original": "シートベルト ちゃくようの サインが きえるまで おざせきにて"
+      },
+      {
+        "reading": "스왓떼 오마치쿠다사이",
+        "original": "すわって おまちください 。"
+      },
+      {
+        "reading": "미나사마안젠노타메",
+        "original": "みなさま、あんぜんのため"
+      },
+      {
+        "reading": "키나이 사-비스 가 오쿠레테오리마스/ 오 츄-단이타시마시타",
+        "original": "きない サービス [が おくれております。/ を ちゅうだんいたしました。]"
+      },
+      {
+        "reading": "키류-가 안테-시마시타라",
+        "original": "きりゅうが あんていしましたら、"
+      },
+      {
+        "reading": "사-비스오 카이시사세테 이타다키마스노데",
+        "original": "サービスを かいしさせて いただきますので、"
+      },
+      {
+        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
+        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
+      },
+      {
+        "reading": "미나사마",
+        "original": "みなさま、"
+      },
+      {
+        "reading": "안젠노타메 / ▶비정상 상황 예문 / ▶TOD Signal 송출 시 니요리",
+        "original": "[あんぜんのため / ▶ / ▶TOD Signal ] により、"
+      },
+      {
+        "reading": "키나이 사-비스오 슈-료-이타시마시타",
+        "original": "きない サービスを しゅうりょういたしました。"
+      },
+      {
+        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
+        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
+      }
     ],
     "caReadings": [
-      {"reading":"gèwèilǚkè,","original":"各位旅客,"},
-      {"reading":"yóuyú fēijī yùyǒu bùwěndìng qìliú zhèngzài (yánzhòng) diānbǒ","original":"由于飞机遇有不稳定气流，正在严重颠簸。"},
-      {"reading":"yóuyú fēijī yùyǒu bùwěndìng qìliú jiānghuì (yánzhòng) diānbǒ","original":"由于飞机遇有不稳定气流，将会严重颠簸。"},
-      {"reading":"qǐng jìhǎo ānquándài","original":"请系好安全带。"},
-      {"reading":"qǐng búyào líkāi zuòwèi hé shǐyòng xǐshǒujiān yě quèrèn nínde háizi jìhǎo ānquándài","original":"请不要离开座位和使用洗手间，也确认您的孩子系好安全带。"},
-      {"reading":"érqiězhèngzài shǐyòng wèishēngjiānde chéngkè qǐng wòjǐn bǎshouquèbǎo ānquán","original":"而且，正在使用卫生间的乘客，请握紧把手，确保安全。"},
-      {"reading":"gèwèilǚkè, fēijī zāoyù bùwěndìng qìliújìxù yánzhòngdiānbǒ","original":"各位旅客,飞机遭遇不稳定气流，继续（严重）颠簸。"},
-      {"reading":"qǐng zàicì quèrèn nínde ānquándài yǐjīng kòuhǎo jìjǐn","original":"请再次确认您的安全带已经扣好系紧。"},
-      {"reading":"qǐng búyào líkāi zuòwèi hé shǐyòng xǐshǒujiān yě quèrèn nínde háizi jìhǎo ānquándài","original":"请不要离开座位和使用洗手间，也确认您的孩子系好安全带。"},
-      {"reading":"gèwèilǚkè, wǒmende fēijī háizài zāoyù bùwěndìng qìliú","original":"各位旅客,我们的飞机还在遭遇不稳定气流。"},
-      {"reading":"zài ānquándài zhǐshìdēng xīmiè zhīqián","original":"在安全带指示灯熄灭之前，"},
-      {"reading":"qǐng zài zuòwèishàng jìxù jìhǎo ānquándài bìng nàixīn děngdài","original":"请在座位上继续系好安全带并耐心等待。"},
-      {"reading":"gèwèilǚkè, wèile ānquánzànshí [yánchí / tíngzhǐ] kècāng fúwù","original":"各位旅客,为了安全，暂时延迟停止客舱服务。"},
-      {"reading":"qìliú wěndìngzhīhòu kāishǐ tígōng fúwùqǐng nín liàngjiě","original":"气流稳定之后开始提供服务，请您谅解。"},
-      {"reading":"gèwèilǚkè,","original":"各位旅客,"},
-      {"reading":"[wèile ānquán/ yóuyú ▶비정상 상황 예문 / ▶TOD Signal 송출 시],","original":"为了安全由于,"},
-      {"reading":"wǒmen wúfǎ jìnxíng kècāng fúwùqǐng nín liàngjiě","original":"我们无法进行客舱服务。请您谅解。"}
+      {
+        "reading": "gèwèilǚkè,",
+        "original": "各位旅客,"
+      },
+      {
+        "reading": "yóuyú fēijī yùyǒu bùwěndìng qìliú zhèngzài (yánzhòng) diānbǒ",
+        "original": "由于飞机遇有不稳定气流，正在严重颠簸。"
+      },
+      {
+        "reading": "yóuyú fēijī yùyǒu bùwěndìng qìliú jiānghuì (yánzhòng) diānbǒ",
+        "original": "由于飞机遇有不稳定气流，将会严重颠簸。"
+      },
+      {
+        "reading": "qǐng jìhǎo ānquándài",
+        "original": "请系好安全带。"
+      },
+      {
+        "reading": "qǐng búyào líkāi zuòwèi hé shǐyòng xǐshǒujiān yě quèrèn nínde háizi jìhǎo ānquándài",
+        "original": "请不要离开座位和使用洗手间，也确认您的孩子系好安全带。"
+      },
+      {
+        "reading": "érqiězhèngzài shǐyòng wèishēngjiānde chéngkè qǐng wòjǐn bǎshouquèbǎo ānquán",
+        "original": "而且，正在使用卫生间的乘客，请握紧把手，确保安全。"
+      },
+      {
+        "reading": "gèwèilǚkè, fēijī zāoyù bùwěndìng qìliújìxù yánzhòngdiānbǒ",
+        "original": "各位旅客,飞机遭遇不稳定气流，继续（严重）颠簸。"
+      },
+      {
+        "reading": "qǐng zàicì quèrèn nínde ānquándài yǐjīng kòuhǎo jìjǐn",
+        "original": "请再次确认您的安全带已经扣好系紧。"
+      },
+      {
+        "reading": "qǐng búyào líkāi zuòwèi hé shǐyòng xǐshǒujiān yě quèrèn nínde háizi jìhǎo ānquándài",
+        "original": "请不要离开座位和使用洗手间，也确认您的孩子系好安全带。"
+      },
+      {
+        "reading": "gèwèilǚkè, wǒmende fēijī háizài zāoyù bùwěndìng qìliú",
+        "original": "各位旅客,我们的飞机还在遭遇不稳定气流。"
+      },
+      {
+        "reading": "zài ānquándài zhǐshìdēng xīmiè zhīqián",
+        "original": "在安全带指示灯熄灭之前，"
+      },
+      {
+        "reading": "qǐng zài zuòwèishàng jìxù jìhǎo ānquándài bìng nàixīn děngdài",
+        "original": "请在座位上继续系好安全带并耐心等待。"
+      },
+      {
+        "reading": "gèwèilǚkè, wèile ānquánzànshí [yánchí / tíngzhǐ] kècāng fúwù",
+        "original": "各位旅客,为了安全，暂时延迟停止客舱服务。"
+      },
+      {
+        "reading": "qìliú wěndìngzhīhòu kāishǐ tígōng fúwùqǐng nín liàngjiě",
+        "original": "气流稳定之后开始提供服务，请您谅解。"
+      },
+      {
+        "reading": "gèwèilǚkè,",
+        "original": "各位旅客,"
+      },
+      {
+        "reading": "[wèile ānquán/ yóuyú ▶비정상 상황 예문 / ▶TOD Signal 송출 시],",
+        "original": "为了安全由于,"
+      },
+      {
+        "reading": "wǒmen wúfǎ jìnxíng kècāng fúwùqǐng nín liàngjiě",
+        "original": "我们无法进行客舱服务。请您谅解。"
+      }
     ]
   },
   "3-7": {
     "jaReadings": [
-      {"reading":"미나사마","original":"みなさま、"},
-      {"reading":"키나이노 쇼-메이오 쿠라쿠 쵸-세츠사세테 이타다키마스","original":"きないの しょうめいを くらく ちょうせつさせて いただきます。"},
-      {"reading":"라이토가 히츠요-나 오캬쿠사마와","original":"ライトが ひつような おきゃくさまは"},
-      {"reading":"우에노 라이토보탄오 고리요-쿠다사이","original":"うえの ライトボタンを ごりようください。"},
-      {"reading":"오테아라이와 젠뽀-또 코-호-니 고자이마스","original":"おてあらいは ぜんぽうと こうほうに ございます。"},
-      {"reading":"타바코와 덴시타바코오 후쿠메 키나이데와 스베떼 킨엔토낫떼오리마스 키츠엔노 사이코-쿠-호안호-니요리 쇼바츠 사레루코토가 아리마스노데 미나사마노 고쿄-료쿠오 오네가이이타시마스","original":"タバコは でんしタバコを ふくめ、 きないでは すべて きんえんとなっております。 きつえんの さい、こうくうほあんほうにより、 しょばつ されることが ありますので みなさまの ごきょうりょくを おねがいいたします。"}
+      {
+        "reading": "미나사마",
+        "original": "みなさま、"
+      },
+      {
+        "reading": "키나이노 쇼-메이오 쿠라쿠 쵸-세츠사세테 이타다키마스",
+        "original": "きないの しょうめいを くらく ちょうせつさせて いただきます。"
+      },
+      {
+        "reading": "라이토가 히츠요-나 오캬쿠사마와",
+        "original": "ライトが ひつような おきゃくさまは"
+      },
+      {
+        "reading": "우에노 라이토보탄오 고리요-쿠다사이",
+        "original": "うえの ライトボタンを ごりようください。"
+      },
+      {
+        "reading": "오테아라이와 젠뽀-또 코-호-니 고자이마스",
+        "original": "おてあらいは ぜんぽうと こうほうに ございます。"
+      },
+      {
+        "reading": "타바코와 덴시타바코오 후쿠메 키나이데와 스베떼 킨엔토낫떼오리마스 키츠엔노 사이코-쿠-호안호-니요리 쇼바츠 사레루코토가 아리마스노데 미나사마노 고쿄-료쿠오 오네가이이타시마스",
+        "original": "タバコは でんしタバコを ふくめ、 きないでは すべて きんえんとなっております。 きつえんの さい、こうくうほあんほうにより、 しょばつ されることが ありますので みなさまの ごきょうりょくを おねがいいたします。"
+      }
     ],
     "caReadings": [
-      {"reading":"gèwèilǚkè, kècāng dēngguāng jiānghuì tiáoàn","original":"各位旅客,客舱灯光将会调暗。"},
-      {"reading":"zài tóudǐngshàng shèyǒu yuèdú dēngxūyàode lǚkè kěyǐ shǐyòng","original":"在头顶上设有阅读灯，需要的旅客可以使用。"},
-      {"reading":"xǐshǒujiān qiánmian yǒu yígèhòumian yǒu liǎnggè","original":"洗手间前面有一个，后面有两个。"},
-      {"reading":"kècāng quánqūyùnèi jìnzhǐ xīyān, bāokuò diànzǐyān rúguǒ wéifǎn jiāng shòudào fǎlǜ zhìcái, qǐng dàjiājījípèihé","original":"客舱全区域内禁止吸烟,包括电子烟。如果违反将受到法律制裁,请大家（积极）配合。"}
+      {
+        "reading": "gèwèilǚkè, kècāng dēngguāng jiānghuì tiáoàn",
+        "original": "各位旅客,客舱灯光将会调暗。"
+      },
+      {
+        "reading": "zài tóudǐngshàng shèyǒu yuèdú dēngxūyàode lǚkè kěyǐ shǐyòng",
+        "original": "在头顶上设有阅读灯，需要的旅客可以使用。"
+      },
+      {
+        "reading": "xǐshǒujiān qiánmian yǒu yígèhòumian yǒu liǎnggè",
+        "original": "洗手间前面有一个，后面有两个。"
+      },
+      {
+        "reading": "kècāng quánqūyùnèi jìnzhǐ xīyān, bāokuò diànzǐyān rúguǒ wéifǎn jiāng shòudào fǎlǜ zhìcái, qǐng dàjiājījípèihé",
+        "original": "客舱全区域内禁止吸烟,包括电子烟。如果违反将受到法律制裁,请大家（积极）配合。"
+      }
     ]
   },
   "3-9-1": {
@@ -1777,182 +2429,513 @@ const MANUAL_READINGS = {
     "jaReadings": [],
     "caReadings": []
   },
-  "3-10": {
-    "jaReadings": [
-      {"reading":"미나사마마모나쿠 챠쿠리쿠이타시마스","original":"みなさま、まもなく ちゃくりくいたします。"},
-      {"reading":"시-토베루토오 오시메쿠다사이자세키노 세모타레테-부루","original":"シートベルトを おしめください。ざせきの せもたれ、テーブル、"},
-      {"reading":"히지카케와 모또노이치니 오모도시쿠다사이 마도노 히요케와 아케타 죠-타이니 시테이타다키마스요- 오네가이이타시마스","original":"ひじかけは もとのいちに おもどしください。 まどの ひよけは あけた じょうたいに していただきますよう おねがいいたします。"},
-      {"reading":"안젠노타메오테니모츠가 테키세츠니 슈-노-사레테이루카 고카쿠닌쿠다사이 타다이마요리안젠나 챠쿠리쿠노타메","original":"あんぜんのため、おてにもつが てきせつに しゅうのうされているか ごかくにんください。 ただいまより、あんぜんな ちゃくりくのため"},
-      {"reading":"오테아라이노 고시요-오 세-겐이타시마스","original":"おてあらいの ごしようを せいげんいたします。"},
-      {"reading":"마타덴시키키스탄도와 모토노 이치니 모도시 쥬-덴 케-부루와 토리하즈시테쿠다사이","original":"また、でんしikikスタンドは もとの いちに もどし、 じゅうでん ケーブルは とりはずしてください。"},
-      {"reading":"공항명와 군지쿠-코-토낫떼오리 가이부노사츠에-가 스베떼 킨시사레마스노데 고쿄-료쿠쿠다사이","original":"[]は ぐんじくうこうとなっており、 がいぶのさつえいが すべて きんしされますので ごきょうりょくください。"},
-      {"reading":"미나사마안젠나 챠쿠리쿠노타메 키나이노 쇼-메-오","original":"みなさま、あんぜんな ちゃくりくのため きないの しょうめいを"},
-      {"reading":"쿠라쿠 쵸-세츠이타시마스","original":"くらく ちょうせついたします。"},
-      {"reading":"아카리노 히츠요-나 카타와 자세키 우에노 라이토보탄오 고리요-쿠다사이","original":"あかりの ひつような かたは ざせき うえの ライトボタンを ごりようください。"},
-      {"reading":"미나사마목적지에 요-코소","original":"みなさま、[]へ ようこそ！"},
-      {"reading":"안젠노타메 시-토베루토 챠쿠요-노사인가 키에루마데","original":"あんぜんのため シートベルト ちゃくようのサインが きえるまで"},
-      {"reading":"오자세키니테 스왓떼 오마치쿠다사이","original":"おざせきにて すわって おまちください。"},
-      {"reading":"마타슈-노-다나오 아케루사이와 나까노 모노가 오치나이요- 고츄-이쿠다사이","original":"また、しゅうのうだなを あけるさいは なかの ものが おちないよう ごちゅういください。"},
-      {"reading":"나오군지시세츠노 호안 이지노타메 마도노 히요케오 오시메 쿠다사이","original":"なお、ぐんじしせつの ほあん いじのため、 まどの ひよけを おしめ ください。"},
-      {"reading":"아리가토-고자이마시타","original":"ありがとうございました。"},
-      {"reading":"미나사마타다이마 목적지니 토-챠쿠이타시마시타","original":"みなさま、ただいま []に とうちゃくいたしました。"},
-      {"reading":"혼지츠와 요테이요리 토-챠쿠가 오쿠레마시타코토오 오와비 모-시아게마스","original":"ほんじつは よていより とうちゃくが おくれましたことを おわび もうしあげます。"},
-      {"reading":"혼지츠와 ▶지연 사유니요리요테이요리 토-챠쿠가 오쿠레마시타코토오 고료-쇼-오네가이이타시마스","original":"ほんじつは [▶ ]により、よていより とうちゃくが おくれましたことを ごりょうしょうおねがいいたします。"},
-      {"reading":"안젠노타메시-토베루토 챠쿠요-노사인가 키에루마데","original":"あんぜんのため、シートベルト ちゃくようのサインが きえるまで"},
-      {"reading":"오자세키니테 스왓떼 오마치쿠다사이","original":"おざせきにて すわって おまちください。"},
-      {"reading":"마타슈-노-다나오 아케루사이와 나까노 모노가 오치나이요- 고츄-이쿠다사이","original":"また、しゅうのうだなを あけるさいは なかの ものが おちないよう ごちゅういください。"},
-      {"reading":"나오군지시세츠노 호안 이지노타메 마도노 히요케오 오시메 쿠다사이","original":"なお、ぐんじしせつの ほあん いじのため、 まどの ひよけを おしめ ください。"},
-      {"reading":"아리가토-고자이마시타","original":"ありがとうございました。"}
-    ],
-    "caReadings": [
-      {"reading":"gèwèilǚkè, wǒmen jíjiāng dàodá [공항]","original":"各位旅客,我们即将到达。"},
-      {"reading":"qǐng jìhǎo ānquándàitiáozhí yǐbèi, shōuqǐ xiǎozhuōbǎn","original":"请系好安全带，调直椅背,收起小桌板，"},
-      {"reading":"fàngxià fúshǒubǎ zhēguāngbǎn dǎkāi","original":"放下扶手，把遮光板打开。"},
-      {"reading":"érqiěqǐng zàicì quèrèn nín de suíshēn xínglǐ cúnfàng zhuàngtài","original":"而且，请再次确认您的随身行李存放状态。"},
-      {"reading":"wèile ānquánqǐng búyào shǐyòng xǐshǒujiān","original":"为了安全，请不要使用洗手间。"},
-      {"reading":"tóngshí, qǐng jiāng diànzǐ shèbèi zhījià shōuhuí yuánwèi, bìng qùchú chōngdiàn diànlǎn","original":"同时,请将电子设备支架收回原位,并去除充电电缆。"},
-      {"reading":"[공항명]shì jūnshìjīchǎng, suǒyǒu jīchǎng qūyùnèi jìnzhǐpāizhào","original":"是军事机场,所有机场区域内禁止拍照。"},
-      {"reading":"lìngwài[공항]wéi jūnshìjīchǎnggēnjù zhōnghuá rénmín gònghéguó jūnshì shèshī bǎohùfǎ wèile bǎochí shèshībǎoān quánmiàn jìnzhǐ chuāngwài shèyǐng gēnjù yǒuguānguīdìng qǐng lìjí guānbì zhēguāngbǎn rúguǒ bèi jiēfā dǎkāi zhēguāngbǎnpāishèděngde wéifǎnxíngwéijiāng kěnéng bèi zhuījiū fǎlǜzérènbìxū bǎochí zhēguāngbǎnde guānbì zhuàngtài","original":"另外，为军事机场。根据中华人民共和国军事设施保护法为了保持设施保安全面禁止窗外摄影。根据有关规定请立即关闭遮光板。如果被揭发打开遮光板，拍摄等的违反行为，将可能被追究法律责任，必须保持遮光板的关闭状态。"},
-      {"reading":"gèwèilǚkè, wèile ānquánde zhuólùkècāng dēngguāng jiāng huìtiáoàn","original":"各位旅客,为了安全的着陆，客舱灯光将会调暗。"},
-      {"reading":"zài tóudǐngshàng shèyǒu yuèdúdēngxūyàode lǚkè kěyǐ shǐyòng","original":"在头顶上设有阅读灯，需要的旅客可以使用。"},
-      {"reading":"zūnjìngde gèwèilǚkèhuānyíng nín láidào [목적지]","original":"尊敬的各位旅客，欢迎您来到。"},
-      {"reading":"wèile nínde ānquánānquándài zhǐshìdēng xīmièzhīqián","original":"为了您的安全，安全带指示灯熄灭之前，"},
-      {"reading":"qǐng búyào líkāi zuòwèi","original":"请不要离开座位。"},
-      {"reading":"érqiěānquándài zhǐshìdēng xīmiè hòu, dǎkāi xínglijiàshí","original":"而且，安全带指示灯熄灭后,打开行李架时，"},
-      {"reading":"qǐng zhùyì lǐmiànde dōngxi diàoluò","original":"请注意里面的东西掉落。"},
-      {"reading":"zhù nín lǚtú yúkuàibìng qīdài yǔ nín zàicì jiànmiàn","original":"祝您旅途愉快，并期待与您再次见面。"},
-      {"reading":"érqiěWèile bǎochí jūnshì shèshī bǎo'ān qǐng bǎ zhēguāngbǎn quánbù guānhǎo","original":"而且，为了保持军事设施保安，请把遮光板全部关好。"},
-      {"reading":"xièxie","original":"谢谢。"},
-      {"reading":"gèwèilǚkèwǒmen dàodá [목적지]","original":"各位旅客，我们到达。"},
-      {"reading":"fēicháng bàoqiànfēijī bǐ yùdìngshíjiān yánchí dàodá","original":"非常抱歉，飞机比预定时间延迟到达。"},
-      {"reading":"yóuyú [▶지연 사유] fēijī bǐ yùdìngshíjiān yánchí dàodáqǐng nín liàngjiě","original":"由于飞机比预定时间延迟到达。请您谅解。"},
-      {"reading":"wèile nínde ānquán, zài ānquándài zhǐshìdēng xīmièzhīqián","original":"为了您的安全,在安全带指示灯熄灭之前"},
-      {"reading":"qǐng búyào líkāi zuòwèi","original":"请不要离开座位。"},
-      {"reading":"érqiěānquándài zhǐshìdēng xīmièhòu, dǎkāi xínglijiàshí","original":"而且，安全带指示灯熄灭后,打开行李架时，"},
-      {"reading":"qǐng zhùyì lǐmiànde dōngxi diàoluò","original":"请注意里面的东西掉落。"},
-      {"reading":"érqiěwèile bǎochí jūnshì shèshī bǎo'ān qǐng bǎ zhēguāngbǎn quánbù guānhǎo","original":"而且，为了保持军事设施保安，请把遮光板全部关好。"},
-      {"reading":"xièxie","original":"谢谢。"}
-    ]
+  "4-1-1": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "4-5": {
+    "jaReadings": [],
+    "caReadings": []
   },
   "5-1-3-1": {
     "jaReadings": [
-      {"reading":"미나사마(토-키와 마다 시테-사레타 게-토니 토-챠쿠시테오리마센)","original":"みなさま、(とうきは まだ していされた ゲートに とうちゃくしておりません。)"},
-      {"reading":"시-토베루토 챠쿠요-노사인가 키에루마데","original":"シートベルト ちゃくようのサインが きえるまで"},
-      {"reading":"오자세키니테 스왓떼 오마치쿠다사이","original":"おざせきにて すわって おまちください。"},
-      {"reading":"미나사마겐자이 ▶비정상 상황 예문니요리","original":"みなさま、げんざい [▶ により、"},
-      {"reading":"/ 시테-사레타 게-토니 호카노 히코-키가 토맛떼이루타메","original":"/ していされた ゲートに ほかの ひこうきが とまっているため、]"},
-      {"reading":"훈(뿐) 칸 / 시바라쿠 타이키이타시마스","original":"[ ふん(ぷん) かん / しばらく] たいきいたします。"},
-      {"reading":"미나사마노 고료-쇼-노호도 오네가이이타시마스","original":"みなさまの ごりょうしょうのほど おねがいいたします。"},
-      {"reading":"미나사마겐자이 미나사마가 오오리니나루","original":"みなさま、げんざい みなさまが おおりになる"},
-      {"reading":"츠-로 / 카이단오 츠나이데오리마스노데 이마시바라쿠 오마치쿠다사이","original":"[つうろ / かいだん]を つないでおりますので いましばらく おまちください。"},
-      {"reading":"츠-로 / 카이단 렌케츠 치엔 / 몬다이노타메 코-키가 오쿠레테오리마스 이마시바라쿠 오자세키니테 스왓떼 오마치쿠다사이","original":"[つうろ / かいだん] れんけつ [ちえん / もんだい]のため こうきが おくれております。 いましばらく おざせきにて すわって おまちください。"},
-      {"reading":"미나사마타-미나루마데 오오쿠리스루 바스오 맛떼오리마스노데 이마시바라쿠 오마치쿠다사이","original":"みなさま、ターミナルまで おおくりする バスをまっておりますので いましばらく おまちください。"},
-      {"reading":"미나사마노 고료-쇼-노호도 오네가이이타시마스","original":"みなさまの ごりょうしょうのほど おねがいいたします。"},
-      {"reading":"미나사마타다이마카라 / 마모나쿠 오오리이타다케마스","original":"みなさま、[ただいまから / まもなく] おおりいただけます。"},
-      {"reading":"타-미나루마데와 바스/토호데노 이도-토나리마스노데 오오리노사이와 아시모토니 고츄-이쿠다사이","original":"ターミナルまでは [バス/とほ]での いどうとなりますので、 おおりのさいは あしもとに ごちゅういください。"},
-      {"reading":"(마타) 오오리노사이와오와스레모노노 나이요- 아라타메테 오타시카메쿠다사이","original":"(また、) おおりのさいは、おわすれものの ないよう あらためて おたしかめください。"},
-      {"reading":"베비-카-와 게-토노 마에 / 테니모츠 우케토리죠-데 오우케토리이타다케마스","original":"ベビーカーは [ゲートの まえ / てにもつ うけとりじょう]で おうけとりいただけます。"},
-      {"reading":"혼지츠와 ▶지연 사유니요리요테-요리 토-챠쿠가 오쿠레마시타코토오 후타타비 오와비 모-시아게마스 / 고료-쇼- 오네가이이타시마스","original":"ほんじつは [▶ ]により、よていより とうちゃくが おくれましたことを [ふたたび おわび もうしあげます。 / ごりょうしょう おねがいいたします。"},
-      {"reading":"미나사마노 마타노 고토-죠- 코코로요리 오마치시테오리마스","original":"みなさまの またの ごとうじょう こころより おまちしております。"},
-      {"reading":"아리가토-고자이마시타","original":"ありがとうございました。"}
+      {
+        "reading": "미나사마(토-키와 마다 시테-사레타 게-토니 토-챠쿠시테오리마센)",
+        "original": "みなさま、(とうきは まだ していされた ゲートに とうちゃくしておりません。)"
+      },
+      {
+        "reading": "시-토베루토 챠쿠요-노사인가 키에루마데",
+        "original": "シートベルト ちゃくようのサインが きえるまで"
+      },
+      {
+        "reading": "오자세키니테 스왓떼 오마치쿠다사이",
+        "original": "おざせきにて すわって おまちください。"
+      },
+      {
+        "reading": "미나사마겐자이 ▶비정상 상황 예문니요리",
+        "original": "みなさま、げんざい [▶ により、"
+      },
+      {
+        "reading": "/ 시테-사레타 게-토니 호카노 히코-키가 토맛떼이루타메",
+        "original": "/ していされた ゲートに ほかの ひこうきが とまっているため、]"
+      },
+      {
+        "reading": "훈(뿐) 칸 / 시바라쿠 타이키이타시마스",
+        "original": "[ ふん(ぷん) かん / しばらく] たいきいたします。"
+      },
+      {
+        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
+        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
+      },
+      {
+        "reading": "미나사마겐자이 미나사마가 오오리니나루",
+        "original": "みなさま、げんざい みなさまが おおりになる"
+      },
+      {
+        "reading": "츠-로 / 카이단오 츠나이데오리마스노데 이마시바라쿠 오마치쿠다사이",
+        "original": "[つうろ / かいだん]を つないでおりますので いましばらく おまちください。"
+      },
+      {
+        "reading": "츠-로 / 카이단 렌케츠 치엔 / 몬다이노타메 코-키가 오쿠레테오리마스 이마시바라쿠 오자세키니테 스왓떼 오마치쿠다사이",
+        "original": "[つうろ / かいだん] れんけつ [ちえん / もんだい]のため こうきが おくれております。 いましばらく おざせきにて すわって おまちください。"
+      },
+      {
+        "reading": "미나사마타-미나루마데 오오쿠리스루 바스오 맛떼오리마스노데 이마시바라쿠 오마치쿠다사이",
+        "original": "みなさま、ターミナルまで おおくりする バスをまっておりますので いましばらく おまちください。"
+      },
+      {
+        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
+        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
+      },
+      {
+        "reading": "미나사마타다이마카라 / 마모나쿠 오오리이타다케마스",
+        "original": "みなさま、[ただいまから / まもなく] おおりいただけます。"
+      },
+      {
+        "reading": "타-미나루마데와 바스/토호데노 이도-토나리마스노데 오오리노사이와 아시모토니 고츄-이쿠다사이",
+        "original": "ターミナルまでは [バス/とほ]での いどうとなりますので、 おおりのさいは あしもとに ごちゅういください。"
+      },
+      {
+        "reading": "(마타) 오오리노사이와오와스레모노노 나이요- 아라타메테 오타시카메쿠다사이",
+        "original": "(また、) おおりのさいは、おわすれものの ないよう あらためて おたしかめください。"
+      },
+      {
+        "reading": "베비-카-와 게-토노 마에 / 테니모츠 우케토리죠-데 오우케토리이타다케마스",
+        "original": "ベビーカーは [ゲートの まえ / てにもつ うけとりじょう]で おうけとりいただけます。"
+      },
+      {
+        "reading": "혼지츠와 ▶지연 사유니요리요테-요리 토-챠쿠가 오쿠레마시타코토오 후타타비 오와비 모-시아게마스 / 고료-쇼- 오네가이이타시마스",
+        "original": "ほんじつは [▶ ]により、よていより とうちゃくが おくれましたことを [ふたたび おわび もうしあげます。 / ごりょうしょう おねがいいたします。"
+      },
+      {
+        "reading": "미나사마노 마타노 고토-죠- 코코로요리 오마치시테오리마스",
+        "original": "みなさまの またの ごとうじょう こころより おまちしております。"
+      },
+      {
+        "reading": "아리가토-고자이마시타",
+        "original": "ありがとうございました。"
+      }
     ],
     "caReadings": [
-      {"reading":"rú gǎndào shēntǐ bùshìyí sì gǎnrǎn xīnguàn huò fārè","original":"如感到身体不适，疑似感染新冠或发热，"},
-      {"reading":"qǐng jíshí gàozhī hǎiguān gōngzuò rényuán","original":"请及时告知海关工作人员。"},
-      {"reading":"gèwèilǚkè(wǒmende fēijī hái méi dàodá zhǐdìngde tíngjīwèi)","original":"各位旅客，我们的飞机还没到达指定的停机位。"},
-      {"reading":"zhídào ānquándài zhǐshìdēng xīmiè","original":"直到安全带指示灯熄灭，"},
-      {"reading":"qǐng zài zuòwèishang nàixīn děngdài","original":"请在座位上耐心等待。"},
-      {"reading":"gèwèilǚkè","original":"各位旅客，"},
-      {"reading":"yóuyú [▶비정상 상황 예문 / zài zhǐdìngde tíngjīwèi yǒu qítāfēijī],","original":"由于在指定的停机位有其他飞机,"},
-      {"reading":"wǒmen jiāng zài yuándì děngdài [___fēnzhōng / yíduànshíjiān]","original":"我们将在原地等待分钟一段时间。"},
-      {"reading":"qǐng nín liàngjiě","original":"请您谅解。"},
-      {"reading":"gèwèilǚkèxiànzài wǒmen liánjiē xiàfēijīde [lángqiáo / kètīchē]qǐng shāoděng","original":"各位旅客，现在我们连接下飞机的廊桥客梯车。请稍等。"},
-      {"reading":"gèwèilǚkèyóuyú [▶비정상 상황 예문] qǐng zài zuòwèishàng nàixīn děngdài","original":"各位旅客，由于，请在座位上耐心等待。"},
-      {"reading":"[lángqiáo / kètīchē] háiméiyǒu dàowèi","original":"廊桥客梯车还没有到位"},
-      {"reading":"[lángqiáo / kètīchē] liánjiē fāshēng wèntí","original":"廊桥客梯车连接发生问题"},
-      {"reading":"gèwèilǚkèxiànzài wǒmen zhǔnbèi bǎidùchē qǐng shāoděng","original":"各位旅客，现在我们准备摆渡车。请稍等。"},
-      {"reading":"zūnjìngde gèwèilǚkè,","original":"尊敬的各位旅客,"},
-      {"reading":"wéi zuòhǎo jìngwài shūrù xīnguàn bìngdú biànyì jiāncè gōngzuò","original":"为做好境外输入新冠病毒变异监测工作，"},
-      {"reading":"gēnjù zhōngguó fǎlǜde xiāngguān guīdìng","original":"根据中国法律的相关规定，"},
-      {"reading":"hǎiguān jiāng duì nín chéngzuòde","original":"海关将对您乘坐的"},
-      {"reading":"hángbān jìnxíng hésuān cǎiyàng chōujiǎn","original":"航班进行核酸采样抽检，"},
-      {"reading":"qǐng pèihé zuòhǎo cǎiyàng gōngzuòyǐmiǎn yǐngxiǎng nínde tōngguān","original":"请配合做好采样工作，以免影响您的通关。"},
-      {"reading":"qǐng niàn dào míngzì/zuòwèi hàode lǚkèná hǎo suíshēn xínglǐ","original":"请念到名字座位号的旅客，拿好随身行李，"},
-      {"reading":"xiànzài xiàjī jìnxíng cǎiyàng","original":"现在下机进行采样。"},
-      {"reading":"<cǎiyàng míngdān>","original":"采样名单"},
-      {"reading":"gǎn xiè nínde hézuò","original":"感谢您的合作！"},
-      {"reading":"gèwèilǚkè[xiànzài / shāohòu] kěyǐ tōngguò qiáncāngmén xiàjī","original":"各位旅客，现在稍后可以通过前舱门下机。"},
-      {"reading":"(nín jiāng bùxíng zǒudào hòujīlóu) xià táijiē shí, qǐng zhùyì jiǎoxiàānquán ér xiǎoxīnhuádǎo","original":"您将步行走到候机楼。下台阶时,请注意脚下安全而小心滑倒。"},
-      {"reading":"qǐng zàicì quèrèn shìfǒu nácuò huò yílòule xíngli lìngwàiyǒushí bǎ guìzhòngwùpǐn fàng zài zuòwèi qiánmiande kǒudàilǐ diūshīqǐng zàicì quèrèn","original":"请再次确认是否拿错或遗漏了行李。另外，有时把贵重物品放在座位前面的口袋里丢失。请再次确认。"},
-      {"reading":"yīngérchē zài [lángqiáoqián/ xíngli zhuǎnpán / cāngménqián] kěyǐ lǐngqǔ","original":"婴儿车在廊桥前行李转盘舱门前可以领取。"},
-      {"reading":"yóuyú[▶지연 사유], fēijī bǐ yùdìng shíjiān yánchí dàodá[zàicì shēnbiǎoqiànyì/ qǐng nín liàngjiě]","original":"由于,飞机比预定时间延迟到达。再次深表歉意。请您谅解。"},
-      {"reading":"xiàcìzàihuì xièxie!","original":"下次再会。谢谢"}
+      {
+        "reading": "rú gǎndào shēntǐ bùshìyí sì gǎnrǎn xīnguàn huò fārè",
+        "original": "如感到身体不适，疑似感染新冠或发热，"
+      },
+      {
+        "reading": "qǐng jíshí gàozhī hǎiguān gōngzuò rényuán",
+        "original": "请及时告知海关工作人员。"
+      },
+      {
+        "reading": "gèwèilǚkè(wǒmende fēijī hái méi dàodá zhǐdìngde tíngjīwèi)",
+        "original": "各位旅客，我们的飞机还没到达指定的停机位。"
+      },
+      {
+        "reading": "zhídào ānquándài zhǐshìdēng xīmiè",
+        "original": "直到安全带指示灯熄灭，"
+      },
+      {
+        "reading": "qǐng zài zuòwèishang nàixīn děngdài",
+        "original": "请在座位上耐心等待。"
+      },
+      {
+        "reading": "gèwèilǚkè",
+        "original": "各位旅客，"
+      },
+      {
+        "reading": "yóuyú [▶비정상 상황 예문 / zài zhǐdìngde tíngjīwèi yǒu qítāfēijī],",
+        "original": "由于在指定的停机位有其他飞机,"
+      },
+      {
+        "reading": "wǒmen jiāng zài yuándì děngdài [___fēnzhōng / yíduànshíjiān]",
+        "original": "我们将在原地等待分钟一段时间。"
+      },
+      {
+        "reading": "qǐng nín liàngjiě",
+        "original": "请您谅解。"
+      },
+      {
+        "reading": "gèwèilǚkèxiànzài wǒmen liánjiē xiàfēijīde [lángqiáo / kètīchē]qǐng shāoděng",
+        "original": "各位旅客，现在我们连接下飞机的廊桥客梯车。请稍等。"
+      },
+      {
+        "reading": "gèwèilǚkèyóuyú [▶비정상 상황 예문] qǐng zài zuòwèishàng nàixīn děngdài",
+        "original": "各位旅客，由于，请在座位上耐心等待。"
+      },
+      {
+        "reading": "[lángqiáo / kètīchē] háiméiyǒu dàowèi",
+        "original": "廊桥客梯车还没有到位"
+      },
+      {
+        "reading": "[lángqiáo / kètīchē] liánjiē fāshēng wèntí",
+        "original": "廊桥客梯车连接发生问题"
+      },
+      {
+        "reading": "gèwèilǚkèxiànzài wǒmen zhǔnbèi bǎidùchē qǐng shāoděng",
+        "original": "各位旅客，现在我们准备摆渡车。请稍等。"
+      },
+      {
+        "reading": "zūnjìngde gèwèilǚkè,",
+        "original": "尊敬的各位旅客,"
+      },
+      {
+        "reading": "wéi zuòhǎo jìngwài shūrù xīnguàn bìngdú biànyì jiāncè gōngzuò",
+        "original": "为做好境外输入新冠病毒变异监测工作，"
+      },
+      {
+        "reading": "gēnjù zhōngguó fǎlǜde xiāngguān guīdìng",
+        "original": "根据中国法律的相关规定，"
+      },
+      {
+        "reading": "hǎiguān jiāng duì nín chéngzuòde",
+        "original": "海关将对您乘坐的"
+      },
+      {
+        "reading": "hángbān jìnxíng hésuān cǎiyàng chōujiǎn",
+        "original": "航班进行核酸采样抽检，"
+      },
+      {
+        "reading": "qǐng pèihé zuòhǎo cǎiyàng gōngzuòyǐmiǎn yǐngxiǎng nínde tōngguān",
+        "original": "请配合做好采样工作，以免影响您的通关。"
+      },
+      {
+        "reading": "qǐng niàn dào míngzì/zuòwèi hàode lǚkèná hǎo suíshēn xínglǐ",
+        "original": "请念到名字座位号的旅客，拿好随身行李，"
+      },
+      {
+        "reading": "xiànzài xiàjī jìnxíng cǎiyàng",
+        "original": "现在下机进行采样。"
+      },
+      {
+        "reading": "<cǎiyàng míngdān>",
+        "original": "采样名单"
+      },
+      {
+        "reading": "gǎn xiè nínde hézuò",
+        "original": "感谢您的合作！"
+      },
+      {
+        "reading": "gèwèilǚkè[xiànzài / shāohòu] kěyǐ tōngguò qiáncāngmén xiàjī",
+        "original": "各位旅客，现在稍后可以通过前舱门下机。"
+      },
+      {
+        "reading": "(nín jiāng bùxíng zǒudào hòujīlóu) xià táijiē shí, qǐng zhùyì jiǎoxiàānquán ér xiǎoxīnhuádǎo",
+        "original": "您将步行走到候机楼。下台阶时,请注意脚下安全而小心滑倒。"
+      },
+      {
+        "reading": "qǐng zàicì quèrèn shìfǒu nácuò huò yílòule xíngli lìngwàiyǒushí bǎ guìzhòngwùpǐn fàng zài zuòwèi qiánmiande kǒudàilǐ diūshīqǐng zàicì quèrèn",
+        "original": "请再次确认是否拿错或遗漏了行李。另外，有时把贵重物品放在座位前面的口袋里丢失。请再次确认。"
+      },
+      {
+        "reading": "yīngérchē zài [lángqiáoqián/ xíngli zhuǎnpán / cāngménqián] kěyǐ lǐngqǔ",
+        "original": "婴儿车在廊桥前行李转盘舱门前可以领取。"
+      },
+      {
+        "reading": "yóuyú[▶지연 사유], fēijī bǐ yùdìng shíjiān yánchí dàodá[zàicì shēnbiǎoqiànyì/ qǐng nín liàngjiě]",
+        "original": "由于,飞机比预定时间延迟到达。再次深表歉意。请您谅解。"
+      },
+      {
+        "reading": "xiàcìzàihuì xièxie!",
+        "original": "下次再会。谢谢"
+      }
     ]
+  },
+  "5-1-3-2": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "5-1-5": {
+    "jaReadings": [],
+    "caReadings": []
   },
   "5-1-6": {
     "jaReadings": [
-      {"reading":"미나사마토-키와 ▶비정상 상황 예문니요리","original":"みなさま、とうきは [▶ ]により、"},
-      {"reading":"슛빠츠가 오쿠레테오리마스","original":"しゅっぱつが おくれております。"},
-      {"reading":"오요소 훈(뿐)고니 / 마모나쿠 슛빠츠스루 요테-데스노데","original":"[およそ ふん(ぷん)ごに / まもなく] しゅっぱつする よていですので"},
-      {"reading":"미나사마노 고료-쇼-노호도 오네가이이타시마스","original":"みなさまの ごりょうしょうのほど おねがいいたします。"},
-      {"reading":"미나사마토-키와 타다이마 ▶비정상 상황 예문니요리","original":"みなさま、とうきは ただいま [▶ ]により、"},
-      {"reading":"슛빠츠 / 챠쿠리쿠마데 오요소 훈(뿐) 호도 사라니 카카루미코미데스","original":"[しゅっぱつ / ちゃくりく]まで およそ ふん(ぷん) ほど さらに かかるみこみです。"},
-      {"reading":"고후벵오 오카케이타시마시테 타이헨 모-시와케고자이마센","original":"[ごふべんを おかけいたしまして たいへん もうしわけございません。"},
-      {"reading":"/ 미나사마노 고료-쇼-노호도 오네가이이타시마스","original":"/ みなさまの ごりょうしょうのほど おねがいいたします。]"},
-      {"reading":"미나사마토-키와 슛빠츠 쥰비오 오에마시타가","original":"みなさま、とうきは しゅっぱつ じゅんびを おえましたが、"},
-      {"reading":"▶비정상 상황 예문니요리","original":"[▶ ]により、"},
-      {"reading":"겐자이노 이치데 타이키스루요- 시지오 우케마시타","original":"げんざいの いちで たいきするよう しじを うけました。"},
-      {"reading":"오요소 훈(뿐)고니 / 마모나쿠 슛빠츠스루 요테-데스노데","original":"[およそ ふん(ぷん)ごに / まもなく] しゅっぱつする よていですので、"},
-      {"reading":"히키츠즈키 오자세키니테 스왓떼 오마치쿠다사이","original":"ひきつづき おざせきにて すわって おまちください。"},
-      {"reading":"미나사마노 고료-쇼-노호도 오네가이이타시마스","original":"みなさまの ごりょうしょうのほど おねがいいたします。"},
-      {"reading":"미나사마토-키와 겐자이","original":"みなさま、とうきは げんざい"},
-      {"reading":"▶비정상 상황 예문니요리 / 칸세-토-카라노","original":"[▶ により / かんせいとうからの]"},
-      {"reading":"리리쿠 쿄카오 맛떼오리마스","original":"りりく きょかを まっております。"},
-      {"reading":"토-키노 리리쿠쥰방와 반메데","original":"とうきの りりくじゅんばんは ばんめで、"},
-      {"reading":"오요소 훈(뿐)고니 / 마모나쿠 리리쿠스루 요테-데스","original":"[およそ ふん(ぷん)ごに / まもなく] りりくする よていです。"},
-      {"reading":"미나사마노 고료-쇼-노호도 오네가이이타시마스","original":"みなさまの ごりょうしょうのほど おねがいいたします。"},
-      {"reading":"고안나이모-시아게마스","original":"ごあんないもうしあげます。"},
-      {"reading":"토-키와 코-쿠-키노 죠세츠 / 죠효- 사교-오 오코나우타메","original":"とうきは こうくうきの [じょせつ / じょひょう] さぎょうを おこなうため"},
-      {"reading":"시테-사레타 바쇼니 이도-이타시마스","original":"していされた ばしょに いどういたします。"},
-      {"reading":"사교-와 오요소 훈(뿐) 호도 카카루미코미데스","original":"さぎょうは およそ ふん(ぷん) ほど かかるみこみです。"},
-      {"reading":"사교-가 오와리시다이 슛빠츠스루요테-데스","original":"さぎょうが おわりしだい しゅっぱつするよていです。"},
-      {"reading":"안젠나 리리쿠노타메노 테츠즈키토 나리마스노데","original":"あんぜんな りりくのための てつづきと なりますので、"},
-      {"reading":"미나사마노 고료-쇼-노호도 오네가이이타시마스","original":"みなさまの ごりょうしょうのほど おねがいいたします。"},
-      {"reading":"고안나이모-시아게마스토-키와 코-쿠-키노","original":"ごあんないもうしあげます。とうきは こうくうきの"},
-      {"reading":"죠세츠 / 죠효- 사교-오 오코낫떼이루타메","original":"[じょせつ / じょひょう] さぎょうを おこなっているため"},
-      {"reading":"슛빠츠가 오쿠레테오리마스","original":"しゅっぱつが おくれております。"},
-      {"reading":"사교-와 오요소 훈(뿐)호도 카카루미코미데스","original":"さぎょうは およそ ふん(ぷん)ほど かかるみこみです。"},
-      {"reading":"사교-가 오와리시다이 슛빠츠스루요테-데스","original":"さぎょうが おわりしだい しゅっぱつするよていです。"},
-      {"reading":"안젠나 리리쿠노타메노 테츠즈키토 나리마스노데","original":"あんぜんな りりくのための てつづきと なりますので、"},
-      {"reading":"미나사마노 고료-쇼-노호도 오네가이이타시마스","original":"みなさまの ごりょうしょうのほど おねがいいたします。"}
+      {
+        "reading": "미나사마토-키와 ▶비정상 상황 예문니요리",
+        "original": "みなさま、とうきは [▶ ]により、"
+      },
+      {
+        "reading": "슛빠츠가 오쿠레테오리마스",
+        "original": "しゅっぱつが おくれております。"
+      },
+      {
+        "reading": "오요소 훈(뿐)고니 / 마모나쿠 슛빠츠스루 요테-데스노데",
+        "original": "[およそ ふん(ぷん)ごに / まもなく] しゅっぱつする よていですので"
+      },
+      {
+        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
+        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
+      },
+      {
+        "reading": "미나사마토-키와 타다이마 ▶비정상 상황 예문니요리",
+        "original": "みなさま、とうきは ただいま [▶ ]により、"
+      },
+      {
+        "reading": "슛빠츠 / 챠쿠리쿠마데 오요소 훈(뿐) 호도 사라니 카카루미코미데스",
+        "original": "[しゅっぱつ / ちゃくりく]まで およそ ふん(ぷん) ほど さらに かかるみこみです。"
+      },
+      {
+        "reading": "고후벵오 오카케이타시마시테 타이헨 모-시와케고자이마센",
+        "original": "[ごふべんを おかけいたしまして たいへん もうしわけございません。"
+      },
+      {
+        "reading": "/ 미나사마노 고료-쇼-노호도 오네가이이타시마스",
+        "original": "/ みなさまの ごりょうしょうのほど おねがいいたします。]"
+      },
+      {
+        "reading": "미나사마토-키와 슛빠츠 쥰비오 오에마시타가",
+        "original": "みなさま、とうきは しゅっぱつ じゅんびを おえましたが、"
+      },
+      {
+        "reading": "▶비정상 상황 예문니요리",
+        "original": "[▶ ]により、"
+      },
+      {
+        "reading": "겐자이노 이치데 타이키스루요- 시지오 우케마시타",
+        "original": "げんざいの いちで たいきするよう しじを うけました。"
+      },
+      {
+        "reading": "오요소 훈(뿐)고니 / 마모나쿠 슛빠츠스루 요테-데스노데",
+        "original": "[およそ ふん(ぷん)ごに / まもなく] しゅっぱつする よていですので、"
+      },
+      {
+        "reading": "히키츠즈키 오자세키니테 스왓떼 오마치쿠다사이",
+        "original": "ひきつづき おざせきにて すわって おまちください。"
+      },
+      {
+        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
+        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
+      },
+      {
+        "reading": "미나사마토-키와 겐자이",
+        "original": "みなさま、とうきは げんざい"
+      },
+      {
+        "reading": "▶비정상 상황 예문니요리 / 칸세-토-카라노",
+        "original": "[▶ により / かんせいとうからの]"
+      },
+      {
+        "reading": "리리쿠 쿄카오 맛떼오리마스",
+        "original": "りりく きょかを まっております。"
+      },
+      {
+        "reading": "토-키노 리리쿠쥰방와 반메데",
+        "original": "とうきの りりくじゅんばんは ばんめで、"
+      },
+      {
+        "reading": "오요소 훈(뿐)고니 / 마모나쿠 리리쿠스루 요테-데스",
+        "original": "[およそ ふん(ぷん)ごに / まもなく] りりくする よていです。"
+      },
+      {
+        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
+        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
+      },
+      {
+        "reading": "고안나이모-시아게마스",
+        "original": "ごあんないもうしあげます。"
+      },
+      {
+        "reading": "토-키와 코-쿠-키노 죠세츠 / 죠효- 사교-오 오코나우타메",
+        "original": "とうきは こうくうきの [じょせつ / じょひょう] さぎょうを おこなうため"
+      },
+      {
+        "reading": "시테-사레타 바쇼니 이도-이타시마스",
+        "original": "していされた ばしょに いどういたします。"
+      },
+      {
+        "reading": "사교-와 오요소 훈(뿐) 호도 카카루미코미데스",
+        "original": "さぎょうは およそ ふん(ぷん) ほど かかるみこみです。"
+      },
+      {
+        "reading": "사교-가 오와리시다이 슛빠츠스루요테-데스",
+        "original": "さぎょうが おわりしだい しゅっぱつするよていです。"
+      },
+      {
+        "reading": "안젠나 리리쿠노타메노 테츠즈키토 나리마스노데",
+        "original": "あんぜんな りりくのための てつづきと なりますので、"
+      },
+      {
+        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
+        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
+      },
+      {
+        "reading": "고안나이모-시아게마스토-키와 코-쿠-키노",
+        "original": "ごあんないもうしあげます。とうきは こうくうきの"
+      },
+      {
+        "reading": "죠세츠 / 죠효- 사교-오 오코낫떼이루타메",
+        "original": "[じょせつ / じょひょう] さぎょうを おこなっているため"
+      },
+      {
+        "reading": "슛빠츠가 오쿠레테오리마스",
+        "original": "しゅっぱつが おくれております。"
+      },
+      {
+        "reading": "사교-와 오요소 훈(뿐)호도 카카루미코미데스",
+        "original": "さぎょうは およそ ふん(ぷん)ほど かかるみこみです。"
+      },
+      {
+        "reading": "사교-가 오와리시다이 슛빠츠스루요테-데스",
+        "original": "さぎょうが おわりしだい しゅっぱつするよていです。"
+      },
+      {
+        "reading": "안젠나 리리쿠노타메노 테츠즈키토 나리마스노데",
+        "original": "あんぜんな りりくのための てつづきと なりますので、"
+      },
+      {
+        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
+        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
+      }
     ],
     "caReadings": [
-      {"reading":"gèwèilǚkèyóuyú [▶비정상 상황 예문], wǒmen zhèngzài děngdài chūfā","original":"各位旅客，由于,我们正在等待出发。"},
-      {"reading":"jiāngyú [ fēnzhōnghòu/ shāohòu] chūfāgǎnxiè nínde lǐjiě","original":"将于分钟后稍后出发，感谢您的理解。"},
-      {"reading":"gèwèilǚkèyóuyú [▶비정상 상황 예문] háiméiyǒu","original":"各位旅客，由于还没有"},
-      {"reading":"[hǎozhuǎn / jiéshù / yǔnxǔ]","original":"好转结束允许。"},
-      {"reading":"wǒmen xūyào zài děngdài [ fēnzhōng / jǐfēnzhōng]","original":"我们需要再等待分钟几分钟。"},
-      {"reading":"[gěinín dàilái búbiànwǒmen shēnbiǎoqiànyì/ qǐng dàjiā liàngjiě]","original":"给您带来不便，我们深表歉意。请大家谅解。"},
-      {"reading":"gèwèilǚkèwǒmende fēijī yǐ zuòhǎo qǐfēi zhǔnbèi","original":"各位旅客，我们的飞机已做好起飞准备，"},
-      {"reading":"yóuyú [▶비정상 상황 예문]zài yuándì děngdài","original":"由于，在原地等待。"},
-      {"reading":"[jiāngyú____fēnzhōnghòu / shāohòu] huì chūfā","original":"将于分钟后稍后会出发，"},
-      {"reading":"qǐng jìhǎo ānquándài jìxù zài zuòwèishang děngdài","original":"请系好安全带继续在座位上等待。"},
-      {"reading":"xièxie nínde liàngjiě","original":"谢谢您的谅解。"},
-      {"reading":"gèwèilǚkèyóuyú [▶비정상 상황 예문 / hángkōng guǎnzhìde zhǐshì]","original":"各位旅客，由于航空管制的指示"},
-      {"reading":"wǒmen zhèngzài děngdài qǐfēi xǔkě","original":"我们正在等待起飞许可。"},
-      {"reading":"mùqián wǒmende qǐfēi shùnxùshì dì wèi","original":"目前我们的起飞顺序是第位，"},
-      {"reading":"[dàyuē fēnzhōng hòu / shāohòu] jiānghuì qǐfēi","original":"大约分钟后稍后将会起飞，"},
-      {"reading":"xièxie nínde liàngjiě","original":"谢谢您的谅解。"},
-      {"reading":"gèwèilǚkèwèile fēijī [chúxuě / chúbīng] gōngzuò,","original":"各位旅客，为了飞机除雪除冰工作,"},
-      {"reading":"wǒmen jiāng zhuǎnyídào zhǐdìng dìdiǎn","original":"我们将转移到指定地点。"},
-      {"reading":"wǒmen yùjì zài fēnzhōnghòu qǐfēi","original":"我们预计在分钟后起飞。"},
-      {"reading":"gōngzuò jiéshùhòu chūfā","original":"工作结束后出发。"},
-      {"reading":"zhèshì wèile ānquán qǐfēide bìyào chéngxùqǐng dàjiā liàngjiě","original":"这是为了安全起飞的必要程序，请大家谅解。"},
-      {"reading":"gèwèilǚkèwèile fēijī [chúxuě / chúbīng] gōngzuò, děngdài chūfā","original":"各位旅客，为了飞机除雪除冰工作,等待出发。"},
-      {"reading":"wǒmen yùjì zài fēnzhōnghòu qǐfēi","original":"我们预计在分钟后起飞。"},
-      {"reading":"gōngzuò jiéshùhòu chūfā","original":"工作结束后出发。"},
-      {"reading":"zhèshì wèile ānquán qǐfēide bìyào chéngxùqǐng dàjiā liàngjiě","original":"这是为了安全起飞的必要程序，请大家谅解。"}
+      {
+        "reading": "gèwèilǚkèyóuyú [▶비정상 상황 예문], wǒmen zhèngzài děngdài chūfā",
+        "original": "各位旅客，由于,我们正在等待出发。"
+      },
+      {
+        "reading": "jiāngyú [ fēnzhōnghòu/ shāohòu] chūfāgǎnxiè nínde lǐjiě",
+        "original": "将于分钟后稍后出发，感谢您的理解。"
+      },
+      {
+        "reading": "gèwèilǚkèyóuyú [▶비정상 상황 예문] háiméiyǒu",
+        "original": "各位旅客，由于还没有"
+      },
+      {
+        "reading": "[hǎozhuǎn / jiéshù / yǔnxǔ]",
+        "original": "好转结束允许。"
+      },
+      {
+        "reading": "wǒmen xūyào zài děngdài [ fēnzhōng / jǐfēnzhōng]",
+        "original": "我们需要再等待分钟几分钟。"
+      },
+      {
+        "reading": "[gěinín dàilái búbiànwǒmen shēnbiǎoqiànyì/ qǐng dàjiā liàngjiě]",
+        "original": "给您带来不便，我们深表歉意。请大家谅解。"
+      },
+      {
+        "reading": "gèwèilǚkèwǒmende fēijī yǐ zuòhǎo qǐfēi zhǔnbèi",
+        "original": "各位旅客，我们的飞机已做好起飞准备，"
+      },
+      {
+        "reading": "yóuyú [▶비정상 상황 예문]zài yuándì děngdài",
+        "original": "由于，在原地等待。"
+      },
+      {
+        "reading": "[jiāngyú____fēnzhōnghòu / shāohòu] huì chūfā",
+        "original": "将于分钟后稍后会出发，"
+      },
+      {
+        "reading": "qǐng jìhǎo ānquándài jìxù zài zuòwèishang děngdài",
+        "original": "请系好安全带继续在座位上等待。"
+      },
+      {
+        "reading": "xièxie nínde liàngjiě",
+        "original": "谢谢您的谅解。"
+      },
+      {
+        "reading": "gèwèilǚkèyóuyú [▶비정상 상황 예문 / hángkōng guǎnzhìde zhǐshì]",
+        "original": "各位旅客，由于航空管制的指示"
+      },
+      {
+        "reading": "wǒmen zhèngzài děngdài qǐfēi xǔkě",
+        "original": "我们正在等待起飞许可。"
+      },
+      {
+        "reading": "mùqián wǒmende qǐfēi shùnxùshì dì wèi",
+        "original": "目前我们的起飞顺序是第位，"
+      },
+      {
+        "reading": "[dàyuē fēnzhōng hòu / shāohòu] jiānghuì qǐfēi",
+        "original": "大约分钟后稍后将会起飞，"
+      },
+      {
+        "reading": "xièxie nínde liàngjiě",
+        "original": "谢谢您的谅解。"
+      },
+      {
+        "reading": "gèwèilǚkèwèile fēijī [chúxuě / chúbīng] gōngzuò,",
+        "original": "各位旅客，为了飞机除雪除冰工作,"
+      },
+      {
+        "reading": "wǒmen jiāng zhuǎnyídào zhǐdìng dìdiǎn",
+        "original": "我们将转移到指定地点。"
+      },
+      {
+        "reading": "wǒmen yùjì zài fēnzhōnghòu qǐfēi",
+        "original": "我们预计在分钟后起飞。"
+      },
+      {
+        "reading": "gōngzuò jiéshùhòu chūfā",
+        "original": "工作结束后出发。"
+      },
+      {
+        "reading": "zhèshì wèile ānquán qǐfēide bìyào chéngxùqǐng dàjiā liàngjiě",
+        "original": "这是为了安全起飞的必要程序，请大家谅解。"
+      },
+      {
+        "reading": "gèwèilǚkèwèile fēijī [chúxuě / chúbīng] gōngzuò, děngdài chūfā",
+        "original": "各位旅客，为了飞机除雪除冰工作,等待出发。"
+      },
+      {
+        "reading": "wǒmen yùjì zài fēnzhōnghòu qǐfēi",
+        "original": "我们预计在分钟后起飞。"
+      },
+      {
+        "reading": "gōngzuò jiéshùhòu chūfā",
+        "original": "工作结束后出发。"
+      },
+      {
+        "reading": "zhèshì wèile ānquán qǐfēide bìyào chéngxùqǐng dàjiā liàngjiě",
+        "original": "这是为了安全起飞的必要程序，请大家谅解。"
+      }
     ]
+  },
+  "5-2-1": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "5-2-3": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "5-3": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "5-4-2": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "5-6-2": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "5-8-1": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "6-1": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "6-2-2": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "6-3-2": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "6-8-1": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "6-9": {
+    "jaReadings": [],
+    "caReadings": []
+  },
+  "7-2": {
+    "jaReadings": [],
+    "caReadings": []
   }
 };
 
