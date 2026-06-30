@@ -1827,37 +1827,38 @@ function _renderStudyGuide(guide) {
 }
 
 // ─── 마스터 방송문 합성 (ko/en) ───────────────────────────────────────────
+// 핵심 원칙: replace(/\//g) 가 이미 삽입된 </b>, </span> 안의 / 를 건드리지 않도록
+// ⟦word⟧ → @@PH0@@ 플레이스홀더로 격리 → / 치환 먼저 → PH 복원(마지막)
 function buildMasterScript(scriptText, guideData) {
-  // 1단계: 순수 텍스트에 마커만 삽입 (HTML 절대 사용 금지)
   let text = String(scriptText || '');
 
-  // breakPoints: ∙ / 기호로 교체 — Firestore에 HTML이 섞인 경우 제거
+  // 1단계: Firestore 데이터 HTML 태그 제거 후 기호 삽입 (순수 텍스트 유지)
   (guideData.breakPoints || []).forEach(bp => {
     if (typeof bp !== 'object' || !bp.text) return;
     const marked = bp.text.replace(/<[^>]*>/g, '');
-    const clean = marked.replace(/[∙\/,|]/g, '').replace(/\s{2,}/g, ' ').trim();
+    const clean  = marked.replace(/[∙\/,|]/g, '').replace(/\s{2,}/g, ' ').trim();
     if (clean && text.includes(clean)) text = text.replace(clean, marked);
   });
 
-  // intonationDetails: ↗↘→ 기호로 교체 — HTML 태그 제거
   (guideData.intonationDetails || []).forEach(item => {
     if (!item.markedText || !item.phrase) return;
     const markedClean = item.markedText.replace(/<[^>]*>/g, '');
     if (text.includes(item.phrase)) text = text.replace(item.phrase, markedClean);
   });
 
-  // emphasisWords: ※word※ 마커로 표시 (HTML 아님)
+  // 2단계: 강조 단어를 충돌 없는 유니코드 마커로 표시
   (guideData.emphasisWords || []).filter(Boolean).forEach(word => {
+    if (!text.includes(word)) return;
     const re = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    text = text.replace(new RegExp(re, 'g'), `※${word}※`);
+    text = text.replace(new RegExp(re, 'g'), `⟦${word}⟧`);
   });
 
-  // 2단계: 줄 단위 처리
+  // 3단계: 줄 단위 변환
   const htmlLines = text.split('\n').map(line => {
     const t = line.trim();
     if (!t) return '<div style="height:8px"></div>';
 
-    // 섹션 태그 처리 (순수 텍스트 단계)
+    // 섹션 태그 처리
     const soloTag = t.match(/^\[([^\]]+)\]$/);
     const tagLine  = !soloTag && t.match(/^\[([^\]]+)\]\s+(.*)/);
     if (soloTag) {
@@ -1868,36 +1869,41 @@ function buildMasterScript(scriptText, guideData) {
     const prefixLabel = tagLine ? tagLine[1] : null;
     const content     = tagLine ? tagLine[2] : t;
 
-    // 3단계: HTML 특수문자 이스케이프 먼저 (이 시점엔 HTML 태그가 절대 없음)
+    // HTML 이스케이프 (한 번만, 가장 먼저)
     let escaped = content
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
 
-    // 4단계: 마커/기호를 HTML로 1회만 변환
-    escaped = escaped.replace(/※([^※]+)※/g,
-      '<b style="color:#FF6B00;font-weight:700;">$1</b>');
-    escaped = escaped.replace(/∙/g,
-      '<span style="color:#22C55E;font-weight:800;">∙</span>');
-    escaped = escaped.replace(/\//g,
-      '<span style="color:#3B82F6;font-weight:800;">/</span>');
-    escaped = escaped.replace(/↗/g,
-      '<span style="color:#EF4444;font-weight:700;">↗</span>');
-    escaped = escaped.replace(/↘/g,
-      '<span style="color:#3B82F6;font-weight:700;">↘</span>');
-    escaped = escaped.replace(/→/g,
-      '<span style="color:#22C55E;font-weight:700;">→</span>');
+    // 강조 단어 → 플레이스홀더 (/ 치환으로부터 <b>...</b> 보호)
+    const placeholders = [];
+    escaped = escaped.replace(/⟦([^⟧]+)⟧/g, (_, word) => {
+      const idx = placeholders.length;
+      placeholders.push(`<b style="color:#FF6B00;font-weight:700;">${word}</b>`);
+      return `@@PH${idx}@@`;
+    });
+
+    // 기호 → HTML 변환 — / 를 반드시 최우선 처리
+    // (이후 생성되는 </span> 의 / 는 더 이상 replace 대상이 아님)
+    escaped = escaped
+      .replace(/\//g,  '<span style="color:#3B82F6;font-weight:800;">/</span>')
+      .replace(/∙/g,   '<span style="color:#22C55E;font-weight:800;">∙</span>')
+      .replace(/↗/g,   '<span style="color:#EF4444;font-weight:700;">↗</span>')
+      .replace(/↘/g,   '<span style="color:#3B82F6;font-weight:700;">↘</span>')
+      .replace(/→/g,   '<span style="color:#22C55E;font-weight:700;">→</span>');
+
+    // 플레이스홀더 복원 (마지막 — 이 시점엔 / 치환이 완료된 후)
+    escaped = escaped.replace(/@@PH(\d+)@@/g, (_, i) => placeholders[+i]);
 
     const prefix = prefixLabel
       ? `<span style="font-size:11px;font-weight:700;color:#6E6E73;background:#F2F2F7;border-radius:4px;padding:1px 5px;margin-right:5px">[${prefixLabel.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}]</span>`
       : '';
 
-    return `<p style="margin:0 0 8px 0;line-height:1.9;">${prefix}${escaped}</p>`;
+    return `<p style="margin:0 0 10px 0;line-height:2.0;">${prefix}${escaped}</p>`;
   });
 
   const result = htmlLines.join('');
   console.log('[마스터방송문] 결과 미리보기:', result.substring(0, 200));
-  console.log('[완료] 마스터방송문 buildMasterScript');
   return result;
 }
 
@@ -1919,11 +1925,12 @@ function _renderMasterScript(script, langCode, guide) {
   const subtitle = '<div class="master-script-subtitle">끊어읽기 · 억양 · 강조가 표시됩니다</div>';
   const legend = `
     <div class="master-script-legend">
-      <span><span style="color:#22C55E;">∙</span> 반박자</span>
-      <span><span style="color:#3B82F6;">/</span> 한박자</span>
-      <span><span style="color:#EF4444;">↗</span> 올림</span>
-      <span><span style="color:#3B82F6;">↘</span> 내림</span>
-      <span><span style="color:#FF6B00;font-weight:700;">단어</span> 강조</span>
+      <span><b style="color:#22C55E;">∙</b> 반박자</span>
+      <span><b style="color:#3B82F6;">/</b> 한박자</span>
+      <span><b style="color:#EF4444;">↗</b> 올림</span>
+      <span><b style="color:#3B82F6;">↘</b> 내림</span>
+      <span><b style="color:#22C55E;">→</b> 평탄</span>
+      <span><b style="color:#FF6B00;">단어</b> 강조</span>
     </div>`;
 
   el.innerHTML = `
