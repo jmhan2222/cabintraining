@@ -2424,3 +2424,74 @@ html, body {
   .paywall-overlay h3 { font-size: 16px; }
   .paywall-btn { font-size: 15px; padding: 12px 24px; }
 }
+
+/* ===== LAUNCH SCREEN ===== */
+#launch-screen {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: ls-fade-out 0.5s ease-in 3s forwards;
+}
+#launch-screen.hidden { display: none; }
+
+#ls-plane {
+  position: absolute;
+  top: 38%;
+  left: -60px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  animation: ls-fly 3.2s ease-out 0.2s forwards;
+  z-index: 1;
+}
+.ls-trail {
+  height: 1px;
+  width: 200px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.5), transparent);
+}
+.ls-plane-icon {
+  font-size: 22px;
+  color: rgba(255,255,255,0.7);
+}
+
+.ls-logo {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  animation: ls-logo-in 0.6s ease-out 0.4s both;
+}
+.ls-logo-mark {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+.ls-logo-text {
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 1px;
+}
+.ls-logo-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,0.6);
+  margin-top: 6px;
+  letter-spacing: 2px;
+}
+
+@keyframes ls-fly {
+  0%   { left: -60px; opacity: 0; }
+  10%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { left: 110%; opacity: 0; }
+}
+@keyframes ls-logo-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ls-fade-out {
+  from { opacity: 1; pointer-events: all; }
+  to   { opacity: 0; pointer-events: none; }
+}
