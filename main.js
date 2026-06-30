@@ -4102,16 +4102,99 @@ async function deployJsonToFirestore() {
   }
 }
 
+// ===== LAUNCH SCREEN ANIMATION =====
+function runLaunchAnimation() {
+  const chars  = document.querySelectorAll('.ls-char');
+  const cursor = document.getElementById('ls-cursor');
+  const plane  = document.getElementById('ls-plane');
+  const logo   = document.getElementById('ls-logo');
+  const pro    = document.getElementById('ls-pro');
+  const bar    = document.getElementById('ls-bar');
+  const sub    = document.getElementById('ls-sub');
+  const wave   = document.getElementById('ls-wave');
+  const jmark  = document.getElementById('ls-jmark');
+  const nl1    = document.getElementById('ls-nl1');
+  const nl2    = document.getElementById('ls-nl2');
+  const nh1    = document.getElementById('ls-nh1');
+  const nh2    = document.getElementById('ls-nh2');
+
+  if (!chars.length) return 3000;
+  console.log('[런칭] 애니메이션 시작');
+
+  // 비행기
+  plane.style.animation = 'ls-fly 3.2s ease-out 0.2s forwards';
+
+  // 네온 라인
+  setTimeout(() => { nl1.style.opacity='1'; nl1.style.transition='height 1.2s ease'; nl1.style.height='100%'; }, 800);
+  setTimeout(() => { nl2.style.opacity='0.7'; nl2.style.transition='height 0.9s ease'; nl2.style.height='100%'; }, 1100);
+  setTimeout(() => { nh1.style.opacity='1'; nh1.style.transition='width 1.5s ease'; nh1.style.width='100%'; }, 600);
+  setTimeout(() => { nh2.style.opacity='0.8'; nh2.style.transition='width 1.2s ease'; nh2.style.width='100%'; }, 1300);
+
+  // 로고 박스 등장
+  setTimeout(() => {
+    logo.style.transition = 'opacity 0.5s cubic-bezier(0.34,1.56,0.64,1), transform 0.5s cubic-bezier(0.34,1.56,0.64,1)';
+    logo.style.opacity = '1';
+  }, 300);
+
+  // 타이핑 시퀀스
+  const delays = [900, 1050, 1180, 1300, 1420];
+  setTimeout(() => { cursor.style.opacity = '1'; }, 850);
+  chars.forEach((c, i) => {
+    setTimeout(() => {
+      cursor.style.opacity = '0';
+      c.style.transition = 'opacity 0.35s cubic-bezier(0.22,1.8,0.36,1), transform 0.35s cubic-bezier(0.22,1.8,0.36,1)';
+      c.style.opacity = '1';
+      c.style.transform = 'translateY(0) scale(1)';
+      c.animate([
+        { transform: 'translateY(20px) scale(0.7)' },
+        { transform: 'translateY(-6px) scale(1.08)', offset: 0.6 },
+        { transform: 'translateY(2px) scale(0.97)', offset: 0.8 },
+        { transform: 'translateY(0) scale(1)' }
+      ], { duration: 350, easing: 'cubic-bezier(0.22,1.8,0.36,1)' });
+      setTimeout(() => { cursor.style.opacity = '1'; }, 80);
+    }, delays[i]);
+  });
+
+  const endTime = delays[delays.length - 1] + 250;
+
+  setTimeout(() => {
+    cursor.style.opacity = '0';
+    pro.style.transition = 'opacity 0.4s cubic-bezier(0.34,1.56,0.64,1), transform 0.4s cubic-bezier(0.34,1.56,0.64,1)';
+    pro.style.opacity = '1';
+  }, endTime + 100);
+  setTimeout(() => {
+    bar.style.transition = 'width 0.6s ease';
+    bar.style.width = '100%';
+  }, endTime + 300);
+  setTimeout(() => {
+    sub.style.transition = 'opacity 0.7s ease, transform 0.7s ease';
+    sub.style.opacity = '1';
+  }, endTime + 500);
+  setTimeout(() => {
+    wave.style.transition = 'opacity 0.5s ease';
+    wave.style.opacity = '1';
+  }, endTime + 750);
+  setTimeout(() => {
+    jmark.style.transition = 'opacity 0.6s ease';
+    jmark.style.opacity = '1';
+  }, endTime + 1000);
+
+  return endTime + 1500;
+}
+
+function hideLaunchScreen() {
+  const ls = document.getElementById('launch-screen');
+  if (!ls) return;
+  const totalMs = runLaunchAnimation();
+  setTimeout(() => {
+    ls.style.animation = 'ls-fadeout 0.6s ease forwards';
+    setTimeout(() => { ls.remove(); console.log('[런칭] 애니메이션 종료'); }, 600);
+  }, totalMs);
+}
+
 // ===== EVENTS =====
 document.addEventListener('DOMContentLoaded', () => {
-  // 런칭 스크린: CSS 애니메이션(3.5s) 후 제거
-  const ls = document.getElementById('launch-screen');
-  if (ls) {
-    ls.addEventListener('animationend', () => {
-      ls.classList.add('hidden');
-      console.log('[완료] 런칭 스크린');
-    });
-  }
+  hideLaunchScreen();
 
   initFirebase();
   renderHome();
