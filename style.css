@@ -2447,5 +2447,15 @@ html, body {
   to   { opacity: 1; transform: scale(1.05); }
 }
 @media (max-width: 480px) {
-  .ls-char, #ls-pro { font-size: 0.7em !important; }
+  /* 0.7em은 부모 16px 기준으로 11px이 돼서 Voice가 극소 렌더링됨 — px로 명시 */
+  .ls-char { font-size: 40px !important; }
+  #ls-pro  { font-size: 14px !important; }
+  #ls-title { height: 54px !important; }
+  #ls-cursor { height: 36px !important; }
+}
+@media (max-width: 360px) {
+  .ls-char { font-size: 32px !important; }
+  #ls-pro  { font-size: 13px !important; }
+  #ls-title { height: 44px !important; }
+  #ls-cursor { height: 28px !important; }
 }
