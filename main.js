@@ -155,9 +155,17 @@ function createModelVoicePlayer(containerId, opts = {}) {
       playBtn.textContent = '▶ 재생';
       return;
     }
+    const _safePlay = (audio) => {
+      // readyState < 2 이면 재로드 후 재생 (백그라운드 복귀 시 stale 상태 대응)
+      if (audio.readyState < 2) audio.load();
+      return audio.play().catch(err => {
+        console.error('[모델음성] 재생 실패:', err.name, err.message);
+      });
+    };
+
     // 일시정지 상태면 현재 위치에서 재개 (Bug 2: currentTime 유지)
     if (_playerAudio && _playerAudio === _currentModelAudio && _currentModelAudio.paused) {
-      _currentModelAudio.play().catch(() => {});
+      _safePlay(_currentModelAudio);
       playBtn.textContent = '⏸ 일시정지';
       return;
     }
@@ -165,7 +173,7 @@ function createModelVoicePlayer(containerId, opts = {}) {
     if (_currentModelAudio && _currentModelAudio.src) {
       _playerAudio = _currentModelAudio;
       attachHandlers();
-      _currentModelAudio.play().catch(() => {});
+      _safePlay(_currentModelAudio);
       playBtn.textContent = '⏸ 일시정지';
       return;
     }
@@ -177,7 +185,7 @@ function createModelVoicePlayer(containerId, opts = {}) {
     window._modelAudioKeepAlive = _currentModelAudio; // 모바일 GC 방지
     _playerAudio = _currentModelAudio;
     attachHandlers();
-    _currentModelAudio.play().catch(() => {});
+    _safePlay(_currentModelAudio);
     playBtn.textContent = '⏸ 일시정지';
   };
 
@@ -1123,6 +1131,16 @@ async function startRecording() {
   const isPWA = window.matchMedia('(display-mode: standalone)').matches
                 || window.navigator.standalone === true;
 
+  // 이전 스트림/AudioContext 정리 (백그라운드 복귀 시 stale 참조 방지)
+  if (state.stream) {
+    state.stream.getTracks().forEach(t => t.stop());
+    state.stream = null;
+  }
+  if (state.audioContext) {
+    await state.audioContext.close().catch(() => {});
+    state.audioContext = null;
+  }
+
   // iOS PWA: getUserMedia는 반드시 클릭 이벤트에서 첫 번째 await로 호출해야 함
   // 카운트다운(await) 이후에 호출하면 사용자 제스처 컨텍스트가 소멸되어 차단됨
   let _stream;
@@ -1174,6 +1192,10 @@ async function startRecording() {
 
   const AudioCtx = /** @type {any} */ (window).AudioContext || /** @type {any} */ (window).webkitAudioContext;
   state.audioContext = new AudioCtx();
+  // iOS는 AudioContext를 suspended 상태로 생성할 수 있음 — 명시적 resume
+  if (state.audioContext.state === 'suspended') {
+    await state.audioContext.resume().catch(() => {});
+  }
   state.analyser = state.audioContext.createAnalyser();
   state.analyser.fftSize = 4096;
   state.analyser.smoothingTimeConstant = 0.6;
@@ -2054,6 +2076,12 @@ async function _drillStartRec() {
   if (_currentModelAudio) { _currentModelAudio.pause(); }
   const mvpPlay = $('drill-model-player-play');
   if (mvpPlay) { mvpPlay.textContent = '▶ 재생'; }
+
+  // 이전 스트림 정리 (백그라운드 복귀 시 stale 참조 방지)
+  if (_drill.stream) {
+    _drill.stream.getTracks().forEach(t => t.stop());
+    _drill.stream = null;
+  }
 
   // iOS PWA: getUserMedia는 반드시 첫 번째 await로 — 이 위치가 안전
   const isPWA = window.matchMedia('(display-mode: standalone)').matches
@@ -4521,6 +4549,21 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-result-select')?.addEventListener('click', () => { stopModelComparison(); showScreen('screen-home'); });
   document.getElementById('btn-result-retry-2')?.addEventListener('click', () => { stopModelComparison(); if (state.currentScript) startPrep(state.currentScript); });
   $('btn-retry')?.addEventListener('click', () => { stopModelComparison(); if (state.currentScript) startPrep(state.currentScript); });
+
+  // iOS PWA 백그라운드 복귀 시 AudioContext 재개
+  // visibilitychange만으로 부족한 경우를 위해 pageshow도 함께 등록
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.audioContext?.state === 'suspended') {
+      state.audioContext.resume().catch(() => {});
+      console.log('[PWA] visibilitychange → AudioContext resume');
+    }
+  });
+  window.addEventListener('pageshow', () => {
+    if (state.audioContext?.state === 'suspended') {
+      state.audioContext.resume().catch(() => {});
+      console.log('[PWA] pageshow → AudioContext resume');
+    }
+  });
 
   console.log('[완료] ja/ca 제거');
 });
