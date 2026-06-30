@@ -1118,10 +1118,25 @@ function startPrepTimer() { /* 타이머 제거됨 */ }
 // ===== RECORDING =====
 async function startRecording() {
   clearInterval(state.prepTimerInterval);
-  // 녹음 시작 시 모델 음성 즉시 중지
   if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; _currentModelAudio = null; }
 
-  // 3-2-1 카운트다운
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches
+                || window.navigator.standalone === true;
+
+  // iOS PWA: getUserMedia는 반드시 클릭 이벤트에서 첫 번째 await로 호출해야 함
+  // 카운트다운(await) 이후에 호출하면 사용자 제스처 컨텍스트가 소멸되어 차단됨
+  let _stream;
+  try {
+    _stream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: 44100, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+    });
+  } catch (e) {
+    console.error('[마이크] 권한 오류:', e.name, e.message, '| PWA:', isPWA);
+    alert(`마이크 접근 권한이 필요합니다.\n오류: ${e.name}`);
+    return;
+  }
+
+  // 마이크 확보 후 카운트다운
   await new Promise(resolve => {
     const overlay = $('countdown-overlay');
     const numEl = $('countdown-number');
@@ -1148,6 +1163,7 @@ async function startRecording() {
   state.pauseSamples = [];
   state.audioChunks = [];
   state.recordingStart = Date.now();
+  state.stream = _stream;
 
   $('record-title').textContent = `${state.currentScript.title} · ${{ ko:'한국어', en:'English' }[state.selectedLang]}`;
   $('record-timer').textContent = '00:00';
@@ -1155,14 +1171,6 @@ async function startRecording() {
   renderScriptText(state.currentScript, state.selectedLang, $('script-peek-text'));
   $('script-peek-text').classList.add('hidden');
   showScreen('screen-record');
-
-  try {
-    state.stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 44100, channelCount: 1, echoCancellation: true, noiseSuppression: true } });
-  } catch (e) {
-    alert('마이크 접근 권한이 필요합니다.');
-    showScreen('screen-prep');
-    return;
-  }
 
   const AudioCtx = /** @type {any} */ (window).AudioContext || /** @type {any} */ (window).webkitAudioContext;
   state.audioContext = new AudioCtx();
@@ -2042,14 +2050,18 @@ function _drillRender() {
 }
 
 async function _drillStartRec() {
-  // 따라읽기 시작 시 모델 음성 일시정지만 (currentTime·객체 유지 — 비교 화면에서 이어듣기 위해)
+  // 동기 작업 먼저 (await 없으므로 제스처 컨텍스트 유지)
   if (_currentModelAudio) { _currentModelAudio.pause(); }
   const mvpPlay = $('drill-model-player-play');
   if (mvpPlay) { mvpPlay.textContent = '▶ 재생'; }
 
+  // iOS PWA: getUserMedia는 반드시 첫 번째 await로 — 이 위치가 안전
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches
+                || window.navigator.standalone === true;
+  let stream;
   try {
     _drill.chunks = [];
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     _drill.stream = stream;
     const _drillRecOpts = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? { mimeType: 'audio/webm;codecs=opus' } : {};
@@ -2072,7 +2084,10 @@ async function _drillStartRec() {
     const btn = $('btn-drill-record');
     btn.textContent = '⏹ 녹음 중지';
     btn.onclick = _drillStopRec;
-  } catch (e) { alert('마이크 접근이 필요합니다: ' + e.message); }
+  } catch (e) {
+    console.error('[마이크] 드릴 권한 오류:', e.name, e.message, '| PWA:', isPWA);
+    alert(`마이크 접근 권한이 필요합니다.\n오류: ${e.name}`);
+  }
 }
 
 function _drillStopRec() {
