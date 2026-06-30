@@ -1,3 +1,6 @@
+// ===== 설문 URL (소프트 페이월) =====
+const SURVEY_URL = 'https://naver.works/설문링크'; // 나중에 실제 URL로 교체
+
 // ===== FIREBASE =====
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyA2rfs2oY80xb374uyYdc5dVlMgac08OWo",
@@ -33,12 +36,12 @@ function initFirebase() {
   } catch { return false; }
 }
 
-// 언어 코드 → 로컬 정적 폴더명
+// 언어 코드 → 로컬 정적 폴더명 (ko/en만 지원)
 const _MV_LOCAL_FOLDERS = {
-  ko: '한국어(남)', en: '영어(남)', ja: '일본어(남)', ca: '중국어(남)',
+  ko: '한국어(남)', en: '영어(남)',
 };
 const _MV_LOCAL_FOLDERS_F = {
-  ko: '한국어(여)', en: '영어(여)', ja: '일본어(여)', ca: '중국어(여)',
+  ko: '한국어(여)', en: '영어(여)',
 };
 
 // [DISABLED] 언어 코드 → Firebase Storage 폴더명 (남성 우선, 없으면 여성)
@@ -254,8 +257,7 @@ async function _doScanLocalModelVoices() {
     }
 
     console.log('[스캔]', num, '→', {
-      ko: modelFiles.ko || null, en: modelFiles.en || null,
-      ja: modelFiles.ja || null, ca: modelFiles.ca || null
+      ko: modelFiles.ko || null, en: modelFiles.en || null
     });
 
     if (Object.keys(modelFiles).length > 0) {
@@ -605,7 +607,7 @@ function getModelVoiceKey(lang) {
   return `cabinvoice_voice_${id}_${lang}`;
 }
 function _refreshMvUI() {
-  ['ko','en','ja','ca'].forEach(lang => {
+  ['ko','en'].forEach(lang => {
     const key = getModelVoiceKey(lang);
     const stored = localStorage.getItem(key);
     const el = document.getElementById(`mv-current-${lang}`);
@@ -659,19 +661,9 @@ function splitSentences(text) {
     .filter(s => s.length > 5);
 }
 
-function renderClickableScript(text, langCode) {
-  // ko/en: 단락 구분 렌더링
-  if (langCode !== 'ja' && langCode !== 'ca') return _renderKoEnText(text);
-  // ja/ca 테이블 포함: 기존 방식 유지
-  if (text.includes('|')) return renderBilingualScript(text, langCode);
-  const sentences = splitSentences(text);
-  if (!sentences.length) return renderBilingualScript(text, langCode);
-  return sentences.map((s, i) => {
-    return `<span class="script-sentence" data-idx="${i}">${renderBilingualScript(s, langCode)}</span>`;
-  }).join(' ');
+function renderClickableScript(text) {
+  return _renderKoEnText(text);
 }
-
-console.log('[완료] 문구 클릭 기능 제거');
 
 // ===== HTML ESCAPING & SCRIPT TEXT RENDERING =====
 function escHtml(s) {
@@ -762,120 +754,6 @@ function _renderKoEnText(text) {
   return `<div class="script-text-rendered">${html}</div>`;
 }
 
-// ja·ca 독음(한글) + 원문 쌍 렌더링
-// readings: [{reading, original}] 배열 전달 시 명시적 map 기반 렌더 (jaReadings/caReadings)
-function renderBilingualScript(text, langCode, readings = null) {
-  if (langCode !== 'ja' && langCode !== 'ca') return _renderKoEnText(text);
-
-  const rdiv = c => `<div class="bilingual-reading">${c}</div>`;
-  const odiv = c => `<div class="bilingual-original">${c}</div>`;
-  const SEP  = '<div class="bilingual-sep"></div>';
-  const PAIR = c => `<div class="bilingual-pair">${c}</div>`;
-  const hv   = s => escHtml(s).replace(/\[([^\]]+)\]/g, (match, inner) => {
-    if (/^(General|수하물|필요|생략|군사)/.test(inner)) return match;
-    return `<span class="script-var">[${inner}]</span>`;
-  });
-  const isSec = s => /^\[[^\]]+\]$/.test(s.trim()) && !/[぀-ヿ一-鿿]/.test(s);
-
-  // ── readings 배열 있으면 순차 렌더 (교범 독음 데이터 기반, map 매칭 없음) ──
-  if (readings?.length) {
-    let html = '';
-    let taggedGroup = [];
-
-    const flushTaggedGroup = () => {
-      if (!taggedGroup.length) return;
-      if (taggedGroup.length === 1) {
-        const { tag, reading: r, content } = taggedGroup[0];
-        html += `<div class="script-section-card"><span class="tag-cell">${escHtml(tag)}</span><span>${r ? `<div class="bilingual-reading">${hv(r)}</div>` : ''}${content ? `<div class="bilingual-original">${hv(content)}</div>` : ''}</span></div>`;
-      } else {
-        html += '<table class="script-section-table">';
-        for (const { tag, reading: r, content } of taggedGroup) {
-          html += `<tr><td class="tag-cell">${escHtml(tag)}</td><td>${r ? `<div class="bilingual-reading">${hv(r)}</div>` : ''}${content ? `<div class="bilingual-original">${hv(content)}</div>` : ''}</td></tr>`;
-        }
-        html += '</table>';
-      }
-      taggedGroup = [];
-    };
-
-    for (const item of readings) {
-      const { reading, original, tag, content } = item;
-      const line = (original || '').trim();
-      if (!line) {
-        flushTaggedGroup();
-        html += SEP;
-      } else if (tag) {
-        taggedGroup.push(item);
-      } else if (isSec(line)) {
-        flushTaggedGroup();
-        html += `<div class="bilingual-header">${hv(line)}</div>`;
-      } else {
-        flushTaggedGroup();
-        html += PAIR((reading ? rdiv(hv(reading)) : '') + odiv(hv(line)));
-      }
-    }
-    flushTaggedGroup();
-
-    console.log('[완료] 이중언어 렌더링 (readings 순차 방식, ' + readings.length + '항목)');
-    return `<div class="script-text-rendered">${html}</div>`;
-  }
-
-  // ── readings 없으면 텍스트 자동 판단 방식 ────────────────────────────────
-  const hasJapanese = s => /[぀-ヿ]/.test(s);
-  const hasKorean   = s => /[가-힣ㄱ-ㆎ]/.test(s);
-
-  // 중국어: readings 없으면 원문만 (독음은 _applyReadingsToElement가 비동기 적용)
-  if (langCode === 'ca') {
-    const html = text.split('\n').map(rawLine => {
-      const line = rawLine.trim();
-      if (!line) return SEP;
-      return PAIR(odiv(hv(line)));
-    }).join('');
-    console.log('[완료] 중국어 원문 초기 렌더 (독음은 별도 로드)');
-    return `<div class="script-text-rendered">${html}</div>`;
-  }
-
-  // 일본어: 한글 독음 줄 + 일본어 원문 줄 짝 맞추기
-  const lines = text.split('\n');
-  lines.forEach((line, i) => {
-    console.log(`[줄${i}]`, JSON.stringify(line.substring(0, 20)), 'Korean:', hasKorean(line), 'Japanese:', hasJapanese(line));
-  });
-
-  let html = '';
-  let pendingReading = null;
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      if (pendingReading !== null) { html += PAIR(rdiv(hv(pendingReading))); pendingReading = null; }
-      html += SEP;
-      continue;
-    }
-    if (isSec(line)) {
-      if (pendingReading !== null) { html += PAIR(rdiv(hv(pendingReading))); pendingReading = null; }
-      html += `<div class="bilingual-header">${hv(line)}</div>`;
-      continue;
-    }
-    if (hasKorean(line) && !hasJapanese(line)) {
-      if (pendingReading !== null) html += PAIR(rdiv(hv(pendingReading)));
-      pendingReading = line;
-    } else if (hasJapanese(line)) {
-      if (pendingReading !== null) {
-        html += PAIR(rdiv(hv(pendingReading)) + odiv(hv(line)));
-        pendingReading = null;
-      } else {
-        html += PAIR(odiv(hv(line)));
-      }
-    } else {
-      if (pendingReading !== null) { html += PAIR(rdiv(hv(pendingReading))); pendingReading = null; }
-      html += PAIR(odiv(hv(line)));
-    }
-  }
-  if (pendingReading !== null) html += PAIR(rdiv(hv(pendingReading)));
-
-  console.log('[완료] 이중언어 방송문 렌더링 (자동 판단 방식)');
-  return `<div class="script-text-rendered">${html}</div>`;
-}
-
 // ===== CUSTOM SCRIPTS (localStorage) =====
 function loadCustomScripts() {
   try { return JSON.parse(localStorage.getItem('cabinvoice_custom_scripts') || '[]'); }
@@ -898,11 +776,10 @@ function extractKeyPhrases(text, lang) {
   return result.length ? result : ['방송'];
 }
 function buildCustomLang(text, cpStr, langCode) {
-  const sttMap = { ko:'ko-KR', en:'en-US', ja:'ja-JP', ca:'zh-CN' };
-  // en은 WPM, 나머지는 음절/분
-  const speedMap      = { ko:350, en:115, ja:325, ca:240 };
-  const speedUnitMap  = { ko:'음절/분', en:'WPM', ja:'음절/분', ca:'음절/분' };
-  const speedTolMap   = { ko:100, en:90, ja:75, ca:80 };
+  const sttMap = { ko:'ko-KR', en:'en-US' };
+  const speedMap      = { ko:350, en:115 };
+  const speedUnitMap  = { ko:'음절/분', en:'WPM' };
+  const speedTolMap   = { ko:100, en:90 };
   const checkpoints = cpStr ? cpStr.split(',').map(s=>s.trim()).filter(Boolean) : [];
   return {
     sttLang:       sttMap[langCode] || 'ko-KR',
@@ -965,10 +842,8 @@ function _mapAnnouncementsToScripts(announcements) {
     langs: {
       ...(a.ko ? { ko: buildCustomLang(a.ko, (a.checkpoints||[]).join(','), 'ko') } : {}),
       ...(a.en ? { en: buildCustomLang(a.en, '', 'en') } : {}),
-      ...(a.ja ? { ja: buildCustomLang(a.ja, '', 'ja') } : {}),
-      ...(a.ca ? { ca: buildCustomLang(a.ca, '', 'ca') } : {}),
     }
-  })).filter(s => s.langs.ko || s.langs.en || s.langs.ja || s.langs.ca);
+  })).filter(s => s.langs.ko || s.langs.en);
 }
 
 function renderSidebar(scripts) {
@@ -1049,7 +924,7 @@ function renderSidebar(scripts) {
 }
 
 function _sidebarItemHtml(s) {
-  const evalLangs = s._evalLang || ['ko','en','ja','ca'];
+  const evalLangs = s._evalLang || ['ko','en'];
   const langDots = evalLangs.filter(l => s.langs?.[l]?.text)
     .map(l => `<span class="lang-dot lang-dot-${l}"></span>`).join('');
   const cnt = getPracticeCount(s.id);
@@ -1100,20 +975,13 @@ function selectScript(id) {
   _renderDetailLangTabs(s);
   _renderDetailContent(s, _detailLang);
 
-  // readings 로드 후 재렌더 (다른 스크립트로 이동했으면 무시)
-  _loadAndAttachReadings(s).then(() => {
-    if (_selectedScriptId === id) {
-      renderScriptText(s, _detailLang, $('detail-script-box'));
-      console.log('[detail] readings 재렌더링 완료');
-    }
-  });
 
   // 모바일: 사이드바 닫기
   if (window.innerWidth <= 768) closeSidebar();
 }
 
 function _renderDetailLangTabs(s) {
-  const evalLangs = s._evalLang || ['ko','en','ja','ca'];
+  const evalLangs = s._evalLang || ['ko','en'];
   const tabs = $('detail-lang-tabs');
   tabs.querySelectorAll('.detail-lang-tab').forEach(tab => {
     const lang = tab.dataset.lang;
@@ -1191,47 +1059,11 @@ function _setupSidebarSearch() {
   });
 }
 
-// script 객체의 jaReadings/caReadings를 1순위로 렌더, 없으면 원문만 표시
-function renderScriptForLang(script, langCode, targetEl) {
-  const lang = script.langs?.[langCode];
-  if (!lang) return;
-
-  if (langCode === 'ja' && script.jaReadings?.length > 0) {
-    targetEl.innerHTML = renderBilingualScript(lang.text, 'ja', script.jaReadings);
-    console.log('[완료] 일본어 독음 표시', script.jaReadings.length, '항목');
-    return;
-  }
-  if (langCode === 'ca' && script.caReadings?.length > 0) {
-    targetEl.innerHTML = renderBilingualScript(lang.text, 'ca', script.caReadings);
-    console.log('[완료] 중국어 독음 표시 (caReadings)', script.caReadings.length, '항목');
-    return;
-  }
-  if (langCode === 'ca' && script.chineseReadings?.length > 0) {
-    _renderChineseScriptWithReadings(lang.text, script.chineseReadings, targetEl);
-    console.log('[완료] 중국어 독음 표시 (chineseReadings)', script.chineseReadings.length, '항목');
-    return;
-  }
-  // readings 아직 미로드 — 원문만 표시 (startPrep의 _loadAndAttachReadings가 완료되면 재렌더)
-  targetEl.innerHTML = renderBilingualScript(lang.text, langCode);
-}
-
-// ─── 통합 방송문 렌더링 함수: jaReadings/caReadings 우선, fallback은 renderBilingualScript ─
+// ─── 통합 방송문 렌더링 함수 (ko/en) ─────────────────────────────────────
 function renderScriptText(script, langCode, targetEl) {
   if (!targetEl) return;
   const text = script?.langs?.[langCode]?.text || '';
-
-  if (langCode === 'ja' && script?.jaReadings?.length > 0) {
-    targetEl.innerHTML = renderBilingualScript(text, 'ja', script.jaReadings);
-  } else if (langCode === 'ca' && script?.caReadings?.length > 0) {
-    targetEl.innerHTML = renderBilingualScript(text, 'ca', script.caReadings);
-  } else if (langCode === 'ca' && script?.chineseReadings?.length > 0) {
-    _renderChineseScriptWithReadings(text, script.chineseReadings, targetEl);
-  } else if (langCode === 'ja' || langCode === 'ca') {
-    targetEl.innerHTML = renderBilingualScript(text, langCode);
-  } else {
-    targetEl.innerHTML = _renderKoEnText(text);
-  }
-  console.log('[완료] renderScriptText 통일');
+  targetEl.innerHTML = _renderKoEnText(text);
 }
 
 // ===== PREP =====
@@ -1241,37 +1073,11 @@ function startPrep(script, lang) {
   clearInterval(state.prepTimerInterval);
   updatePrepContent();
   showScreen('screen-prep');
-  // 독음 로드 후 script 객체에 부착 → ja/ca 탭 전환 시 즉시 사용
-  _loadAndAttachReadings(script);
-}
-
-// readings를 Firestore에서 불러와 script 객체에 직접 부착 후 prep/study 화면 재렌더
-async function _loadAndAttachReadings(script) {
-  const fid = script.id.replace(/\./g, '-');
-  const r = await _loadScriptReadings(fid);
-  if (!r) return;
-  if (r.jaReadings?.length)      script.jaReadings      = r.jaReadings;
-  if (r.caReadings?.length)      script.caReadings      = r.caReadings;
-  if (r.chineseReadings?.length) script.chineseReadings = r.chineseReadings;
-  if (state.currentScript !== script) return;
-  // prep 화면이 활성이면 prep 재렌더
-  if ($('screen-prep')?.classList.contains('active') &&
-      (state.selectedLang === 'ja' || state.selectedLang === 'ca')) {
-    updatePrepContent();
-  }
-  // study 화면이 활성이면 study-script-text 재렌더
-  if ($('screen-study')?.classList.contains('active')) {
-    const el = $('study-script-text');
-    if (el) {
-      renderScriptText(script, state.selectedLang, el);
-      console.log('[학습모드] readings 로드 후 재렌더링:', script.id, state.selectedLang);
-    }
-  }
 }
 
 function updatePrepContent() {
   const s = state.currentScript;
-  const evalLangs = s._evalLang || ['ko','en','ja','ca'];
+  const evalLangs = s._evalLang || ['ko','en'];
 
   // 언어 탭: evalLang에 포함되고 데이터 있는 탭만 표시
   $('lang-tabs').querySelectorAll('.lang-tab').forEach(tab => {
@@ -1343,7 +1149,7 @@ async function startRecording() {
   state.audioChunks = [];
   state.recordingStart = Date.now();
 
-  $('record-title').textContent = `${state.currentScript.title} · ${{ ko:'한국어', en:'English', ja:'日本語', ca:'中文' }[state.selectedLang]}`;
+  $('record-title').textContent = `${state.currentScript.title} · ${{ ko:'한국어', en:'English' }[state.selectedLang]}`;
   $('record-timer').textContent = '00:00';
   $('live-text').textContent = '말씀해 주세요...';
   renderScriptText(state.currentScript, state.selectedLang, $('script-peek-text'));
@@ -1510,6 +1316,18 @@ function stopRecording() {
   const finish = () => {
     const mimeType = state.mediaRecorder?.mimeType || 'audio/webm';
     state.audioBlob = new Blob(state.audioChunks, { type: mimeType });
+    // ① 녹음 시간 3초 미만 차단
+    if (duration < 3) {
+      _completeOverlay();
+      showToast('녹음 시간이 너무 짧습니다. 3초 이상 녹음해주세요.', 3000);
+      return;
+    }
+    // ② 파일 크기 10KB 미만 차단
+    if (state.audioBlob.size < 10000) {
+      _completeOverlay();
+      showToast('녹음 파일이 너무 작습니다. 마이크를 확인하고 다시 시도해주세요.', 3000);
+      return;
+    }
     _lastRecordingBlob = state.audioBlob;
     _aiAnalysisRetryCount = 0;
     if (_lastRecordingUrl) { URL.revokeObjectURL(_lastRecordingUrl); }
@@ -1551,1545 +1369,8 @@ function tierScore(ratio, maxPt) {
 }
 
 // ===== STUDY MODE =====
-const _studyGuideCache    = {};  // key: `${scriptId}_${lang}`
-const _readingsCache      = {};  // key: `${scriptId}_ca_readings`
-const _scriptReadingsCache = {}; // key: firestoreId → { jaReadings, caReadings, chineseReadings }
-let _prepRenderToken = 0;        // stale async 렌더 방지용 토큰
-
-// ===== 교범 독음 데이터 (관리자 업로드용) =====
-// "2-1-1" 형식 Firestore 문서 ID → jaReadings / caReadings 배열
-// 각 항목: { reading: "한글독음", original: "원문줄" }
-const MANUAL_READINGS = {
-  "2-1-1": {
-    "jaReadings": [
-      {
-        "reading": "미나사마, 토-키와 제주코-쿠- [편명]빈 [목적지] 유키데고자이마스.",
-        "original": "みなさま、とうきは チェジュこうくう [편명]びん [목적지] ゆきでございます。"
-      },
-      {
-        "reading": "오테니모츠와 마에노 자세키노 시타, 마타와 슈-노-다나오 고리요-쿠다사이.",
-        "original": "[General] おてにもつは まえの ざせきの した、または しゅうのうだなを ごりようください。"
-      },
-      {
-        "reading": "혼지츠와 [키나이노 오테니모츠가 오-이타메 / 만세키토낫떼오리] 슈-노-다나노 스페-스부소쿠가 요소-사레마스. 치이사나 오테니모츠, 마타와 코와레야스이 오테니모츠와 마에노 자세키노 시타니 오이레쿠다사이.",
-        "original": "[수하물 과다 반입] ほんじつは [きないの おてにもつが おおいため / まんせきとなっており] しゅうのうだなの スペースぶそくが よそうされます。ちいさな おてにもつ、または こわれやすい おてにもつは まえの ざせきの したに おいれください。"
-      },
-      {
-        "reading": "마타, 스베떼노 덴시키키와 키나이모-도니 셋떼-스루카, 덴겡오 오키리쿠다사이.",
-        "original": "また、すべての でんしききは きないモードに せっていするか、でんげんを おきりください。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "gèwèilǚkè, nǐmenhǎo huānyíng chéngzuò jìzhōuhángkōng gōngsī [편명]cì hángbān qiánwǎng [목적지].",
-        "original": "各位旅客，你们好！欢迎乘坐济州航空公司[편명]次航班前往[목적지]。"
-      },
-      {
-        "reading": "qǐng jiāng nínde xínglǐ fàngzài qiánpái zuòyǐxià huò shàngmiànde xínglijiànèi.",
-        "original": "[General] 请将您的行李放在前排座椅下，或上面的行李架内。"
-      },
-      {
-        "reading": "(lìngwài, yīnwèi jīntiān mǎnkè, yùjì xínglijià kōngjiān bùzú.) chúle xínglixiāng yǐwài, xiǎojiàn huò yìsuì wùpǐn, qǐng fàngzài qiánpái zuòyǐ xiàmiàn.",
-        "original": "[수하물 과다 반입] 另外，因为今天满客，预计行李架空间不足。除了行李箱以外，小件或易碎物品，请放在前排座椅下面。"
-      },
-      {
-        "reading": "qǐng bǎ diàn z ǐ shèbèi tiáochéng wéi fēixíng móshì huò guānj ī.",
-        "original": "请把电子设备调成为飞行模式或关机。"
-      }
-    ],
-    "chineseReadings": [
-      {
-        "reading": "거웨이 뤼커, 니먼 하오! 환잉 청쭈어 지저우 항콩 궁쓰[편명]츠 항반 치엔왕[목적지].",
-        "original": "各位旅客，你们好！欢迎乘坐济州航空公司[편명]次航班前往[목적지]。"
-      },
-      {
-        "reading": "칭지앙 닌더 싱리 팡짜이 치엔파이 쭈어이 시아, 후오 상미엔 더 싱리찌아 네이.",
-        "original": "请将您的行李放在前排座椅下，或上面的行李架内。"
-      },
-      {
-        "reading": "링와이, 인웨이 진티엔 만커, 위지 싱리찌아 콩찌엔 부쭈. 추러 싱리시앙 이와이, 시아오찌엔 후오 이쑤이 우핀, 칭팡짜이 치엔파이 쭈어이 시아미엔.",
-        "original": "另外，因为今天满客，预计行李架空间不足。除了行李箱以外，小件或易碎物品，请放在前排座椅下面。"
-      },
-      {
-        "reading": "칭바 띠엔쯔 서베이 티아오청 웨이 페이싱 모스 후오 꽌지.",
-        "original": "请把电子设备调成为飞行模式或关机。"
-      }
-    ]
-  },
-  "2-1-2": {
-    "jaReadings": [
-      {
-        "reading": "미나사마",
-        "original": "みなさま、"
-      },
-      {
-        "reading": "모바이루 밧테리-덴시타바코라이타-와",
-        "original": "モバイルバッテリー、でんしタバコ、ライターは"
-      },
-      {
-        "reading": "우에노 타나니 오이레 이타다케마센노데",
-        "original": "うえの たなに おいれ ただけませんので"
-      },
-      {
-        "reading": "오테모토니 오모치이타다쿠카 마타와 자세키 포켓토니 오이레쿠다사이",
-        "original": "おてもとに おもちいただくか または ざせき ポケットに おいれください。"
-      },
-      {
-        "reading": "마타모바이루밧테리- 오요비 덴시타바코와 키나이데노",
-        "original": "また、モバイルバッテリー および でんしタバコは きないでの"
-      },
-      {
-        "reading": "쥬-덴와 킨시사레테오리마스",
-        "original": "じゅうでんは きんしされております。"
-      },
-      {
-        "reading": "덴시키키가 자세키니 하사맛타리 아츠쿠낫타리",
-        "original": "でんしききが ざせきに はさまったり あつくなったり、"
-      },
-      {
-        "reading": "후쿠란다바아이와 스구니 죠-무인니 오시라세쿠다사이",
-        "original": "ふくらんだばあいは すぐに じょうむいんに おしらせください。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "gèwèilǚkèchōngdiànbǎodiànzǐyān hé dǎhuǒjī jìnzhǐ bǎoguǎn zài xínglǐjià nèi",
-        "original": "各位旅客，充电宝、电子烟和打火机禁止保管在行李架内，"
-      },
-      {
-        "reading": "qǐng suíshēn xiédài huò bǎoguǎn zài zuòwèi qiánmiàn de kǒudài lǐ",
-        "original": "请随身携带或保管在座位前面的口袋里。"
-      },
-      {
-        "reading": "cǐwàiyángé jìnzhǐ chōngdiànbǎo hé diànzǐyān chōngdiàn de xíngwéi",
-        "original": "此外，严格禁止充电宝和电子烟充电的行为。"
-      },
-      {
-        "reading": "qǐng bìmiǎn diànzǐ shèbèi kǎ zài zuòyǐ shàng",
-        "original": "请避免电子设备卡在座椅上，"
-      },
-      {
-        "reading": "tóngshífārè huò gǔbāo shíqǐng lìjí gàosu chéngwùyuán",
-        "original": "同时，发热或鼓包时，请立即告诉乘务员。"
-      }
-    ]
-  },
-  "2-3": {
-    "jaReadings": [
-      {
-        "reading": "토-키도아오 시메 (마모나쿠) 슛빠츠이타시마스",
-        "original": "とうき、ドアを しめ (まもなく) しゅっぱついたします。"
-      },
-      {
-        "reading": "안젠나 슛빠츠노타메",
-        "original": "あんぜんな しゅっぱつのため、"
-      },
-      {
-        "reading": "시테-사레타 오자세키니 고챠쿠세키쿠다사이",
-        "original": "していされた おざせきに ごちゃくせきください。"
-      },
-      {
-        "reading": "미나사마오하요-고자이마스/ 곤니치와/ 곰방와",
-        "original": "みなさま、[おはようございます。/ こんにちは。/ こんばんは。]"
-      },
-      {
-        "reading": "혼지츠와 고토-죠- 아리가토-고자이마스",
-        "original": "ほんじつは ごとうじょう ありがとうございます。"
-      },
-      {
-        "reading": "마타▶지연 사유니요리 슛빠츠가 오쿠레타텐 오와비 모시아게마스/고료-쇼-오네가이이타시마스",
-        "original": "また、[▶ ]により しゅっぱつが おくれたてん [おわび もうしあげます。/ごりょうしょうおねがいいたします。]"
-      },
-      {
-        "reading": "목적지 마데노 히코-지칸와",
-        "original": "[] までの ひこうじかんは"
-      },
-      {
-        "reading": "리리쿠고 ___지칸 ___훈(뿐)오 요테-시테오리마스",
-        "original": "りりくご ___じかん ___ふん(ぷん)を よていしております。"
-      },
-      {
-        "reading": "나오공항명와 군지쿠-코-토낫떼오리 가이부노 사츠에이가 스베테 킨시사레마스노데 고쿄-료쿠쿠다사이 타다이마요리마도노 히요케오 오시메 쿠다사이 마타리리쿠 쵸쿠고니 마도노 히요케오 아케루 코토가 데키마스",
-        "original": "なお、[]は ぐんじくうこうとなっており、 がいぶの さつえいが すべて きんしされますので ごきょうりょくください。 ただいまより、まどの ひよけを おしめ ください。 また、りりく ちょくごに まどの ひよけを あける ことが できます。"
-      },
-      {
-        "reading": "마타키나이데 죠-무인야 호카노 오캬쿠사마오 무단데 사츠에-스루 코토와 키나이노 치츠죠이지노타메오코토와리시테오리마스",
-        "original": "また、きないで じょうむいんや ほかの おきゃくさまを むだんで さつえいする ことは きないの ちつじょいじのため、おことわりしております。"
-      },
-      {
-        "reading": "안젠나 소라노타비노타메죠-무인카라노 안나이니 고쿄-료쿠 오네가이이타시마스아리가토-고자이마시타",
-        "original": "あんぜんな そらのたびのため、じょうむいんからの あんないに ごきょうりょく おねがいいたします。ありがとうございました。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "[shāohòu / kècāng zhǔnbèi wánbìhòu]",
-        "original": "稍后客舱准备完毕后"
-      },
-      {
-        "reading": "běncì hángbān cāngmén jíjiāng guānbì",
-        "original": "本次航班舱门即将关闭。"
-      },
-      {
-        "reading": "wèile běnjià fēijī ānquánde chūfā",
-        "original": "为了本架飞机安全的出发，"
-      },
-      {
-        "reading": "qǐng zài zhǐdìngde zuòwèishàng zuòhǎo",
-        "original": "请在指定的座位上坐好。"
-      },
-      {
-        "reading": "qīnàide lǚkèmennínhǎohuānyíng nín xuǎnchéng",
-        "original": "亲爱的旅客们，您好。欢迎您选乘"
-      },
-      {
-        "reading": "jìzhōuhángkōng [편명]cì hángbān qiánwǎng [목적지]",
-        "original": "济州航空次航班前往。"
-      },
-      {
-        "reading": "yóuyú [▶지연 사유] dānwùle nínde lǚchéng, xīwàng nín néng liàngjiě",
-        "original": "由于耽误了您的旅程,希望您能谅解。"
-      },
-      {
-        "reading": "dàodá [목적지]de yùjì fēixíng shíjiān shì gèxiǎoshí fēnzhōng",
-        "original": "到达的预计飞行时间是个小时分钟。"
-      },
-      {
-        "reading": "[공항명]shì jūnshì jīchǎng, jīchǎng qūyùnèi jìnzhǐ pāizhào érqiěQǐng bǎ zhēguāngbǎn quánbù guānhǎo Qǐfēi yǐhòunín kěyǐ dǎkāi zhēguāngbǎn",
-        "original": "是军事机场,机场区域内禁止拍照。而且，请把遮光板全部关好。起飞以后，您可以打开遮光板。"
-      },
-      {
-        "reading": "gēnjù zhōnghuá rénmín gònghéguó jūnshì shèshī bǎohùfǎ, qǐng lìjí bǎ zhēguāngbǎn quánbù guānhǎo yóuyú [공항]shì jūnshì jīchǎngjìnzhǐ shèyǐngpāizhào lùyīnmiáohuì děngde xíngwéi cóng dāchéng dào xiàjīde quánqījiānrúguǒ wéifǎn, jiānghuì shòudào yǒuguān fǎlǜfǎguīde chǔfá",
-        "original": "根据中华人民共和国军事设施保护法,请立即把遮光板全部关好。由于是军事机场，禁止摄影，拍照，录音，描绘等的行为。从搭乘到下机的全期间，如果违反,将会受到有关法律法规的处罚。"
-      },
-      {
-        "reading": "cǐwàirú zài jīcāngnèi shànzì pāishè chénwùyuán huò qítā lǚkèwéi wéihù jīcāng zhìxù kěnéng huì shòudào xiànzhì",
-        "original": "此外，如在机舱内擅自拍摄乘务员或其他旅客，为维护机舱秩序，可能会受到限制。"
-      },
-      {
-        "reading": "wèile ānquán fēixíngqǐng jījí xiézhù chéngwùyuánde zhǐshìxièxie!",
-        "original": "为了安全飞行，请积极协助乘务员的指示。谢谢"
-      }
-    ],
-    "chineseReadings": [
-      {
-        "reading": "친아이 더 뤼커 먼, 닌하오. 환잉 닌 쉬앤청 지조우 항콩[편명] 츠 항반 치앤왕[목적지].",
-        "original": "亲爱的旅客们，您好。欢迎您选乘济州航空[편명]次航班前往[목적지]。"
-      },
-      {
-        "reading": "요우위[▶지연 사유] 단우 러 닌 더 뤼청, 시왕 닌 넝 량지에.",
-        "original": "由于[▶지연 사유]耽误了您的旅程，希望您能谅解。"
-      },
-      {
-        "reading": "다다오[목적지] 더 위지 페이싱 스지앤 스___ 거 샤오스___ 펀종.",
-        "original": "到达[목적지]的预计飞行时间是___个小时___分钟。"
-      },
-      {
-        "reading": "츠와이, 루 짜이 지창 네이 산쯔 파이서 청우위앤 후어 치타 뤼커, 웨이 웨이후 지창 즈쉬, 커넝 후이 서우다오 시앤즈.",
-        "original": "此外，如在机舱内擅自拍摄乘务员或其他旅客，为维护机舱秩序，可能会受到限制。"
-      },
-      {
-        "reading": "웨이러 안취앤 페이싱, 칭 지지 시에주 청우위앤 더 즈스. 시에시에!",
-        "original": "为了安全飞行，请积极协助乘务员的指示。谢谢！"
-      }
-    ]
-  },
-  "2-4-1": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "2-4-2": {
-    "jaReadings": [
-      {
-        "reading": "히죠-구치와 카나라즈 죠-무인노 시지가 아루 바아이노미",
-        "original": "히죠-쿠치와 카나라즈 죠-무인노 시지가 아루 바아이노미 오아케쿠다사이。무단데 소-사시타 바아이、사이다이 10넨노 초-에키니나루 카노-세이가 아리마스"
-      },
-      {
-        "reading": "오아케쿠다사이무단데 소-사시타 바아이",
-        "original": "ひじょうくちは かならず じょうむいんの しじが ある ばあいのみ おあけください。むだんで そうさした ばあい、さいだい 10ねんの ちょうえきになる かのうせいがあります。"
-      },
-      {
-        "reading": "사이다이 쥬-넨노10 쵸-에키니나루 카노-세-가아리마스",
-        "original": "마타、죠-무인노 교-무보-가이코-이、덴시타바코오 후쿠무 키나이데노 키츠엔、소시테 덴시키키시요-키쥰노 이한와、코-쿠-호안호-니요리 쇼바츠노 타이쇼-토나리마스"
-      },
-      {
-        "reading": "마타죠-무인노 교-무보-가이코-이",
-        "original": "また、じょうむいんの ぎょうむぼうがいこうい、でんしタバコを ふくむ きないでの きつえん、そして でんしききしようきじゅんの いはんは、こうくうほあんほうにより しょばつの たいしょうとなります。"
-      },
-      {
-        "reading": "덴시타바코오 후쿠무 키나이데노 키츠엔",
-        "original": "안젠나 운코-노타메、미나사마노 고쿄-료쿠 오네가이이타시마스"
-      },
-      {
-        "reading": "소시테 덴시키키시요-키쥰노 이항와",
-        "original": "あんぜんな うんこうのため、みなさまの ごきょうりょく おねがいいたします。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "jǐnjí chūkǒu bìxū zài chéngwùyuán zhǐshì xià cái néng kāiqǐ",
-        "original": "紧急出口必须在乘务员指示下才能开启。如擅自操作，最高可判处十年有期徒刑。"
-      },
-      {
-        "reading": "rú shànzì cāozuòzuìgāo kě pànchǔ shí nián yǒuqī túxíng",
-        "original": "此外，妨碍乘务员执行职务、在机内吸烟包括电子烟、违反电子设备使用规定等，均可依据航空安全法受到处罚。"
-      },
-      {
-        "reading": "cǐwàifángài chéngwùyuán zhíxíng zhíwù",
-        "original": "为了您的安全与顺利的飞行，请予以配合。"
-      }
-    ],
-    "chineseReadings": [
-      {
-        "reading": "진지 추커우 비쉬 짜이 청우위안 즈스 샤 차이넝 카이치.",
-        "original": "紧急出口必须在乘务员指示下才能开启。"
-      },
-      {
-        "reading": "루 샨쯔 차오쭤, 쭤이가오 커 판추 스녠 요우치 투싱.",
-        "original": "如擅自操作，最高可判处十年有期徒刑。"
-      },
-      {
-        "reading": "츠와이, 팡아이 청우위안 즈싱 즈우, 짜이 지네이 시옌 바오쿠어 뎬쯔옌, 웨이판 뎬쯔 서베이 스융 꾸이딩 등, 쥔커 이쥐 항쿵 안췐파 쇼우따오 추파.",
-        "original": "此外，妨碍乘务员执行职务、在机内吸烟包括电子烟、违反电子设备使用规定等，均可依据航空安全法受到处罚。"
-      },
-      {
-        "reading": "웨이러 닌더 안췐 위 슌리 더 페이싱, 칭 위이 페이허.",
-        "original": "为了您的安全与顺利的飞行，请予以配合。"
-      }
-    ]
-  },
-  "2-5-1": {
-    "jaReadings": [
-      {
-        "reading": "미나사마 가소린노 니오이와 이치지테키나 겐쇼-토나리",
-        "original": "みなさま、 ガソリンの においは いちじてきな げんしょうとなり、"
-      },
-      {
-        "reading": "리리쿠고니와 키에마스노데 고안신쿠다사이",
-        "original": "りりくごには きえますので ごあんしんください。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "gèwèilǚkèkècāngnèi kěnéng huì chūxiàn yìwèi",
-        "original": "各位旅客，客舱内可能会出现异味。"
-      },
-      {
-        "reading": "zhèshì qǐfēi zhīqiánde zànshí xiànxiàngqǐng nín liàngjiě",
-        "original": "这是起飞之前的暂时现象，请您谅解。"
-      }
-    ]
-  },
-  "2-5-2": {
-    "jaReadings": [
-      {
-        "reading": "미나사마 키나이노 온도와 리리쿠고 테키세츠니 쵸-세츠사레마스노데 시바라쿠 오마치쿠다사이",
-        "original": "みなさま、 きないの おんどは りりくご てきせつに ちょうせつされますので しばらく おまちください。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "gèwèilǚkèmùqián kècāng wēndù kěnéng huì búshìyí,",
-        "original": "各位旅客，目前客舱温度可能会不适宜,"
-      },
-      {
-        "reading": "kècāng wēndù qǐfēi hòu huì shìdàng tiáozhěng",
-        "original": "客舱温度起飞后会适当调整。"
-      },
-      {
-        "reading": "qǐng nàixīn děngdài",
-        "original": "请耐心等待。"
-      }
-    ]
-  },
-  "2-5-3": {
-    "jaReadings": [
-      {
-        "reading": "미나사마코-쿠-키노 나카토 소토노 온도사니요리",
-        "original": "みなさま、こうくうきの なかと そとの おんどさにより、"
-      },
-      {
-        "reading": "시즈쿠가 오치루 바아이가 고자이마스",
-        "original": "しずくが おちる ばあいが ございます。"
-      },
-      {
-        "reading": "온도사니요루 이치지테키나 겐쇼-토나리마스노데",
-        "original": "おんどさによる いちじてきな げんしょうとなりますので"
-      },
-      {
-        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
-        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
-      },
-      {
-        "reading": "미나사마안젠나 리리쿠니 소나에 키나이노 쇼-메이오",
-        "original": "みなさま、あんぜんな りりくに そなえ きないの しょうめいを"
-      },
-      {
-        "reading": "쿠라쿠 쵸-세츠이타시마스아카리노 히츠요-나 카타와",
-        "original": "くらく ちょうせついたします。あかりの ひつような かたは"
-      },
-      {
-        "reading": "자세키 우에노 라이토보탄오 고리요-쿠다사이",
-        "original": "ざせき うえの ライトボタンを ごりようください。"
-      },
-      {
-        "reading": "미나사마마모나쿠 리리쿠이타시마스시-토베루토오 오시메쿠다사이",
-        "original": "みなさま、まもなく りりくいたします。シートベルトを おしめください。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "gèwèilǚkèyóuyú jīcāng nèiwàide wēndù chāyìkècāng nèi kěnéng huì fāshēng jiélù zhèshì qǐfēi zhīqiánde zànshí xiànxiàngqǐng nín liàngjiě",
-        "original": "各位旅客，由于机舱内外的温度差异，客舱内可能会发生结露。这是起飞之前的暂时现象，请您谅解。"
-      },
-      {
-        "reading": "gèwèilǚkèwèile ānquánde qǐfēiwǒmen jiāng tiáoàn kècāng dēngguāng",
-        "original": "各位旅客，为了安全的起飞，我们将调暗客舱灯光。"
-      },
-      {
-        "reading": "zài tóudǐngshàng shèyǒu yuèdúdēngxūyàode lǚkè kěyǐ shǐyòng",
-        "original": "在头顶上设有阅读灯，需要的旅客可以使用。"
-      },
-      {
-        "reading": "gèwèilǚkèwǒmende fēijī jíjiāng qǐfēiqǐng jìhǎo ānquándài",
-        "original": "各位旅客，我们的飞机即将起飞，请系好安全带。"
-      }
-    ]
-  },
-  "3-1": {
-    "jaReadings": [
-      {
-        "reading": "미나사마코노 빈데와 에아-카훼AIR CAFE / (오요비) 멘제-힌노",
-        "original": "みなさま、この びんでは [AIR CAFE / (および) めんぜいひん]の"
-      }
-    ],
-    "caReadings": []
-  },
-  "3-10": {
-    "jaReadings": [
-      {
-        "reading": "미나사마마모나쿠 챠쿠리쿠이타시마스",
-        "original": "みなさま、まもなく ちゃくりくいたします。"
-      },
-      {
-        "reading": "시-토베루토오 오시메쿠다사이자세키노 세모타레테-부루",
-        "original": "シートベルトを おしめください。ざせきの せもたれ、テーブル、"
-      },
-      {
-        "reading": "히지카케와 모또노이치니 오모도시쿠다사이 마도노 히요케와 아케타 죠-타이니 시테이타다키마스요- 오네가이이타시마스",
-        "original": "ひじかけは もとのいちに おもどしください。 まどの ひよけは あけた じょうたいに していただきますよう おねがいいたします。"
-      },
-      {
-        "reading": "안젠노타메오테니모츠가 테키세츠니 슈-노-사레테이루카 고카쿠닌쿠다사이 타다이마요리안젠나 챠쿠리쿠노타메",
-        "original": "あんぜんのため、おてにもつが てきせつに しゅうのうされているか ごかくにんください。 ただいまより、あんぜんな ちゃくりくのため"
-      },
-      {
-        "reading": "오테아라이노 고시요-오 세-겐이타시마스",
-        "original": "おてあらいの ごしようを せいげんいたします。"
-      },
-      {
-        "reading": "마타덴시키키스탄도와 모토노 이치니 모도시 쥬-덴 케-부루와 토리하즈시테쿠다사이",
-        "original": "また、でんしききスタンドは もとの いちに もどし、 じゅうでん ケーブルは とりはずしてください。"
-      },
-      {
-        "reading": "공항명와 군지쿠-코-토낫떼오리 가이부노사츠에-가 스베떼 킨시사레마스노데 고쿄-료쿠쿠다사이",
-        "original": "[]は ぐんじくうこうとなっており、 がいぶのさつえいが すべて きんしされますので ごきょうりょくください。"
-      },
-      {
-        "reading": "미나사마안젠나 챠쿠리쿠노타메 키나이노 쇼-메-오",
-        "original": "みなさま、あんぜんな ちゃくりくのため きないの しょうめいを"
-      },
-      {
-        "reading": "쿠라쿠 쵸-세츠이타시마스",
-        "original": "くらく ちょうせついたします。"
-      },
-      {
-        "reading": "아카리노 히츠요-나 카타와 자세키 우에노 라이토보탄오 고리요-쿠다사이",
-        "original": "あかりの ひつような かたは ざせき うえの ライトボタンを ごりようください。"
-      },
-      {
-        "reading": "미나사마목적지에 요-코소",
-        "original": "みなさま、[]へ ようこそ！"
-      },
-      {
-        "reading": "안젠노타메 시-토베루토 챠쿠요-노사인가 키에루마데",
-        "original": "あんぜんのため シートベルト ちゃくようのサインが きえるまで"
-      },
-      {
-        "reading": "오자세키니테 스왓떼 오마치쿠다사이",
-        "original": "おざせきにて すわって おまちください。"
-      },
-      {
-        "reading": "마타슈-노-다나오 아케루사이와 나까노 모노가 오치나이요- 고츄-이쿠다사이",
-        "original": "また、しゅうのうだなを あけるさいは なかの ものが おちないよう ごちゅういください。"
-      },
-      {
-        "reading": "나오군지시세츠노 호안 이지노타메 마도노 히요케오 오시메 쿠다사이",
-        "original": "なお、ぐんじしせつの ほあん いじのため、 まどの ひよけを おしめ ください。"
-      },
-      {
-        "reading": "아리가토-고자이마시타",
-        "original": "ありがとうございました。"
-      },
-      {
-        "reading": "미나사마타다이마 목적지니 토-챠쿠이타시마시타",
-        "original": "みなさま、ただいま []に とうちゃくいたしました。"
-      },
-      {
-        "reading": "혼지츠와 요테이요리 토-챠쿠가 오쿠레마시타코토오 오와비 모-시아게마스",
-        "original": "ほんじつは よていより とうちゃくが おくれましたことを おわび もうしあげます。"
-      },
-      {
-        "reading": "혼지츠와 ▶지연 사유니요리요테이요리 토-챠쿠가 오쿠레마시타코토오 고료-쇼-오네가이이타시마스",
-        "original": "ほんじつは [▶ ]により、よていより とうちゃくが おくれましたことを ごりょうしょうおねがいいたします。"
-      },
-      {
-        "reading": "안젠노타메시-토베루토 챠쿠요-노사인가 키에루마데",
-        "original": "あんぜんのため、シートベルト ちゃくようのサインが きえるまで"
-      },
-      {
-        "reading": "오자세키니테 스왓떼 오마치쿠다사이",
-        "original": "おざせきにて すわって おまちください。"
-      },
-      {
-        "reading": "마타슈-노-다나오 아케루사이와 나까노 모노가 오치나이요- 고츄-이쿠다사이",
-        "original": "また、しゅうのうだなを あけるさいは なかの ものが おちないよう ごちゅういください。"
-      },
-      {
-        "reading": "나오군지시세츠노 호안 이지노타메 마도노 히요케오 오시메 쿠다사이",
-        "original": "なお、ぐんじしせつの ほあん いじのため、 まどの ひよけを おしめ ください。"
-      },
-      {
-        "reading": "아리가토-고자이마시타",
-        "original": "ありがとうございました。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "gèwèilǚkè, wǒmen jíjiāng dàodá [공항]",
-        "original": "各位旅客,我们即将到达。"
-      },
-      {
-        "reading": "qǐng jìhǎo ānquándàitiáozhí yǐbèi, shōuqǐ xiǎozhuōbǎn",
-        "original": "请系好安全带，调直椅背,收起小桌板，"
-      },
-      {
-        "reading": "fàngxià fúshǒubǎ zhēguāngbǎn dǎkāi",
-        "original": "放下扶手，把遮光板打开。"
-      },
-      {
-        "reading": "érqiěqǐng zàicì quèrèn nín de suíshēn xínglǐ cúnfàng zhuàngtài",
-        "original": "而且，请再次确认您的随身行李存放状态。"
-      },
-      {
-        "reading": "wèile ānquánqǐng búyào shǐyòng xǐshǒujiān",
-        "original": "为了安全，请不要使用洗手间。"
-      },
-      {
-        "reading": "tóngshí, qǐng jiāng diànzǐ shèbèi zhījià shōuhuí yuánwèi, bìng qùchú chōngdiàn diànlǎn",
-        "original": "同时,请将电子设备支架收回原位,并去除充电电缆。"
-      },
-      {
-        "reading": "[공항명]shì jūnshìjīchǎng, suǒyǒu jīchǎng qūyùnèi jìnzhǐpāizhào",
-        "original": "是军事机场,所有机场区域内禁止拍照。"
-      },
-      {
-        "reading": "lìngwài[공항]wéi jūnshìjīchǎnggēnjù zhōnghuá rénmín gònghéguó jūnshì shèshī bǎohùfǎ wèile bǎochí shèshībǎoān quánmiàn jìnzhǐ chuāngwài shèyǐng gēnjù yǒuguānguīdìng qǐng lìjí guānbì zhēguāngbǎn rúguǒ bèi jiēfā dǎkāi zhēguāngbǎnpāishèděngde wéifǎnxíngwéijiāng kěnéng bèi zhuījiū fǎlǜzérènbìxū bǎochí zhēguāngbǎnde guānbì zhuàngtài",
-        "original": "另外，为军事机场。根据中华人民共和国军事设施保护法为了保持设施保安全面禁止窗外摄影。根据有关规定请立即关闭遮光板。如果被揭发打开遮光板，拍摄等的违反行为，将可能被追究法律责任，必须保持遮光板的关闭状态。"
-      },
-      {
-        "reading": "gèwèilǚkè, wèile ānquánde zhuólùkècāng dēngguāng jiāng huìtiáoàn",
-        "original": "各位旅客,为了安全的着陆，客舱灯光将会调暗。"
-      },
-      {
-        "reading": "zài tóudǐngshàng shèyǒu yuèdúdēngxūyàode lǚkè kěyǐ shǐyòng",
-        "original": "在头顶上设有阅读灯，需要的旅客可以使用。"
-      },
-      {
-        "reading": "zūnjìngde gèwèilǚkèhuānyíng nín láidào [목적지]",
-        "original": "尊敬的各位旅客，欢迎您来到。"
-      },
-      {
-        "reading": "wèile nínde ānquánānquándài zhǐshìdēng xīmièzhīqián",
-        "original": "为了您的安全，安全带指示灯熄灭之前，"
-      },
-      {
-        "reading": "qǐng búyào líkāi zuòwèi",
-        "original": "请不要离开座位。"
-      },
-      {
-        "reading": "érqiěānquándài zhǐshìdēng xīmiè hòu, dǎkāi xínglijiàshí",
-        "original": "而且，安全带指示灯熄灭后,打开行李架时，"
-      },
-      {
-        "reading": "qǐng zhùyì lǐmiànde dōngxi diàoluò",
-        "original": "请注意里面的东西掉落。"
-      },
-      {
-        "reading": "zhù nín lǚtú yúkuàibìng qīdài yǔ nín zàicì jiànmiàn",
-        "original": "祝您旅途愉快，并期待与您再次见面。"
-      },
-      {
-        "reading": "érqiěWèile bǎochí jūnshì shèshī bǎo’ān qǐng bǎ zhēguāngbǎn quánbù guānhǎo",
-        "original": "而且，为了保持军事设施保安，请把遮光板全部关好。"
-      },
-      {
-        "reading": "xièxie",
-        "original": "谢谢。"
-      },
-      {
-        "reading": "gèwèilǚkèwǒmen dàodá [목적지]",
-        "original": "各位旅客，我们到达。"
-      },
-      {
-        "reading": "fēicháng bàoqiànfēijī bǐ yùdìngshíjiān yánchí dàodá",
-        "original": "非常抱歉，飞机比预定时间延迟到达。"
-      },
-      {
-        "reading": "yóuyú [▶지연 사유] fēijī bǐ yùdìngshíjiān yánchí dàodáqǐng nín liàngjiě",
-        "original": "由于飞机比预定时间延迟到达。请您谅解。"
-      },
-      {
-        "reading": "wèile nínde ānquán, zài ānquándài zhǐshìdēng xīmièzhīqián",
-        "original": "为了您的安全,在安全带指示灯熄灭之前"
-      },
-      {
-        "reading": "qǐng búyào líkāi zuòwèi",
-        "original": "请不要离开座位。"
-      },
-      {
-        "reading": "érqiěānquándài zhǐshìdēng xīmièhòu, dǎkāi xínglijiàshí",
-        "original": "而且，安全带指示灯熄灭后,打开行李架时，"
-      },
-      {
-        "reading": "qǐng zhùyì lǐmiànde dōngxi diàoluò",
-        "original": "请注意里面的东西掉落。"
-      },
-      {
-        "reading": "érqiěwèile bǎochí jūnshì shèshī bǎo’ān qǐng bǎ zhēguāngbǎn quánbù guānhǎo",
-        "original": "而且，为了保持军事设施保安，请把遮光板全部关好。"
-      },
-      {
-        "reading": "xièxie",
-        "original": "谢谢。"
-      }
-    ]
-  },
-  "3-3": {
-    "jaReadings": [
-      {
-        "reading": "한바이오 오코낫떼오리마센",
-        "original": "はんばいを おこなっておりません。"
-      },
-      {
-        "reading": "고료-쇼-노호도 오네가이이타시마스",
-        "original": "ごりょうしょうのほど おねがいいたします。"
-      },
-      {
-        "reading": "미나사마",
-        "original": "みなさま、"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "gèwèilǚkè, běncì hángbān bújìnxíng xiāoshòu",
-        "original": "各位旅客,本次航班不进行销售"
-      },
-      {
-        "reading": "[língshí hé gèzhǒng zhōubiān chǎnpǐn / (yǐjí) miǎnshuìpǐn]",
-        "original": "零食和各种周边产品以及免税品。"
-      },
-      {
-        "reading": "qǐng nín liàngjiě",
-        "original": "请您谅解。"
-      }
-    ]
-  },
-  "3-4-3": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "3-4-4": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "3-5-1": {
-    "jaReadings": [
-      {
-        "reading": "타다이마(히죠-니) 키류-노 후안테-나 토코로오 츠-카시테오리마스",
-        "original": "ただいま、(ひじょうに) きりゅうの ふあんていな ところを つうかしております。"
-      },
-      {
-        "reading": "코레요리사키 (히죠-니) 키류-노 후안테-나 토코로오 츠-카스루 요테-데스",
-        "original": "これよりさき (ひじょうに) きりゅうの ふあんていな ところを つうかする よていです。"
-      },
-      {
-        "reading": "코레요리사키와 오테아라이노 고리요-나도자세키노 이도-와 시바라쿠고엔료쿠다사이 마타오코사마즈레노 오캬쿠사마와 오코사마노 시-토베루토모 고카쿠닌쿠다사이",
-        "original": "これよりさきは おてあらいの ごりようなど、ざせきの いどうは しばらくごえんりょください。 また、おこさまづれの おきゃくさまは おこさまの シートベルトも ごかくにんください。"
-      },
-      {
-        "reading": "나오오테아라이니 이랏샤루 오캬쿠사마와 치카쿠노 테스리니 오츠카마리니나리 고지신노 안젠카쿠호 오네가이이타시마스",
-        "original": "なお、おてあらいに いらっしゃる おきゃくさまは ちかくの てすりに おつかまりになり、 ごじしんの あんぜんかくほ おねがいいたします。"
-      },
-      {
-        "reading": "시-토베루토오 싯카리토 오시메쿠다사이",
-        "original": "シートベルトを しっかりと おしめください。"
-      },
-      {
-        "reading": "미나사마타다이마 (히죠-니) 키류-노 후안테-나 토코로오",
-        "original": "みなさま、ただいま (ひじょうに) きりゅうの ふあんていな ところを"
-      },
-      {
-        "reading": "츠-카시테이루타메히키츠즈키 히코-키가 유레테오리마스",
-        "original": "つうかしているため、ひきつづき ひこうきが ゆれております。"
-      },
-      {
-        "reading": "시-토베루토오 모-이치도 오타시카메쿠다사이",
-        "original": "シートベルトを もういちど おたしかめください。"
-      },
-      {
-        "reading": "코레요리사키와 오테아라이노 고리요-나도 자세키노 이도-와 시바라쿠 고엔료쿠다사이 마타오코사마즈레노 오캬쿠사마와 오코사마노 시-토베루토모 고카쿠닌쿠다사이",
-        "original": "これよりさきは おてあらいの ごりようなど、 ざせきの いどうは しばらく ごえんりょください。 また、おこさまづれの おきゃくさまは おこさまの シートベルトも ごかくにんください。"
-      },
-      {
-        "reading": "미나사마",
-        "original": "みなさま、"
-      },
-      {
-        "reading": "토-키와 마다 키류-노 후안테-나 토코로오 츠-카시테오리마스",
-        "original": "とうきは まだ きりゅうの ふあんていな ところを つうかしております。"
-      },
-      {
-        "reading": "시-토베루토 챠쿠요-노 사인가 키에루마데 오자세키니테",
-        "original": "シートベルト ちゃくようの サインが きえるまで おざせきにて"
-      },
-      {
-        "reading": "스왓떼 오마치쿠다사이",
-        "original": "すわって おまちください 。"
-      },
-      {
-        "reading": "미나사마안젠노타메",
-        "original": "みなさま、あんぜんのため"
-      },
-      {
-        "reading": "키나이 사-비스 가 오쿠레테오리마스/ 오 츄-단이타시마시타",
-        "original": "きない サービス [が おくれております。/ を ちゅうだんいたしました。]"
-      },
-      {
-        "reading": "키류-가 안테-시마시타라",
-        "original": "きりゅうが あんていしましたら、"
-      },
-      {
-        "reading": "사-비스오 카이시사세테 이타다키마스노데",
-        "original": "サービスを かいしさせて いただきますので、"
-      },
-      {
-        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
-        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
-      },
-      {
-        "reading": "미나사마",
-        "original": "みなさま、"
-      },
-      {
-        "reading": "안젠노타메 / ▶비정상 상황 예문 / ▶TOD Signal 송출 시 니요리",
-        "original": "[あんぜんのため / ▶ / ▶TOD Signal ] により、"
-      },
-      {
-        "reading": "키나이 사-비스오 슈-료-이타시마시타",
-        "original": "きない サービスを しゅうりょういたしました。"
-      },
-      {
-        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
-        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "gèwèilǚkè,",
-        "original": "各位旅客,"
-      },
-      {
-        "reading": "yóuyú fēijī yùyǒu bùwěndìng qìliú zhèngzài (yánzhòng) diānbǒ",
-        "original": "由于飞机遇有不稳定气流，正在严重颠簸。"
-      },
-      {
-        "reading": "yóuyú fēijī yùyǒu bùwěndìng qìliú jiānghuì (yánzhòng) diānbǒ",
-        "original": "由于飞机遇有不稳定气流，将会严重颠簸。"
-      },
-      {
-        "reading": "qǐng jìhǎo ānquándài",
-        "original": "请系好安全带。"
-      },
-      {
-        "reading": "qǐng búyào líkāi zuòwèi hé shǐyòng xǐshǒujiān yě quèrèn nínde háizi jìhǎo ānquándài",
-        "original": "请不要离开座位和使用洗手间，也确认您的孩子系好安全带。"
-      },
-      {
-        "reading": "érqiězhèngzài shǐyòng wèishēngjiānde chéngkè qǐng wòjǐn bǎshouquèbǎo ānquán",
-        "original": "而且，正在使用卫生间的乘客，请握紧把手，确保安全。"
-      },
-      {
-        "reading": "gèwèilǚkè, fēijī zāoyù bùwěndìng qìliújìxù yánzhòngdiānbǒ",
-        "original": "各位旅客,飞机遭遇不稳定气流，继续（严重）颠簸。"
-      },
-      {
-        "reading": "qǐng zàicì quèrèn nínde ānquándài yǐjīng kòuhǎo jìjǐn",
-        "original": "请再次确认您的安全带已经扣好系紧。"
-      },
-      {
-        "reading": "qǐng búyào líkāi zuòwèi hé shǐyòng xǐshǒujiān yě quèrèn nínde háizi jìhǎo ānquándài",
-        "original": "请不要离开座位和使用洗手间，也确认您的孩子系好安全带。"
-      },
-      {
-        "reading": "gèwèilǚkè, wǒmende fēijī háizài zāoyù bùwěndìng qìliú",
-        "original": "各位旅客,我们的飞机还在遭遇不稳定气流。"
-      },
-      {
-        "reading": "zài ānquándài zhǐshìdēng xīmiè zhīqián",
-        "original": "在安全带指示灯熄灭之前，"
-      },
-      {
-        "reading": "qǐng zài zuòwèishàng jìxù jìhǎo ānquándài bìng nàixīn děngdài",
-        "original": "请在座位上继续系好安全带并耐心等待。"
-      },
-      {
-        "reading": "gèwèilǚkè, wèile ānquánzànshí [yánchí / tíngzhǐ] kècāng fúwù",
-        "original": "各位旅客,为了安全，暂时延迟停止客舱服务。"
-      },
-      {
-        "reading": "qìliú wěndìngzhīhòu kāishǐ tígōng fúwùqǐng nín liàngjiě",
-        "original": "气流稳定之后开始提供服务，请您谅解。"
-      },
-      {
-        "reading": "gèwèilǚkè,",
-        "original": "各位旅客,"
-      },
-      {
-        "reading": "[wèile ānquán/ yóuyú ▶비정상 상황 예문 / ▶TOD Signal 송출 시],",
-        "original": "为了安全由于,"
-      },
-      {
-        "reading": "wǒmen wúfǎ jìnxíng kècāng fúwùqǐng nín liàngjiě",
-        "original": "我们无法进行客舱服务。请您谅解。"
-      }
-    ]
-  },
-  "3-7": {
-    "jaReadings": [
-      {
-        "reading": "미나사마",
-        "original": "みなさま、"
-      },
-      {
-        "reading": "키나이노 쇼-메이오 쿠라쿠 쵸-세츠사세테 이타다키마스",
-        "original": "きないの しょうめいを くらく ちょうせつさせて いただきます。"
-      },
-      {
-        "reading": "라이토가 히츠요-나 오캬쿠사마와",
-        "original": "ライトが ひつような おきゃくさまは"
-      },
-      {
-        "reading": "우에노 라이토보탄오 고리요-쿠다사이",
-        "original": "うえの ライトボタンを ごりようください。"
-      },
-      {
-        "reading": "오테아라이와 젠뽀-또 코-호-니 고자이마스",
-        "original": "おてあらいは ぜんぽうと こうほうに ございます。"
-      },
-      {
-        "reading": "타바코와 덴시타바코오 후쿠메 키나이데와 스베떼 킨엔토낫떼오리마스 키츠엔노 사이코-쿠-호안호-니요리 쇼바츠 사레루코토가 아리마스노데 미나사마노 고쿄-료쿠오 오네가이이타시마스",
-        "original": "タバコは でんしタバコを ふくめ、 きないでは すべて きんえんとなっております。 きつえんの さい、こうくうほあんほうにより、 しょばつ されることが ありますので みなさまの ごきょうりょくを おねがいいたします。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "gèwèilǚkè, kècāng dēngguāng jiānghuì tiáoàn",
-        "original": "各位旅客,客舱灯光将会调暗。"
-      },
-      {
-        "reading": "zài tóudǐngshàng shèyǒu yuèdú dēngxūyàode lǚkè kěyǐ shǐyòng",
-        "original": "在头顶上设有阅读灯，需要的旅客可以使用。"
-      },
-      {
-        "reading": "xǐshǒujiān qiánmian yǒu yígèhòumian yǒu liǎnggè",
-        "original": "洗手间前面有一个，后面有两个。"
-      },
-      {
-        "reading": "kècāng quánqūyùnèi jìnzhǐ xīyān, bāokuò diànzǐyān rúguǒ wéifǎn jiāng shòudào fǎlǜ zhìcái, qǐng dàjiājījípèihé",
-        "original": "客舱全区域内禁止吸烟,包括电子烟。如果违反将受到法律制裁,请大家（积极）配合。"
-      }
-    ]
-  },
-  "3-9-1": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "3-9-2": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "4-1-1": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "4-5": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "5-1-3-1": {
-    "jaReadings": [
-      {
-        "reading": "미나사마(토-키와 마다 시테-사레타 게-토니 토-챠쿠시테오리마센)",
-        "original": "みなさま、(とうきは まだ していされた ゲートに とうちゃくしておりません。)"
-      },
-      {
-        "reading": "시-토베루토 챠쿠요-노사인가 키에루마데",
-        "original": "シートベルト ちゃくようのサインが きえるまで"
-      },
-      {
-        "reading": "오자세키니테 스왓떼 오마치쿠다사이",
-        "original": "おざせきにて すわって おまちください。"
-      },
-      {
-        "reading": "미나사마겐자이 ▶비정상 상황 예문니요리",
-        "original": "みなさま、げんざい [▶ により、"
-      },
-      {
-        "reading": "/ 시테-사레타 게-토니 호카노 히코-키가 토맛떼이루타메",
-        "original": "/ していされた ゲートに ほかの ひこうきが とまっているため、]"
-      },
-      {
-        "reading": "훈(뿐) 칸 / 시바라쿠 타이키이타시마스",
-        "original": "[ ふん(ぷん) かん / しばらく] たいきいたします。"
-      },
-      {
-        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
-        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
-      },
-      {
-        "reading": "미나사마겐자이 미나사마가 오오리니나루",
-        "original": "みなさま、げんざい みなさまが おおりになる"
-      },
-      {
-        "reading": "츠-로 / 카이단오 츠나이데오리마스노데 이마시바라쿠 오마치쿠다사이",
-        "original": "[つうろ / かいだん]を つないでおりますので いましばらく おまちください。"
-      },
-      {
-        "reading": "츠-로 / 카이단 렌케츠 치엔 / 몬다이노타메 코-키가 오쿠레테오리마스 이마시바라쿠 오자세키니테 스왓떼 오마치쿠다사이",
-        "original": "[つうろ / かいだん] れんけつ [ちえん / もんだい]のため こうきが おくれております。 いましばらく おざせきにて すわって おまちください。"
-      },
-      {
-        "reading": "미나사마타-미나루마데 오오쿠리스루 바스오 맛떼오리마스노데 이마시바라쿠 오마치쿠다사이",
-        "original": "みなさま、ターミナルまで おおくりする バスをまっておりますので いましばらく おまちください。"
-      },
-      {
-        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
-        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
-      },
-      {
-        "reading": "미나사마타다이마카라 / 마모나쿠 오오리이타다케마스",
-        "original": "みなさま、[ただいまから / まもなく] おおりいただけます。"
-      },
-      {
-        "reading": "타-미나루마데와 바스/토호데노 이도-토나리마스노데 오오리노사이와 아시모토니 고츄-이쿠다사이",
-        "original": "ターミナルまでは [バス/とほ]での いどうとなりますので、 おおりのさいは あしもとに ごちゅういください。"
-      },
-      {
-        "reading": "(마타) 오오리노사이와오와스레모노노 나이요- 아라타메테 오타시카메쿠다사이",
-        "original": "(また、) おおりのさいは、おわすれものの ないよう あらためて おたしかめください。"
-      },
-      {
-        "reading": "베비-카-와 게-토노 마에 / 테니모츠 우케토리죠-데 오우케토리이타다케마스",
-        "original": "ベビーカーは [ゲートの まえ / てにもつ うけとりじょう]で おうけとりいただけます。"
-      },
-      {
-        "reading": "혼지츠와 ▶지연 사유니요리요테-요리 토-챠쿠가 오쿠레마시타코토오 후타타비 오와비 모-시아게마스 / 고료-쇼- 오네가이이타시마스",
-        "original": "ほんじつは [▶ ]により、よていより とうちゃくが おくれましたことを [ふたたび おわび もうしあげます。 / ごりょうしょう おねがいいたします。"
-      },
-      {
-        "reading": "미나사마노 마타노 고토-죠- 코코로요리 오마치시테오리마스",
-        "original": "みなさまの またの ごとうじょう こころより おまちしております。"
-      },
-      {
-        "reading": "아리가토-고자이마시타",
-        "original": "ありがとうございました。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "rú gǎndào shēntǐ bùshìyí sì gǎnrǎn xīnguàn huò fārè",
-        "original": "如感到身体不适，疑似感染新冠或发热，"
-      },
-      {
-        "reading": "qǐng jíshí gàozhī hǎiguān gōngzuò rényuán",
-        "original": "请及时告知海关工作人员。"
-      },
-      {
-        "reading": "gèwèilǚkè(wǒmende fēijī hái méi dàodá zhǐdìngde tíngjīwèi)",
-        "original": "各位旅客，我们的飞机还没到达指定的停机位。"
-      },
-      {
-        "reading": "zhídào ānquándài zhǐshìdēng xīmiè",
-        "original": "直到安全带指示灯熄灭，"
-      },
-      {
-        "reading": "qǐng zài zuòwèishang nàixīn děngdài",
-        "original": "请在座位上耐心等待。"
-      },
-      {
-        "reading": "gèwèilǚkè",
-        "original": "各位旅客，"
-      },
-      {
-        "reading": "yóuyú [▶비정상 상황 예문 / zài zhǐdìngde tíngjīwèi yǒu qítāfēijī],",
-        "original": "由于在指定的停机位有其他飞机,"
-      },
-      {
-        "reading": "wǒmen jiāng zài yuándì děngdài [___fēnzhōng / yíduànshíjiān]",
-        "original": "我们将在原地等待分钟一段时间。"
-      },
-      {
-        "reading": "qǐng nín liàngjiě",
-        "original": "请您谅解。"
-      },
-      {
-        "reading": "gèwèilǚkèxiànzài wǒmen liánjiē xiàfēijīde [lángqiáo / kètīchē]qǐng shāoděng",
-        "original": "各位旅客，现在我们连接下飞机的廊桥客梯车。请稍等。"
-      },
-      {
-        "reading": "gèwèilǚkèyóuyú [▶비정상 상황 예문] qǐng zài zuòwèishàng nàixīn děngdài",
-        "original": "各位旅客，由于，请在座位上耐心等待。"
-      },
-      {
-        "reading": "[lángqiáo / kètīchē] háiméiyǒu dàowèi",
-        "original": "廊桥客梯车还没有到位"
-      },
-      {
-        "reading": "[lángqiáo / kètīchē] liánjiē fāshēng wèntí",
-        "original": "廊桥客梯车连接发生问题"
-      },
-      {
-        "reading": "gèwèilǚkèxiànzài wǒmen zhǔnbèi bǎidùchē qǐng shāoděng",
-        "original": "各位旅客，现在我们准备摆渡车。请稍等。"
-      },
-      {
-        "reading": "zūnjìngde gèwèilǚkè,",
-        "original": "尊敬的各位旅客,"
-      },
-      {
-        "reading": "wéi zuòhǎo jìngwài shūrù xīnguàn bìngdú biànyì jiāncè gōngzuò",
-        "original": "为做好境外输入新冠病毒变异监测工作，"
-      },
-      {
-        "reading": "gēnjù zhōngguó fǎlǜde xiāngguān guīdìng",
-        "original": "根据中国法律的相关规定，"
-      },
-      {
-        "reading": "hǎiguān jiāng duì nín chéngzuòde",
-        "original": "海关将对您乘坐的"
-      },
-      {
-        "reading": "hángbān jìnxíng hésuān cǎiyàng chōujiǎn",
-        "original": "航班进行核酸采样抽检，"
-      },
-      {
-        "reading": "qǐng pèihé zuòhǎo cǎiyàng gōngzuòyǐmiǎn yǐngxiǎng nínde tōngguān",
-        "original": "请配合做好采样工作，以免影响您的通关。"
-      },
-      {
-        "reading": "qǐng niàn dào míngzì/zuòwèi hàode lǚkèná hǎo suíshēn xínglǐ",
-        "original": "请念到名字座位号的旅客，拿好随身行李，"
-      },
-      {
-        "reading": "xiànzài xiàjī jìnxíng cǎiyàng",
-        "original": "现在下机进行采样。"
-      },
-      {
-        "reading": "<cǎiyàng míngdān>",
-        "original": "采样名单"
-      },
-      {
-        "reading": "gǎn xiè nínde hézuò",
-        "original": "感谢您的合作！"
-      },
-      {
-        "reading": "gèwèilǚkè[xiànzài / shāohòu] kěyǐ tōngguò qiáncāngmén xiàjī",
-        "original": "各位旅客，现在稍后可以通过前舱门下机。"
-      },
-      {
-        "reading": "(nín jiāng bùxíng zǒudào hòujīlóu) xià táijiē shí, qǐng zhùyì jiǎoxiàānquán ér xiǎoxīnhuádǎo",
-        "original": "您将步行走到候机楼。下台阶时,请注意脚下安全而小心滑倒。"
-      },
-      {
-        "reading": "qǐng zàicì quèrèn shìfǒu nácuò huò yílòule xíngli lìngwàiyǒushí bǎ guìzhòngwùpǐn fàng zài zuòwèi qiánmiande kǒudàilǐ diūshīqǐng zàicì quèrèn",
-        "original": "请再次确认是否拿错或遗漏了行李。另外，有时把贵重物品放在座位前面的口袋里丢失。请再次确认。"
-      },
-      {
-        "reading": "yīngérchē zài [lángqiáoqián/ xíngli zhuǎnpán / cāngménqián] kěyǐ lǐngqǔ",
-        "original": "婴儿车在廊桥前行李转盘舱门前可以领取。"
-      },
-      {
-        "reading": "yóuyú[▶지연 사유], fēijī bǐ yùdìng shíjiān yánchí dàodá[zàicì shēnbiǎoqiànyì/ qǐng nín liàngjiě]",
-        "original": "由于,飞机比预定时间延迟到达。再次深表歉意。请您谅解。"
-      },
-      {
-        "reading": "xiàcìzàihuì xièxie!",
-        "original": "下次再会。谢谢"
-      }
-    ]
-  },
-  "5-1-3-2": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "5-1-5": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "5-1-6": {
-    "jaReadings": [
-      {
-        "reading": "미나사마토-키와 ▶비정상 상황 예문니요리",
-        "original": "みなさま、とうきは [▶ ]により、"
-      },
-      {
-        "reading": "슛빠츠가 오쿠레테오리마스",
-        "original": "しゅっぱつが おくれております。"
-      },
-      {
-        "reading": "오요소 훈(뿐)고니 / 마모나쿠 슛빠츠스루 요테-데스노데",
-        "original": "[およそ ふん(ぷん)ごに / まもなく] しゅっぱつする よていですので"
-      },
-      {
-        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
-        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
-      },
-      {
-        "reading": "미나사마토-키와 타다이마 ▶비정상 상황 예문니요리",
-        "original": "みなさま、とうきは ただいま [▶ ]により、"
-      },
-      {
-        "reading": "슛빠츠 / 챠쿠리쿠마데 오요소 훈(뿐) 호도 사라니 카카루미코미데스",
-        "original": "[しゅっぱつ / ちゃくりく]まで およそ ふん(ぷん) ほど さらに かかるみこみです。"
-      },
-      {
-        "reading": "고후벵오 오카케이타시마시테 타이헨 모-시와케고자이마센",
-        "original": "[ごふべんを おかけいたしまして たいへん もうしわけございません。"
-      },
-      {
-        "reading": "/ 미나사마노 고료-쇼-노호도 오네가이이타시마스",
-        "original": "/ みなさまの ごりょうしょうのほど おねがいいたします。]"
-      },
-      {
-        "reading": "미나사마토-키와 슛빠츠 쥰비오 오에마시타가",
-        "original": "みなさま、とうきは しゅっぱつ じゅんびを おえましたが、"
-      },
-      {
-        "reading": "▶비정상 상황 예문니요리",
-        "original": "[▶ ]により、"
-      },
-      {
-        "reading": "겐자이노 이치데 타이키스루요- 시지오 우케마시타",
-        "original": "げんざいの いちで たいきするよう しじを うけました。"
-      },
-      {
-        "reading": "오요소 훈(뿐)고니 / 마모나쿠 슛빠츠스루 요테-데스노데",
-        "original": "[およそ ふん(ぷん)ごに / まもなく] しゅっぱつする よていですので、"
-      },
-      {
-        "reading": "히키츠즈키 오자세키니테 스왓떼 오마치쿠다사이",
-        "original": "ひきつづき おざせきにて すわって おまちください。"
-      },
-      {
-        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
-        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
-      },
-      {
-        "reading": "미나사마토-키와 겐자이",
-        "original": "みなさま、とうきは げんざい"
-      },
-      {
-        "reading": "▶비정상 상황 예문니요리 / 칸세-토-카라노",
-        "original": "[▶ により / かんせいとうからの]"
-      },
-      {
-        "reading": "리리쿠 쿄카오 맛떼오리마스",
-        "original": "りりく きょかを まっております。"
-      },
-      {
-        "reading": "토-키노 리리쿠쥰방와 반메데",
-        "original": "とうきの りりくじゅんばんは ばんめで、"
-      },
-      {
-        "reading": "오요소 훈(뿐)고니 / 마모나쿠 리리쿠스루 요테-데스",
-        "original": "[およそ ふん(ぷん)ごに / まもなく] りりくする よていです。"
-      },
-      {
-        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
-        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
-      },
-      {
-        "reading": "고안나이모-시아게마스",
-        "original": "ごあんないもうしあげます。"
-      },
-      {
-        "reading": "토-키와 코-쿠-키노 죠세츠 / 죠효- 사교-오 오코나우타메",
-        "original": "とうきは こうくうきの [じょせつ / じょひょう] さぎょうを おこなうため"
-      },
-      {
-        "reading": "시테-사레타 바쇼니 이도-이타시마스",
-        "original": "していされた ばしょに いどういたします。"
-      },
-      {
-        "reading": "사교-와 오요소 훈(뿐) 호도 카카루미코미데스",
-        "original": "さぎょうは およそ ふん(ぷん) ほど かかるみこみです。"
-      },
-      {
-        "reading": "사교-가 오와리시다이 슛빠츠스루요테-데스",
-        "original": "さぎょうが おわりしだい しゅっぱつするよていです。"
-      },
-      {
-        "reading": "안젠나 리리쿠노타메노 테츠즈키토 나리마스노데",
-        "original": "あんぜんな りりくのための てつづきと なりますので、"
-      },
-      {
-        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
-        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
-      },
-      {
-        "reading": "고안나이모-시아게마스토-키와 코-쿠-키노",
-        "original": "ごあんないもうしあげます。とうきは こうくうきの"
-      },
-      {
-        "reading": "죠세츠 / 죠효- 사교-오 오코낫떼이루타메",
-        "original": "[じょせつ / じょひょう] さぎょうを おこなっているため"
-      },
-      {
-        "reading": "슛빠츠가 오쿠레테오리마스",
-        "original": "しゅっぱつが おくれております。"
-      },
-      {
-        "reading": "사교-와 오요소 훈(뿐)호도 카카루미코미데스",
-        "original": "さぎょうは およそ ふん(ぷん)ほど かかるみこみです。"
-      },
-      {
-        "reading": "사교-가 오와리시다이 슛빠츠스루요테-데스",
-        "original": "さぎょうが おわりしだい しゅっぱつするよていです。"
-      },
-      {
-        "reading": "안젠나 리리쿠노타메노 테츠즈키토 나리마스노데",
-        "original": "あんぜんな りりくのための てつづきと なりますので、"
-      },
-      {
-        "reading": "미나사마노 고료-쇼-노호도 오네가이이타시마스",
-        "original": "みなさまの ごりょうしょうのほど おねがいいたします。"
-      }
-    ],
-    "caReadings": [
-      {
-        "reading": "gèwèilǚkèyóuyú [▶비정상 상황 예문], wǒmen zhèngzài děngdài chūfā",
-        "original": "各位旅客，由于,我们正在等待出发。"
-      },
-      {
-        "reading": "jiāngyú [ fēnzhōnghòu/ shāohòu] chūfāgǎnxiè nínde lǐjiě",
-        "original": "将于分钟后稍后出发，感谢您的理解。"
-      },
-      {
-        "reading": "gèwèilǚkèyóuyú [▶비정상 상황 예문] háiméiyǒu",
-        "original": "各位旅客，由于还没有"
-      },
-      {
-        "reading": "[hǎozhuǎn / jiéshù / yǔnxǔ]",
-        "original": "好转结束允许。"
-      },
-      {
-        "reading": "wǒmen xūyào zài děngdài [ fēnzhōng / jǐfēnzhōng]",
-        "original": "我们需要再等待分钟几分钟。"
-      },
-      {
-        "reading": "[gěinín dàilái búbiànwǒmen shēnbiǎoqiànyì/ qǐng dàjiā liàngjiě]",
-        "original": "给您带来不便，我们深表歉意。请大家谅解。"
-      },
-      {
-        "reading": "gèwèilǚkèwǒmende fēijī yǐ zuòhǎo qǐfēi zhǔnbèi",
-        "original": "各位旅客，我们的飞机已做好起飞准备，"
-      },
-      {
-        "reading": "yóuyú [▶비정상 상황 예문]zài yuándì děngdài",
-        "original": "由于，在原地等待。"
-      },
-      {
-        "reading": "[jiāngyú____fēnzhōnghòu / shāohòu] huì chūfā",
-        "original": "将于分钟后稍后会出发，"
-      },
-      {
-        "reading": "qǐng jìhǎo ānquándài jìxù zài zuòwèishang děngdài",
-        "original": "请系好安全带继续在座位上等待。"
-      },
-      {
-        "reading": "xièxie nínde liàngjiě",
-        "original": "谢谢您的谅解。"
-      },
-      {
-        "reading": "gèwèilǚkèyóuyú [▶비정상 상황 예문 / hángkōng guǎnzhìde zhǐshì]",
-        "original": "各位旅客，由于航空管制的指示"
-      },
-      {
-        "reading": "wǒmen zhèngzài děngdài qǐfēi xǔkě",
-        "original": "我们正在等待起飞许可。"
-      },
-      {
-        "reading": "mùqián wǒmende qǐfēi shùnxùshì dì wèi",
-        "original": "目前我们的起飞顺序是第位，"
-      },
-      {
-        "reading": "[dàyuē fēnzhōng hòu / shāohòu] jiānghuì qǐfēi",
-        "original": "大约分钟后稍后将会起飞，"
-      },
-      {
-        "reading": "xièxie nínde liàngjiě",
-        "original": "谢谢您的谅解。"
-      },
-      {
-        "reading": "gèwèilǚkèwèile fēijī [chúxuě / chúbīng] gōngzuò,",
-        "original": "各位旅客，为了飞机除雪除冰工作,"
-      },
-      {
-        "reading": "wǒmen jiāng zhuǎnyídào zhǐdìng dìdiǎn",
-        "original": "我们将转移到指定地点。"
-      },
-      {
-        "reading": "wǒmen yùjì zài fēnzhōnghòu qǐfēi",
-        "original": "我们预计在分钟后起飞。"
-      },
-      {
-        "reading": "gōngzuò jiéshùhòu chūfā",
-        "original": "工作结束后出发。"
-      },
-      {
-        "reading": "zhèshì wèile ānquán qǐfēide bìyào chéngxùqǐng dàjiā liàngjiě",
-        "original": "这是为了安全起飞的必要程序，请大家谅解。"
-      },
-      {
-        "reading": "gèwèilǚkèwèile fēijī [chúxuě / chúbīng] gōngzuò, děngdài chūfā",
-        "original": "各位旅客，为了飞机除雪除冰工作,等待出发。"
-      },
-      {
-        "reading": "wǒmen yùjì zài fēnzhōnghòu qǐfēi",
-        "original": "我们预计在分钟后起飞。"
-      },
-      {
-        "reading": "gōngzuò jiéshùhòu chūfā",
-        "original": "工作结束后出发。"
-      },
-      {
-        "reading": "zhèshì wèile ānquán qǐfēide bìyào chéngxùqǐng dàjiā liàngjiě",
-        "original": "这是为了安全起飞的必要程序，请大家谅解。"
-      }
-    ]
-  },
-  "5-2-1": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "5-2-3": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "5-3": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "5-4-2": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "5-6-2": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "5-8-1": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "6-1": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "6-2-2": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "6-3-2": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "6-8-1": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "6-9": {
-    "jaReadings": [],
-    "caReadings": []
-  },
-  "7-2": {
-    "jaReadings": [],
-    "caReadings": []
-  }
-};
-
-// ─── 학습 화면 방송문 텍스트 렌더 ─────────────────────────────────────────
-// ja/ca: renderBilingualScript 활용 | ko/en: 빈 줄 압축 + 줄 단위 div 렌더
-function _renderStudyScriptText(text, langCode) {
-  const el = $('study-script-text');
-  if (!el) return;
-
-  const lines = String(text || '').split('\n');
-  const firstValid = lines.find(l => l.trim())?.substring(0, 60) || '(없음)';
-  console.log('[방송문] 총 라인 수:', lines.length, '첫 줄:', firstValid);
-
-  if (langCode === 'ja' || langCode === 'ca') {
-    el.innerHTML = renderBilingualScript(text, langCode);
-  } else {
-    // 연속 빈 줄은 하나로 압축, 첫 줄은 무조건 보존
-    const out = [];
-    let prevBlank = false;
-    for (const line of lines) {
-      if (!line.trim()) {
-        if (!prevBlank) out.push('');
-        prevBlank = true;
-      } else {
-        out.push(line);
-        prevBlank = false;
-      }
-    }
-    el.innerHTML = out.map(l => l
-      ? `<div class="study-script-line">${escHtml(l)}</div>`
-      : '<div class="study-script-sep"></div>'
-    ).join('');
-  }
-  console.log('[완료] 방송문 첫 줄 보존 렌더링');
-}
-
-// ─── 중국어 방송문 한글 독음 덮어쓰기 ────────────────────────────────────
-// targetEl: 기본값 study-script-text, 준비 화면에서는 prep-text 전달
-function _renderChineseScriptWithReadings(text, chineseReadings, targetEl = null) {
-  const el = targetEl || $('study-script-text');
-  if (!el || !chineseReadings?.length) return;
-  const hasCJK = s => /[一-鿿]/.test(s);
-  const isSectionHeader = s => /^\[[^\]]+\]$/.test(s.trim()) && !hasCJK(s);
-
-  const readingMap = new Map();
-  chineseReadings.forEach(r => {
-    if (r.original && r.reading) readingMap.set(r.original.trim(), r.reading.trim());
-  });
-
-  let html = '';
-  for (const line of text.split('\n')) {
-    const t = line.trim();
-    if (!t) { html += '<div class="bilingual-sep"></div>'; continue; }
-    if (isSectionHeader(t)) { html += `<div class="bilingual-header">${escHtml(t)}</div>`; continue; }
-    if (hasCJK(t)) {
-      const reading = readingMap.get(t);
-      html += `<div class="bilingual-pair">${reading ? `<div class="bilingual-reading">${escHtml(reading)}</div>` : ''}<div class="bilingual-original">${escHtml(t)}</div></div>`;
-    } else {
-      html += `<div class="bilingual-pair"><div class="bilingual-original">${escHtml(t)}</div></div>`;
-    }
-  }
-  el.innerHTML = `<div class="script-text-rendered">${html}</div>`;
-  console.log('[완료] 중국어 한글 독음 표시');
-}
-
-// ─── 중국어 독음 Firestore 전용 로드 (API 호출 없음) ─────────────────────────
-async function _loadChineseReadingsFromFirestore(scriptText, firestoreId, targetEl = null) {
-  const cacheKey = `${firestoreId}_ca_readings`;
-  if (_readingsCache[cacheKey]) {
-    _renderChineseScriptWithReadings(scriptText, _readingsCache[cacheKey], targetEl);
-    console.log('[완료] 중국어 독음 캐시에서 즉시 표시');
-    return;
-  }
-  if (!_db) return;
-  try {
-    const doc = await _db.collection('scripts').doc(firestoreId).get();
-    const readings = doc.exists ? doc.data()?.chineseReadings : null;
-    if (readings?.length) {
-      _readingsCache[cacheKey] = readings;
-      _renderChineseScriptWithReadings(scriptText, readings, targetEl);
-      console.log('[완료] 중국어 독음 Firestore에서 즉시 표시');
-    }
-  } catch (e) {
-    console.warn('[중국어독음] Firestore 로드 실패:', e.message);
-  }
-}
-
-// ─── 통합 독음 로더: MANUAL_READINGS 우선, Firestore가 있으면 덮어씀 ─────────
-async function _loadScriptReadings(firestoreId) {
-  if (firestoreId in _scriptReadingsCache) return _scriptReadingsCache[firestoreId];
-
-  // MANUAL_READINGS를 베이스로 세팅 (오프라인/Firestore 미연결 시에도 동작)
-  const manual = MANUAL_READINGS[firestoreId] || {};
-  const r = {};
-  if (manual.jaReadings?.length)      r.jaReadings      = manual.jaReadings;
-  if (manual.caReadings?.length)      r.caReadings      = manual.caReadings;
-  if (manual.chineseReadings?.length) r.chineseReadings = manual.chineseReadings;
-
-  if (_db) {
-    try {
-      const doc = await _db.collection('scripts').doc(firestoreId).get();
-      if (doc.exists) {
-        const d = doc.data();
-        // Firestore 데이터가 있으면 MANUAL_READINGS를 덮어씀
-        if (d.jaReadings?.length)      r.jaReadings      = d.jaReadings;
-        if (d.caReadings?.length)      r.caReadings      = d.caReadings;
-        if (d.chineseReadings?.length) r.chineseReadings = d.chineseReadings;
-      }
-    } catch (e) {
-      console.warn('[독음 로드] Firestore 오류:', e.message);
-    }
-  }
-
-  const result = Object.keys(r).length ? r : null;
-  _scriptReadingsCache[firestoreId] = result;
-  return result;
-}
-
-// ─── 요소에 독음 비동기 적용 (ja: jaReadings / ca: caReadings → chineseReadings) ─
-async function _applyReadingsToElement(text, langCode, firestoreId, targetEl) {
-  const r = await _loadScriptReadings(firestoreId);
-  if (!r) return;
-
-  if (langCode === 'ja' && r.jaReadings?.length) {
-    targetEl.innerHTML = renderBilingualScript(text, 'ja', r.jaReadings);
-    console.log('[완료] 일본어 독음 표시 (jaReadings)');
-    return;
-  }
-
-  if (langCode === 'ca') {
-    if (r.caReadings?.length) {
-      // 교범 수동 독음: readings 배열 순차 렌더
-      targetEl.innerHTML = renderBilingualScript(text, 'ca', r.caReadings);
-      _readingsCache[`${firestoreId}_ca_readings`] = r.caReadings;
-      console.log('[완료] 중국어 독음 표시 (caReadings)');
-      return;
-    }
-    if (r.chineseReadings?.length) {
-      // Gemini API 생성 독음: map 기반 렌더 (원문 줄 매칭)
-      _renderChineseScriptWithReadings(text, r.chineseReadings, targetEl);
-      _readingsCache[`${firestoreId}_ca_readings`] = r.chineseReadings;
-      console.log('[완료] 중국어 독음 표시 (chineseReadings)');
-    }
-  }
-}
-
-// ─── 중국어 독음 독립 API (가이드 생성과 독립적으로 즉시 호출) ──────────────
-
-// 중국어 독음 자동 로드 (Firestore 전용 — Gemini API 자동 호출 없음)
-async function _autoLoadChineseReadings(scriptText, scriptId) {
-  const firestoreId = scriptId.replace(/\./g, '-');
-  await _loadChineseReadingsFromFirestore(scriptText, firestoreId);
-  console.log('[완료] 중국어 독음 자동 로드 (Firestore 전용)');
-}
+const _studyGuideCache = {};  // key: `${scriptId}_${lang}`
+let _prepRenderToken = 0;     // stale async 렌더 방지용 토큰
 
 async function startStudyMode() {
   const s = state.currentScript;
@@ -3108,9 +1389,6 @@ async function startStudyMode() {
     renderScriptText(s, langCode, studyEl);
     console.log('[학습모드 방송문]', { id: s.id, lang: langCode, text: lang.text?.substring(0, 50) });
   }
-
-  // readings 로드 후 재렌더링은 _loadAndAttachReadings 내부에서 처리
-  _loadAndAttachReadings(s);
 
   ['M', 'F'].forEach(g => {
     const btn = $(`study-gender-${g.toLowerCase()}`);
@@ -3132,9 +1410,6 @@ async function startStudyMode() {
   if (_studyGuideCache[cacheKey]) {
     const cached = _studyGuideCache[cacheKey];
     _renderStudyGuide(cached);
-    if (state.selectedLang === 'ca' && cached.chineseReadings?.length && !s.caReadings?.length) {
-      _renderChineseScriptWithReadings(lang.text, cached.chineseReadings);
-    }
     $('btn-gen-guide').textContent = '✅ 가이드 완성';
   } else {
     const statusEl = $('study-guide-status');
@@ -3147,9 +1422,6 @@ async function startStudyMode() {
       if (saved) {
         _studyGuideCache[cacheKey] = saved;
         _renderStudyGuide(saved);
-        if (state.selectedLang === 'ca' && saved.chineseReadings?.length && !s.caReadings?.length) {
-          _renderChineseScriptWithReadings(lang.text, saved.chineseReadings);
-        }
         $('btn-gen-guide').textContent = '✅ 가이드 완성';
         console.log('[완료] Firestore 저장 가이드 로드');
       }
@@ -3212,7 +1484,7 @@ async function fetchWithRetry(url, options, { maxRetries = 3, statusEl = null } 
 }
 
 async function callGeminiGuide(scriptText, langCode) {
-  const langName = { ko: '한국어', en: '영어', ja: '일본어', ca: '중국어' }[langCode] || '한국어';
+  const langName = { ko: '한국어', en: '영어' }[langCode] || '한국어';
 
   const langSpecific = {
     en: `영어 억양 가이드 필수 포함:
@@ -3220,18 +1492,6 @@ async function callGeminiGuide(scriptText, langCode) {
 - 내용어(content word) vs 기능어(function word) 구분
 - 문장 끝 억양 방향 표시
 - 연음(linking) 포인트 표시 예) 'seat_belt'`,
-    ja: `일본어 억양 가이드 필수 포함:
-- 고저 악센트 패턴 (高低로 표시) 예) 'ご搭乗 高低低低'
-- 장음 위치 강조 (ー 충분히)
-- 한국어 억양 개입 주의사항
-- ん/촉음 처리 포인트`,
-    ca: `중국어 억양 가이드 필수 포함:
-- 각 단어 성조 표시 예) '女士(3성4성) 先生(1성1성)'
-- 성조 변조 규칙 표시 (不/一)
-- 리듬감 있는 연결 방법
-- 스타카토 지양 포인트
-- 방송문 각 문장(줄)에 한글 발음 독음 추가 (성조 제외, 한국어 화자가 읽기 쉽게 표기)
-  예) "女士们、先生们，" → "뉘스먼 셴셩먼"`,
     ko: `한국어 억양 가이드 필수 포함:
 - 문장 끝 어미 처리(~니다↘, ~세요↘) 반드시 포함
 - 강조 단어 위치의 음높이 변화`
@@ -3246,7 +1506,7 @@ async function callGeminiGuide(scriptText, langCode) {
 방송문 (${langName}):
 ${scriptText}
 
-중요: 방송문이 영어/일본어/중국어이더라도 학습 가이드(summary, breakPoints 설명, speedGuide, intonationGuide, tips)는 반드시 한국어로 작성하세요. 단, emphasisWords와 intonationDetails의 phrase, breakPoints의 실제 방송문 구간은 원어 그대로 표시하고 설명만 한국어로 작성하세요.
+중요: 방송문이 영어이더라도 학습 가이드(summary, breakPoints 설명, speedGuide, intonationGuide, tips)는 반드시 한국어로 작성하세요. 단, emphasisWords와 intonationDetails의 phrase, breakPoints의 실제 방송문 구간은 원어 그대로 표시하고 설명만 한국어로 작성하세요.
 
 끊어읽기 가이드 작성 규칙:
 1. 각 문장마다 끊어읽기 기호를 삽입한 텍스트를 text 필드에 제공
@@ -3292,10 +1552,8 @@ ${langSpecific[langCode] || langSpecific.ko}
       ]
     }
   ],
-  "tips": ["실전 팁 1 (한국어)", "..."],
-  "chineseReadings": [{"original":"중국어 원문 줄","reading":"한글 독음"}]
-}
-중국어(ca)인 경우에만 chineseReadings 필드를 채워줘. 다른 언어는 chineseReadings 생략.`;
+  "tips": ["실전 팁 1 (한국어)", "..."]
+}`;
 
   const res = await fetchWithRetry('/api/gemini', {
     method: 'POST',
@@ -3603,18 +1861,23 @@ function buildMasterScript(text, guide) {
       : '';
     const content = tagLine ? tagLine[2] : t;
 
+    // 1단계: HTML 이스케이프
     let html = escHtml(content);
+    // 2단계: 강조 단어를 【】 마커로 표시 (HTML 태그 없이)
     emphasis.forEach(w => {
       if (!w) return;
       const ew = escHtml(w);
-      html = html.split(ew).join(`<strong style="color:#FF6B00;">${ew}</strong>`);
+      html = html.split(ew).join(`【${ew}】`);
     });
+    // 3단계: 특수 기호 → HTML (이 시점엔 HTML 태그 없으므로 / 치환 안전)
     html = html
       .replace(/∙/g, '<span style="color:#22C55E;font-weight:800;">∙</span>')
       .replace(/\//g, '<span style="color:#3B82F6;font-weight:800;">/</span>')
       .replace(/↗/g, '<span style="color:#EF4444;font-weight:700;">↗</span>')
       .replace(/↘/g, '<span style="color:#3B82F6;font-weight:700;">↘</span>')
       .replace(/→/g, '<span style="color:#22C55E;font-weight:700;">→</span>');
+    // 4단계: 【】 → <b> 변환 (마지막에만 HTML 태그 삽입)
+    html = html.replace(/【([^】]+)】/g, '<b style="color:#FF6B00;">$1</b>');
     return `<p style="margin:0 0 6px;line-height:2.0">${prefix}${html}</p>`;
   }).join('');
 }
@@ -3626,36 +1889,16 @@ function _renderMasterScript(script, langCode, guide) {
   const lang = script.langs[langCode];
   if (!lang?.text) return;
 
-  const isJaCa = langCode === 'ja' || langCode === 'ca';
-
   // 마스터(annotated) HTML
-  let masterHtml = '';
-  if (isJaCa) {
-    const tmp = document.createElement('div');
-    renderScriptText(script, langCode, tmp);
-    masterHtml = tmp.innerHTML;
-  } else {
-    masterHtml = buildMasterScript(lang.text, guide);
-  }
+  const masterHtml = buildMasterScript(lang.text, guide);
 
-  // 원본(toggle) HTML — ja/ca: 원문만, ko/en: renderScriptText
-  let origHtml = '';
-  if (isJaCa) {
-    const plainLines = lang.text.split('\n').map(l => {
-      const t = l.trim();
-      if (!t) return '<div class="bilingual-sep"></div>';
-      if (/^\[[^\]]+\]$/.test(t)) return `<div class="bilingual-header">${escHtml(t)}</div>`;
-      return `<div class="bilingual-pair"><div class="bilingual-original">${escHtml(t)}</div></div>`;
-    }).join('');
-    origHtml = `<div class="script-text-rendered">${plainLines}</div>`;
-  } else {
-    const tmpO = document.createElement('div');
-    renderScriptText(script, langCode, tmpO);
-    origHtml = tmpO.innerHTML;
-  }
+  // 원본(toggle) HTML
+  const tmpO = document.createElement('div');
+  renderScriptText(script, langCode, tmpO);
+  const origHtml = tmpO.innerHTML;
 
-  const subtitle = isJaCa ? '' : '<div class="master-script-subtitle">끊어읽기 · 억양 · 강조가 표시됩니다</div>';
-  const legend   = isJaCa ? '' : `
+  const subtitle = '<div class="master-script-subtitle">끊어읽기 · 억양 · 강조가 표시됩니다</div>';
+  const legend = `
     <div class="master-script-legend">
       <span><span style="color:#22C55E;">∙</span> 반박자</span>
       <span><span style="color:#3B82F6;">/</span> 한박자</span>
@@ -3911,6 +2154,7 @@ let _aiAnalysisRetryCount = 0;  // 재분석 시도 횟수 (최대 2회)
 let _cmp = { active: false, audio: null, timeout: null, myUrl: null };
 let _rvcModelAudio = null;   // 결과 화면 모델 음성 Audio 객체
 let _rvcMyAudio    = null;   // 결과 화면 내 녹음 Audio 객체
+let _rvcGender     = 'M';    // 결과 화면 모델 음성 성별 (M/F)
 
 function _rvcFmt(s) { const m = Math.floor(s/60); return `${m}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
 
@@ -3943,6 +2187,18 @@ function _cmpStop() {
 
 function stopModelComparison() { _cmpStop(); }
 
+async function _rvcSetGender(g) {
+  if (_rvcGender === g) return;
+  _rvcGender = g;
+  $('rvc-gender-m')?.classList.toggle('active', g === 'M');
+  $('rvc-gender-f')?.classList.toggle('active', g === 'F');
+  // 재생 중인 모델 음성 초기화
+  if (_rvcModelAudio) { _rvcModelAudio.pause(); _rvcModelAudio = null; }
+  const btn = $('btn-play-model'); if (btn) btn.textContent = '▶ 재생';
+  const scrub = $('rvc-model-scrub'); if (scrub) { scrub.value = 0; scrub.disabled = true; }
+  const timeEl = $('rvc-model-time'); if (timeEl) timeEl.textContent = '0:00 / 0:00';
+}
+
 async function playModelVoice() {
   _cmpStop();
   const btn = $('btn-play-model');
@@ -3955,7 +2211,7 @@ async function playModelVoice() {
   }
   const s = state.currentScript;
   if (!s) return;
-  const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
+  const url = await _resolveModelVoiceUrl(s.id, state.selectedLang, _rvcGender);
   if (!url) { showToast('모델 음성 없음'); return; }
   if (_rvcModelAudio) { _rvcModelAudio.pause(); }
   _rvcModelAudio = new Audio(url);
@@ -4224,6 +2480,20 @@ function showResults(result, transcript) {
   if (_rvcMyAudio)    { _rvcMyAudio.pause();    _rvcMyAudio    = null; }
   const modelBtn = $('btn-play-model'); if (modelBtn) modelBtn.textContent = '▶ 재생';
   const myBtn    = $('btn-play-my');    if (myBtn)    myBtn.textContent    = '▶ 재생';
+  // 성별 토글 초기화 (기본: 남)
+  _rvcGender = 'M';
+  $('rvc-gender-m')?.classList.add('active');
+  $('rvc-gender-f')?.classList.remove('active');
+  $('rvc-gender-m')?.removeAttribute('disabled');
+  $('rvc-gender-f')?.removeAttribute('disabled');
+  // 각 성별 가용성 확인 (비동기)
+  const _rvcScript = state.currentScript;
+  if (_rvcScript) {
+    ['M', 'F'].forEach(async g => {
+      const url = await _resolveModelVoiceUrl(_rvcScript.id, state.selectedLang, g);
+      if (!url) $(`rvc-gender-${g === 'M' ? 'm' : 'f'}`)?.setAttribute('disabled', '');
+    });
+  }
   const mScrub   = $('rvc-model-scrub'); if (mScrub) { mScrub.value = 0; mScrub.disabled = true; }
   const yScrub   = $('rvc-my-scrub');   if (yScrub)  { yScrub.value = 0; yScrub.disabled = true; }
   const mTime    = $('rvc-model-time'); if (mTime)  mTime.textContent  = '0:00 / 0:00';
@@ -4231,6 +2501,9 @@ function showResults(result, transcript) {
 
   const lang    = state.currentScript.langs[state.selectedLang];
   const isAdmin = isEditUnlocked();
+
+  // 음성 비교 카드 블러 (소프트 페이월)
+  $('result-voice-card')?.classList.add('blur-section');
 
   // 내 녹음 없으면 scrub 영역 메시지
   if (!_lastRecordingBlob) {
@@ -4539,14 +2812,7 @@ function renderFeedback(result, transcript, lang, isAdmin) {
 }
 
 function renderTranscriptCompare(transcript, lang) {
-  let preview;
-  if (state.selectedLang === 'ja' || state.selectedLang === 'ca') {
-    // ja/ca: 원문(히라가나/한자) 줄만 추출해 미리보기
-    const origLines = lang.text.split('\n').filter(l => /[぀-ヿ一-鿿]/.test(l));
-    preview = origLines.slice(0, 2).join(' ') + (origLines.length > 2 ? '…' : '');
-  } else {
-    preview = lang.text.split('\n').slice(0, 3).join(' ') + (lang.text.split('\n').length > 3 ? '…' : '');
-  }
+  const preview = lang.text.split('\n').slice(0, 3).join(' ') + (lang.text.split('\n').length > 3 ? '…' : '');
   $('transcript-compare').innerHTML = `
     <div class="tc-row"><div class="tc-label">방송 원문</div><div class="tc-text">${escHtml(preview)}</div></div>
     <div class="tc-row"><div class="tc-label">AI 인식</div><div class="tc-text recognized">${transcript ? escHtml(transcript) : '(AI 채점 결과 대기 중...)'}</div></div>`;
@@ -4573,13 +2839,9 @@ function _resetModal() {
   document.getElementById('custom-title').value = '';
   document.getElementById('custom-icon').value = '📋';
   document.getElementById('custom-difficulty').value = '기본';
-  ['ko','en','ja','ca'].forEach(l => {
+  ['ko','en'].forEach(l => {
     const ta = document.getElementById(`custom-text-${l}`);
     if (ta) ta.value = '';
-  });
-  ['ja','ca'].forEach(l => {
-    const ra = document.getElementById(`custom-reading-${l}`);
-    if (ra) ra.value = '';
   });
   document.getElementById('custom-checkpoints-ko').value = '';
   document.querySelectorAll('.modal-lang-tab').forEach(t => t.classList.remove('active'));
@@ -4590,7 +2852,7 @@ function _resetModal() {
   $('table-builder').classList.add('hidden');
   $('btn-table-toggle').classList.remove('active');
   // model voice (언어별 초기화)
-  ['ko','en','ja','ca'].forEach(lang => {
+  ['ko','en'].forEach(lang => {
     const el = document.getElementById(`mv-current-${lang}`);
     const nameEl = document.getElementById(`mv-name-${lang}`);
     const fileEl = document.getElementById(`mv-file-${lang}`);
@@ -4638,7 +2900,7 @@ async function openEditModal(id, source) {
   document.getElementById('custom-icon').value = script.icon || '📋';
   document.getElementById('custom-difficulty').value = script.difficulty || '기본';
 
-  ['ko','en','ja','ca'].forEach(l => {
+  ['ko','en'].forEach(l => {
     const ta = document.getElementById(`custom-text-${l}`);
     if (ta && script.langs[l]) ta.value = script.langs[l].text || '';
   });
@@ -4647,7 +2909,7 @@ async function openEditModal(id, source) {
     document.getElementById('custom-checkpoints-ko').value = koLang.checkpoints.join(', ');
   }
   // model voice (언어별)
-  ['ko','en','ja','ca'].forEach(lang => {
+  ['ko','en'].forEach(lang => {
     const stored = localStorage.getItem(`cabinvoice_voice_${id}_${lang}`);
     if (stored) {
       const el = document.getElementById(`mv-current-${lang}`);
@@ -4658,74 +2920,9 @@ async function openEditModal(id, source) {
   });
   $('modal-save').textContent = '수정 저장';
   $('custom-modal').classList.remove('hidden');
-
-  // builtin 스크립트: Firestore에서 독음 로드 후 textarea에 채우기
-  if (source === 'builtin') {
-    const firestoreId = id.replace(/\./g, '-');
-    const r = await _loadScriptReadings(firestoreId);
-    if (r?.jaReadings?.length) {
-      const raJa = document.getElementById('custom-reading-ja');
-      if (raJa) raJa.value = r.jaReadings.map(x => x.reading || '').join('\n');
-    }
-    if (r?.caReadings?.length) {
-      const raCa = document.getElementById('custom-reading-ca');
-      if (raCa) raCa.value = r.caReadings.map(x => x.reading || '').join('\n');
-    }
-  }
 }
 
 function closeCustomModal() { $('custom-modal').classList.add('hidden'); }
-
-function _previewReadings(lang) {
-  const textEl    = document.getElementById(`custom-text-${lang}`);
-  const readingEl = document.getElementById(`custom-reading-${lang}`);
-  const previewEl = document.getElementById(`preview-${lang}`);
-  if (!textEl || !readingEl || !previewEl) return;
-
-  const origLines    = textEl.value.split('\n').map(l => l.trim()).filter(Boolean);
-  const readingLines = readingEl.value.split('\n').map(l => l.trim());
-
-  if (!origLines.length) {
-    previewEl.innerHTML = '<div class="preview-label">미리보기</div><div style="font-size:12px;color:#8E8E93">원문을 먼저 입력해 주세요.</div>';
-    previewEl.classList.remove('hidden');
-    return;
-  }
-
-  let pairsHtml = '';
-  let taggedGroupPrev = [];
-
-  const flushPrevTagged = () => {
-    if (!taggedGroupPrev.length) return;
-    if (taggedGroupPrev.length === 1) {
-      const { tag, reading: r, content } = taggedGroupPrev[0];
-      pairsHtml += `<div class="script-section-card"><span class="tag-cell">${escHtml(tag)}</span><span>${r ? `<div class="bilingual-reading">${escHtml(r)}</div>` : ''}${content ? `<div class="bilingual-original">${escHtml(content)}</div>` : ''}</span></div>`;
-    } else {
-      pairsHtml += '<table class="script-section-table">';
-      for (const { tag, reading: r, content } of taggedGroupPrev) {
-        pairsHtml += `<tr><td class="tag-cell">${escHtml(tag)}</td><td>${r ? `<div class="bilingual-reading">${escHtml(r)}</div>` : ''}${content ? `<div class="bilingual-original">${escHtml(content)}</div>` : ''}</td></tr>`;
-      }
-      pairsHtml += '</table>';
-    }
-    taggedGroupPrev = [];
-  };
-
-  origLines.forEach((orig, i) => {
-    const reading = readingLines[i] || '';
-    const tagMatch = orig.match(/^\[([^\]]+)\]\s*(.*)/);
-    if (tagMatch) {
-      taggedGroupPrev.push({ tag: tagMatch[1], content: tagMatch[2], reading });
-    } else {
-      flushPrevTagged();
-      pairsHtml += `<div class="preview-pair">${
-        reading ? `<div class="bilingual-reading">${escHtml(reading)}</div>` : ''
-      }<div class="bilingual-original">${escHtml(orig)}</div></div>`;
-    }
-  });
-  flushPrevTagged();
-
-  previewEl.innerHTML = `<div class="preview-label">미리보기 (${origLines.length}줄)</div>${pairsHtml}`;
-  previewEl.classList.remove('hidden');
-}
 
 async function saveScriptFromModal() {
   const title = document.getElementById('custom-title').value.trim();
@@ -4746,7 +2943,7 @@ async function saveScriptFromModal() {
     const base = _allScripts.find(s => s.id === _modalState.editId);
     const overrides = loadOverrides();
     const newLangs = {};
-    ['ko','en','ja','ca'].forEach(l => {
+    ['ko','en'].forEach(l => {
       const ta = document.getElementById(`custom-text-${l}`);
       const text = ta?.value.trim();
       if (text) {
@@ -4771,61 +2968,7 @@ async function saveScriptFromModal() {
       }
     }
 
-    // 독음 Firestore 저장 (jaReadings / caReadings 자동 생성)
     if (_db) {
-      const firestoreId = _modalState.editId.replace(/\./g, '-');
-      const _builtinEditId = _modalState.editId;
-      const payload = {};
-      const jaText = document.getElementById('custom-text-ja')?.value.trim();
-      const jaReadingText = document.getElementById('custom-reading-ja')?.value;
-      if (jaText && jaReadingText?.trim()) {
-        const origLines = jaText.split('\n').filter(l => l.trim());
-        const readLines = jaReadingText.split('\n').filter(l => l.trim());
-        if (origLines.length && readLines.length) {
-          payload.jaReadings = origLines.map((orig, idx) => {
-            const read = readLines[idx] || '';
-            const tagMatch = orig.match(/^\[([^\]]+)\]\s*(.*)/);
-            if (tagMatch) return { original: orig, reading: read, tag: tagMatch[1], content: tagMatch[2] };
-            return { original: orig, reading: read };
-          });
-        }
-      }
-      const caText = document.getElementById('custom-text-ca')?.value.trim();
-      const caReadingText = document.getElementById('custom-reading-ca')?.value;
-      if (caText && caReadingText?.trim()) {
-        const origLines = caText.split('\n').filter(l => l.trim());
-        const readLines = caReadingText.split('\n').filter(l => l.trim());
-        if (origLines.length && readLines.length) {
-          payload.caReadings = origLines.map((orig, idx) => {
-            const read = readLines[idx] || '';
-            const tagMatch = orig.match(/^\[([^\]]+)\]\s*(.*)/);
-            if (tagMatch) return { original: orig, reading: read, tag: tagMatch[1], content: tagMatch[2] };
-            return { original: orig, reading: read };
-          });
-        }
-      }
-      // 낙관적 업데이트: Firestore 완료 전에 script 객체에 즉시 부착
-      const _builtinScript = _allScripts.find(s => s.id === _builtinEditId);
-      if (_builtinScript) {
-        if (payload.jaReadings) _builtinScript.jaReadings = payload.jaReadings;
-        if (payload.caReadings) _builtinScript.caReadings = payload.caReadings;
-      }
-      if (Object.keys(payload).length) {
-        console.log('[저장] Firestore 저장 시작:', firestoreId);
-        try {
-          await _db.collection('scripts').doc(firestoreId).set(payload, { merge: true });
-          _scriptReadingsCache[firestoreId] = { ..._scriptReadingsCache[firestoreId], ...payload };
-          console.log('[저장] Firestore 성공:', firestoreId);
-        } catch(e) {
-          console.error('[저장] Firestore 실패:', e.code, e.message);
-          if (e.code === 'permission-denied') {
-            showToast('Firebase 권한 오류. 관리자에게 문의하세요.', 4000);
-          } else {
-            showToast('저장 실패: ' + e.message, 3000);
-          }
-        }
-      }
-
       // cabinManual/latest 내 해당 방송문도 업데이트 (새로고침 후에도 반영)
       const capturedEditId = _modalState.editId;
       try {
@@ -4837,8 +2980,6 @@ async function saveScriptFromModal() {
             const a = { ...announcements[aIdx] };
             if (newLangs.ko?.text) a.ko = newLangs.ko.text;
             if (newLangs.en?.text) a.en = newLangs.en.text;
-            if (newLangs.ja?.text) a.ja = newLangs.ja.text;
-            if (newLangs.ca?.text) a.ca = newLangs.ca.text;
             if (newLangs.ko?.checkpoints?.length) a.checkpoints = newLangs.ko.checkpoints;
             announcements[aIdx] = a;
             await _db.collection('cabinManual').doc('latest').update({ announcements });
@@ -4860,7 +3001,7 @@ async function saveScriptFromModal() {
     if (idx === -1) { closeCustomModal(); return; }
     const langs = {};
     langs.ko = buildCustomLang(koText, cpStr, 'ko');
-    ['en','ja','ca'].forEach(l => {
+    ['en'].forEach(l => {
       const text = document.getElementById(`custom-text-${l}`)?.value.trim();
       if (text) langs[l] = buildCustomLang(text, '', l);
     });
@@ -4874,13 +3015,13 @@ async function saveScriptFromModal() {
     // 새 방송문 추가
     const langs = {};
     langs.ko = buildCustomLang(koText, cpStr, 'ko');
-    ['en','ja','ca'].forEach(l => {
+    ['en'].forEach(l => {
       const text = document.getElementById(`custom-text-${l}`)?.value.trim();
       if (text) langs[l] = buildCustomLang(text, '', l);
     });
     const id = 'custom_' + Date.now();
     // pending 모델 음성 → 실제 id로 이동 (언어별)
-    ['ko','en','ja','ca'].forEach(lang => {
+    ['ko','en'].forEach(lang => {
       const pv = localStorage.getItem(`cabinvoice_voice__pending_${lang}`);
       const pn = localStorage.getItem(`cabinvoice_voice__pending_${lang}_name`);
       if (pv) {
@@ -4901,13 +3042,6 @@ async function saveScriptFromModal() {
     const arr = loadCustomScripts();
     arr.unshift({ id, icon, colorClass:'c-blue', difficulty, difficultyClass, title, langs, _custom: true });
     saveCustomScripts(arr);
-  }
-
-  // readings 캐시 초기화 (저장된 독음이 즉시 반영되도록)
-  if (_savedEditId) {
-    const _fid = _savedEditId.replace(/\./g, '-');
-    delete _scriptReadingsCache[_fid];
-    delete _readingsCache[`${_fid}_ca_readings`];
   }
 
   // detail 패널 즉시 재렌더링 (편집 모드일 때만)
@@ -4970,8 +3104,7 @@ async function handlePdfFile(file) {
     const USER_PROMPT = `항공사 방송교범 PDF 페이지들입니다. 각 페이지를 순서대로 분석하여 JSON 배열로만 반환하세요.
 
 규칙:
-- 언어 코드: ko(한국어), en(영어), ja(일본어), ca(중국어)
-- 일본어: 한글 독음(읽는 법)이 있으면 반드시 포함. 형식: 한글독음 줄 바로 다음에 히라가나/가타카나 원문 줄 (쌍으로 구성). 예) "미나사마\nみなさま"
+- 언어 코드: ko(한국어), en(영어)
 - 헤더(챕터명), 푸터(페이지번호, REV.XX) 제외
 - 조건부 문안(표 구조, General/수하물 과다 반입 등): variants 배열로 추출
 
@@ -5058,14 +3191,14 @@ function groupPagesByScript(pageResults) {
   for (const r of pageResults) {
     if (!r.num) continue;
     if (!scriptMap.has(r.num)) {
-      scriptMap.set(r.num, { num: r.num, title: r.title || r.num, ko: '', en: '', ja: '', ca: '' });
+      scriptMap.set(r.num, { num: r.num, title: r.title || r.num, ko: '', en: '' });
       order.push(r.num);
     }
     const s = scriptMap.get(r.num);
     if (r.title && !s.title) s.title = r.title;
 
     const lang = r.lang;
-    if (['ko','en','ja','ca'].includes(lang)) {
+    if (['ko','en'].includes(lang)) {
       if (r.variants && r.variants.length >= 2) {
         s[lang] = r.variants.map(v => `[${v.label}]\n${v.text.trim()}`).join('\n\n');
       } else {
@@ -5074,7 +3207,7 @@ function groupPagesByScript(pageResults) {
     }
   }
 
-  return order.map(k => scriptMap.get(k)).filter(s => s.ko || s.en || s.ja || s.ca);
+  return order.map(k => scriptMap.get(k)).filter(s => s.ko || s.en);
 }
 
 function renderPdfPreview(scripts) {
@@ -5084,14 +3217,14 @@ function renderPdfPreview(scripts) {
     `${scripts.length}개 방송문안 인식됨 — 가져올 항목을 선택·편집하세요`;
   $('pdf-import-btn').classList.remove('hidden');
 
-  const LANG_LABELS = { ko: '🇰🇷 한국어', en: '🇺🇸 영어', ja: '🇯🇵 일본어', ca: '🇨🇳 중국어' };
+  const LANG_LABELS = { ko: '🇰🇷 한국어', en: '🇺🇸 영어' };
 
   const rows = scripts.map((s, i) => {
-    const activeLang = ['ko','en','ja','ca'].find(l => s[l]) || 'ko';
-    const langTabs = ['ko','en','ja','ca'].map(l =>
+    const activeLang = ['ko','en'].find(l => s[l]) || 'ko';
+    const langTabs = ['ko','en'].map(l =>
       `<button class="pdf-lang-tab${l === activeLang ? ' active' : ''}" data-lang="${l}"${!s[l] ? ' style="opacity:.4"' : ''}>${LANG_LABELS[l]}</button>`
     ).join('');
-    const langPanels = ['ko','en','ja','ca'].map(l =>
+    const langPanels = ['ko','en'].map(l =>
       `<textarea class="pdf-field-textarea${l !== activeLang ? ' hidden' : ''}" data-field="${l}" rows="4">${(s[l] || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`
     ).join('');
 
@@ -5144,7 +3277,7 @@ function importSelectedPdfScripts() {
     const meta  = _pdfParsedScripts[idx] || {};
     const title = item.querySelector('[data-field="title"]').value.trim() || '방송문';
     const langs = {};
-    ['ko','en','ja','ca'].forEach(l => {
+    ['ko','en'].forEach(l => {
       const ta = item.querySelector(`[data-field="${l}"]`);
       const text = ta ? ta.value.trim() : '';
       if (text) langs[l] = buildCustomLang(text, '', l);
@@ -5183,18 +3316,14 @@ function blobToBase64(blob) {
 async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
   console.log('audioBlob size:', audioBlob?.size, 'type:', audioBlob?.type);
   const model = await getGeminiModel();
-  const langName = { ko:'한국어', en:'영어', ja:'일본어', ca:'중국어' }[langCode] || '한국어';
+  const langName = { ko:'한국어', en:'영어' }[langCode] || '한국어';
   const cpText = checkpoints?.length
     ? `\n핵심 체크포인트 (누락 여부 반드시 확인):\n${checkpoints.map(c=>`- ${c}`).join('\n')}\n`
     : '';
 
-  const isKoEn = langCode === 'ko' || langCode === 'en';
-  const isJaCa = langCode === 'ja' || langCode === 'ca';
-  const maxFluency = isJaCa ? 25 : 30;
-  const maxPron    = isJaCa ? 25 : 20;
-  const gradeRule = isKoEn
-    ? 'score 90이상→grade"A", 75이상→"B", 60이상→"C", 59이하→"미취득"'
-    : 'score 85이상→grade"PASS", 84이하→"FAIL"';
+  const maxFluency = 30;
+  const maxPron    = 20;
+  const gradeRule  = 'score 90이상→grade"A", 75이상→"B", 60이상→"C", 59이하→"미취득"';
 
   const criteriaMap = {
     ko: `[한국어 채점 기준 - 100점]
@@ -5296,69 +3425,7 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
     - passengers→패신저스O
     - lavatory→래버토리O
     - emergency→이머전씨O
-  명확성(10): th발음, 끝자음 처리, 연음 자연스러운가`,
-
-    ja: `[일본어 채점 기준 - 100점]
-
-유창성 ${maxFluency}점:
-  끊어읽기(5): 일본어 문절 단위로 자연스럽게 끊는가
-  문안 숙지(5): 버벅거림, 반복 없는가
-  속도(5):
-    [속도 채점 기준 — 반드시 준수]
-    너무 빠르면 장음(ー)이 뭉개지고 발음이 부정확해짐 → 반드시 감점.
-    - 천천히 명확하게 읽으면 → 우수 평가 (5점)
-    금지 표현: '더 빠르게', '속도를 높여', '빠릿하게'
-    권장 표현: '천천히 명확하게', '여유 있게', '장음을 충분히 늘여서'
-  자연스러운 연출(10): 일본어로 말하는 듯한 자연스러운 리듬인가, 한국어 억양이 섞이지 않는가
-
-분위기·목소리 25점 (반드시 0점 이상 부여):
-  톤(8): 일본 항공사 방송 특유의 부드럽고 정중한 톤인가. 최소 4점 이상
-  발성(7): 안정적 발성, 균일한 음량. 최소 4점 이상
-  친절함(5): 따뜻하고 배려 있는 느낌인가. 최소 2점 이상
-  과장 지양(5): 과도하게 높은 피치나 작위적인 연출 없는가
-
-억양 25점:
-  일본어 특성 억양(10): 일본어 고저 악센트가 자연스러운가. 한국어식 강세 억양 개입 없는가
-  고른 억양(5): 특정 구간만 억양이 튀지 않는가
-  장음 처리(5): コース·ございます 등 장음이 충분히 늘어나는가
-  어미 처리(5): ます·です 어미가 자연스럽게 처리되는가. 끊어먹거나 올라가면 감점
-
-발음 ${maxPron}점:
-  장음 처리(7): 장음 기호(ー) 위치에서 확실하게 늘어나는가
-  고유 발음(6): ざ/ず/ぜ/ぞ, じゃ/じゅ/じょ 정확한가
-  ん·촉음(6): ん이 뒤 음에 따라 변화하는가 / 촉음(っ) 앞 짧은 정지 있는가
-  모음 정확성(6): 5모음 정확히 / 으 개입 방지 (です→데스O/데으스X)`,
-
-    ca: `[중국어 채점 기준 - 100점]
-
-유창성 ${maxFluency}점:
-  끊어읽기(5): 중국어 의미 단위로 자연스럽게 끊는가
-  말하는 듯한 연출(10): 스타카토식(단어 단위로 끊어 읽는 방식) 지양. 자연스럽게 이어지는가
-  강조(5): 중요 단어에서 강조가 들어가는가
-  속도(5):
-    [속도 채점 기준 — 반드시 준수]
-    너무 빠르면 성조가 뭉개짐 → 반드시 감점.
-    - 천천히 명확하게 읽으면 → 우수 평가 (5점)
-    금지 표현: '더 빠르게', '속도를 높여', '빠릿하게'
-    권장 표현: '천천히 명확하게', '여유 있게', '성조를 살려서 읽기'
-  문안 숙지(5): 버벅거림, 반복 없는가
-
-분위기·목소리 25점 (반드시 0점 이상 부여):
-  친근함(10): 승객에게 직접 말하는 따뜻한 느낌인가. 최소 5점 이상
-  발성(5): 적절한 음량, 안정적 발성. 최소 3점 이상
-  톤(10): 중국어 기내방송에 어울리는 부드럽고 자연스러운 톤인가. 최소 5점 이상
-
-성조·억양 25점:
-  1성·4성(5): 1성(高平) 충분히 높게 유지, 4성(下降) 확실하게 내려가는가
-  2성·3성(5): 2성(上扬) 올라가는 흐름, 3성(曲折) 내렸다 올라가는 흐름 확인
-  성조 변화 규칙(5): 변조 규칙(不·一 등) 준수하는가
-  중국어 특성 억양(10): 전체 문장 리듬이 중국어답게 자연스러운가
-
-발음 ${maxPron}점:
-  권설음(5): zh·ch·sh·r과 z·c·s 구별되는가
-  단운모(5): ü·e·o 정확한가
-  복운모(5): ian·uan·üan 등 정확한가
-  오발음(5): 빈번한 오류 단어 체크`
+  명확성(10): th발음, 끝자음 처리, 연음 자연스러운가`
   };
   const criteria = criteriaMap[langCode] || criteriaMap.ko;
 
@@ -5459,6 +3526,25 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
 피드백에서 선택 문안 누락 언급 금지.
 단, 핵심 안전 키워드([목적지], 편명, 실제 안전 지시사항)는 여전히 체크.
 
+[채점 전 필수 확인 1 — 묵음/빈 녹음 체크]
+음성이 사실상 묵음이거나 3초 미만인 경우:
+- score를 0으로 설정하고 grade를 "미취득"으로 설정
+- feedback에 "녹음된 음성이 너무 짧거나 들리지 않습니다" 명시
+- 아래 채점 기준 적용하지 않음
+
+[채점 전 필수 확인 2 — 방송문 일치도 (matchRate)]
+원문과 실제 발화 내용을 비교하여 matchRate(0-100 정수)를 계산하세요:
+- 원문의 핵심 문장/단어 중 실제로 발화된 비율 (%)
+- [생략 가능] · [선택] · [필요 시] 등 선택 문안은 분모에서 제외
+- 계산한 matchRate를 JSON "matchRate" 필드에 반드시 포함하세요
+
+[채점 전 필수 확인 3 — 발음 정밀 분석 (pronunciationErrors)]
+실제 발음 오류를 분석하여 pronunciationErrors 배열로 반환하세요:
+- word: 잘못 발음된 단어 또는 음절
+- correct: 올바른 발음 (한국어 또는 IPA 표기)
+- error: 오류 유형 간략 설명 (예: "장음 미처리", "연음 오류", "th 발음 누락")
+- 오류가 없으면 빈 배열 [] 반환
+
 ${criteria}
 ${cpText}
 원문:
@@ -5469,7 +3555,9 @@ ${script}`;
   "transcript": "음성에서 실제 발화된 내용 (직접 청취해 전사)",
   "language": "${langCode}",
   "score": 0-100 정수,
-  "grade": ${isKoEn ? '"A" 또는 "B" 또는 "C" 또는 "미취득"' : '"PASS" 또는 "FAIL"'},
+  "grade": "A" 또는 "B" 또는 "C" 또는 "미취득",
+  "matchRate": 0-100 정수 (원문 대비 발화 일치율, 선택 문안 제외),
+  "pronunciationErrors": [{"word":"단어","correct":"올바른발음","error":"오류설명"}],
   "categories": {
     "fluency": {
       "score": 0-${maxFluency} 정수,
@@ -5626,27 +3714,34 @@ function renderAiResult(ai, isAdmin) {
   const sec = $('ai-result-section');
   if (!sec) return;
 
-  const lang    = ai.language || state.selectedLang;
-  const isKoEn  = lang === 'ko' || lang === 'en';
-  const isJaCa  = lang === 'ja' || lang === 'ca';
-  const score   = typeof ai.score === 'number' ? ai.score : 0;
-  const grade   = ai.grade || (isKoEn ? '미취득' : 'FAIL');
-
-  const gradeColor = isKoEn
-    ? (grade === 'A' ? '#16a34a' : grade === 'B' ? '#2563eb' : grade === 'C' ? '#d97706' : '#dc2626')
-    : (grade === 'PASS' ? '#16a34a' : '#dc2626');
+  const score = typeof ai.score === 'number' ? ai.score : 0;
+  const grade = ai.grade || '미취득';
+  const gradeColor = grade === 'A' ? '#16a34a' : grade === 'B' ? '#2563eb' : grade === 'C' ? '#d97706' : '#dc2626';
   const emojiGrade = score >= 85 ? '✨ 잘하셨어요!' : score >= 70 ? '👍 계속 연습해요' : '💪 더 연습이 필요해요';
-
-  const maxScores = isJaCa
-    ? { fluency: 25, atmosphere: 25, intonation: 25, pronunciation: 25 }
-    : { fluency: 30, atmosphere: 25, intonation: 25, pronunciation: 20 };
-
+  const maxScores = { fluency: 30, atmosphere: 25, intonation: 25, pronunciation: 20 };
   const catMeta = {
     fluency:       { name: '유창성',       icon: '💨', max: maxScores.fluency },
     atmosphere:    { name: '분위기/목소리', icon: '🎙',  max: maxScores.atmosphere },
     intonation:    { name: '억양',         icon: '〰️', max: maxScores.intonation },
     pronunciation: { name: '발음',         icon: '🗣',  max: maxScores.pronunciation }
   };
+
+  // matchRate 경고 카드 (90% 미만일 때만 표시)
+  const matchRate = typeof ai.matchRate === 'number' ? ai.matchRate : null;
+  let matchRateHtml = '';
+  if (matchRate !== null && matchRate < 90) {
+    if (matchRate >= 70) {
+      matchRateHtml = `<div class="ai-match-card ai-match-warn">
+        <div class="ai-match-title">⚠️ 방송문 일치율 ${matchRate}%</div>
+        <div class="ai-match-desc">방송문 일부가 누락되었습니다. 전체 완주 연습을 더 해보세요.</div>
+      </div>`;
+    } else {
+      matchRateHtml = `<div class="ai-match-card ai-match-danger">
+        <div class="ai-match-title">🔴 방송문 일치율 ${matchRate}%</div>
+        <div class="ai-match-desc">방송문 상당 부분이 누락되었습니다. 방송문을 충분히 숙지한 후 다시 연습해주세요.</div>
+      </div>`;
+    }
+  }
 
   // 등급 헤더
   const gradeHeaderHtml = `
@@ -5655,35 +3750,28 @@ function renderAiResult(ai, isAdmin) {
       ${isAdmin ? `<span class="ai-score-chip">${score}점</span>` : ''}
     </div>`;
 
-  // 잘한 점 박스 — 70점 미만 미완주 시 숨김
-  const goodPointsHtml = (ai.goodPoints?.length && score >= 70)
-    ? `<div class="ai-good-points-box">
-        <div class="ai-good-points-label">👏 잘하셨어요!</div>
-        ${ai.goodPoints.map(p => `<div class="ai-good-point-item">✓ ${escHtml(p)}</div>`).join('')}
-      </div>` : '';
-
-  // 카테고리 카드
-  const catCardsHtml = Object.entries(ai.categories || {}).map(([key, cat]) => {
+  // 카테고리 카드 빌더 (헬퍼)
+  const _buildCatCard = (key, cat) => {
     const m = catMeta[key];
-    if (!m) return '';
+    if (!m || !cat) return '';
     const pct   = Math.round((Math.min(cat.score, m.max) / m.max) * 100);
     const level = cat.level || (pct >= 87 ? '우수' : pct >= 60 ? '보통' : '노력필요');
     const bgCls = level === '우수' ? 'ai-card-good' : level === '보통' ? 'ai-card-mid' : 'ai-card-low';
     const lvlCls = level === '우수' ? 'lvl-good' : level === '보통' ? 'lvl-mid' : 'lvl-low';
     const lvlEmoji = level === '우수' ? '🔥' : level === '보통' ? '✅' : '⚠️';
-
-    // good 필드 우선, 없으면 feedback 첫 문장 fallback (레거시 호환)
     const goodText  = (cat.good && cat.good.trim()) ? cat.good.trim() : null;
-    const fbImproveText = cat.feedback?.trim() || null;
     const fbGood    = goodText
       ? `<div class="ai-card-fb-row ai-card-fb-good"><span class="ai-card-fb-icon">✅</span><div><strong>잘된 점</strong><br>${escHtml(goodText)}</div></div>` : '';
-    const fbImprove = fbImproveText
-      ? `<div class="ai-card-fb-row ai-card-fb-improve"><span class="ai-card-fb-icon">📌</span><div><strong>개선 포인트</strong><br>${escHtml(fbImproveText)}</div></div>` : '';
+    const fbImprove = cat.feedback?.trim()
+      ? `<div class="ai-card-fb-row ai-card-fb-improve"><span class="ai-card-fb-icon">📌</span><div><strong>개선 포인트</strong><br>${escHtml(cat.feedback.trim())}</div></div>` : '';
     const fbTip     = cat.practiceTip
       ? `<div class="ai-card-fb-row ai-card-fb-tip"><span class="ai-card-fb-icon">🎯</span><div><strong>다음 연습 목표</strong><br>${escHtml(cat.practiceTip)}</div></div>` : '';
     const pronDetails = (key === 'pronunciation' && cat.details?.length)
       ? cat.details.map(d => `<div class="ai-pron-detail-item">💬 ${escHtml(d)}</div>`).join('') : '';
-
+    const pronErrors = (key === 'pronunciation' && ai.pronunciationErrors?.length)
+      ? `<div class="ai-pron-errors">${ai.pronunciationErrors.map(e =>
+          `<div class="ai-pron-error-item">❌ <strong>${escHtml(e.word)}</strong> → <span class="ai-pron-correct">${escHtml(e.correct)}</span> <span class="ai-pron-error-desc">(${escHtml(e.error)})</span></div>`
+        ).join('')}</div>` : '';
     return `<div class="ai-cat-card ${bgCls}">
       <div class="ai-cat-card-header">
         <span class="ai-cat-card-icon">${m.icon}</span>
@@ -5692,11 +3780,50 @@ function renderAiResult(ai, isAdmin) {
         ${isAdmin ? `<span class="ai-cat-score-chip">${cat.score}/${m.max}</span>` : ''}
       </div>
       ${fbGood}${fbImprove}${fbTip}
-      ${pronDetails}
+      ${pronDetails}${pronErrors}
     </div>`;
-  }).join('');
+  };
 
-  // 누락 키워드
+  // ── 유창성 카드: 헤더+잘된점 공개 / 개선포인트+목표 블러 ──
+  const flCat = ai.categories?.fluency;
+  let fluencyCardHtml = '';
+  if (flCat) {
+    const m = catMeta.fluency;
+    const pct   = Math.round((Math.min(flCat.score, m.max) / m.max) * 100);
+    const level = flCat.level || (pct >= 87 ? '우수' : pct >= 60 ? '보통' : '노력필요');
+    const bgCls = level === '우수' ? 'ai-card-good' : level === '보통' ? 'ai-card-mid' : 'ai-card-low';
+    const lvlCls = level === '우수' ? 'lvl-good' : level === '보통' ? 'lvl-mid' : 'lvl-low';
+    const lvlEmoji = level === '우수' ? '🔥' : level === '보통' ? '✅' : '⚠️';
+    const goodText = (flCat.good && flCat.good.trim()) ? flCat.good.trim() : null;
+    const fbGood = goodText
+      ? `<div class="ai-card-fb-row ai-card-fb-good"><span class="ai-card-fb-icon">✅</span><div><strong>잘된 점</strong><br>${escHtml(goodText)}</div></div>` : '';
+    const fbImprove = flCat.feedback?.trim()
+      ? `<div class="ai-card-fb-row ai-card-fb-improve"><span class="ai-card-fb-icon">📌</span><div><strong>개선 포인트</strong><br>${escHtml(flCat.feedback.trim())}</div></div>` : '';
+    const fbTip = flCat.practiceTip
+      ? `<div class="ai-card-fb-row ai-card-fb-tip"><span class="ai-card-fb-icon">🎯</span><div><strong>다음 연습 목표</strong><br>${escHtml(flCat.practiceTip)}</div></div>` : '';
+    const blurredRows = (fbImprove || fbTip) ? `<div class="blur-section paywall-fluency-blur">${fbImprove}${fbTip}</div>` : '';
+    fluencyCardHtml = `<div class="ai-cat-card ${bgCls}">
+      <div class="ai-cat-card-header">
+        <span class="ai-cat-card-icon">${m.icon}</span>
+        <span class="ai-cat-card-name">${m.name}</span>
+        <span class="ai-cat-level-badge ${lvlCls}">${lvlEmoji} ${level}</span>
+        ${isAdmin ? `<span class="ai-cat-score-chip">${flCat.score}/${m.max}</span>` : ''}
+      </div>
+      ${fbGood}
+      ${blurredRows}
+    </div>`;
+  }
+
+  // ── 블러 영역: 잘한점박스 + 분위기/억양/발음 + 누락 + 핵심목표 ──
+  const goodPointsHtml = (ai.goodPoints?.length && score >= 70)
+    ? `<div class="ai-good-points-box">
+        <div class="ai-good-points-label">👏 잘하셨어요!</div>
+        ${ai.goodPoints.map(p => `<div class="ai-good-point-item">✓ ${escHtml(p)}</div>`).join('')}
+      </div>` : '';
+
+  const blurredCatCardsHtml = ['atmosphere','intonation','pronunciation']
+    .map(key => _buildCatCard(key, ai.categories?.[key])).join('');
+
   const missedHtml = ai.missedKeywords?.length
     ? `<div class="ai-missed-box">
         <div class="ai-missed-label">⚠️ 누락된 핵심 내용</div>
@@ -5704,7 +3831,6 @@ function renderAiResult(ai, isAdmin) {
         <div class="ai-missed-list">${ai.missedKeywords.map(k => `<span class="ai-missed-item">${escHtml(k)}</span>`).join('')}</div>
       </div>` : '';
 
-  // 핵심 목표 카드
   const nextFocusHtml = (ai.nextFocus || ai.improvementTip)
     ? `<div class="ai-focus-card">
         <div class="ai-focus-title">🎯 이번 핵심 개선 목표</div>
@@ -5713,7 +3839,7 @@ function renderAiResult(ai, isAdmin) {
           ? `<div class="ai-focus-method"><span class="ai-pm-label">💡 단계별 연습 방법</span> ${escHtml(ai.practiceMethod)}</div>` : ''}
       </div>` : '';
 
-  // 응원 카드 — 점수별 색상 및 추가 메시지
+  // ── 응원 카드 (공개) ──
   let encourageHtml = '';
   if (ai.encouragement) {
     const encCls  = score >= 85 ? 'ai-encourage-green' : score >= 70 ? 'ai-encourage-blue' : 'ai-encourage-orange';
@@ -5726,13 +3852,24 @@ function renderAiResult(ai, isAdmin) {
   sec.innerHTML = `
     <div class="ai-result-heading">🤖 AI 상세 분석</div>
     ${gradeHeaderHtml}
-    ${goodPointsHtml}
-    ${catCardsHtml}
-    ${missedHtml}
-    ${nextFocusHtml}
+    ${matchRateHtml}
+    ${fluencyCardHtml}
+    <div class="blur-wrapper">
+      <div class="blur-section">
+        ${goodPointsHtml}
+        ${blurredCatCardsHtml}
+        ${missedHtml}
+        ${nextFocusHtml}
+      </div>
+      <div class="paywall-overlay">
+        <h3>🔒 상세 분석 결과</h3>
+        <p>발음 오류, 억양, 분위기/목소리<br>개선 포인트와 모델 음성 비교까지<br>전체 분석을 확인할 수 있어요.</p>
+        <button class="paywall-btn" onclick="window.open(SURVEY_URL,'_blank')">✈️ 자가 학습할게요!</button>
+      </div>
+    </div>
     ${encourageHtml}
   `;
-  console.log('[완료] AI 상세 분석 렌더링');
+  console.log('[완료] 소프트 페이월');
 }
 
 // ===== ADMIN =====
@@ -5771,58 +3908,6 @@ function _setupAdminMvSection() {
       if (id) _renderAdminMvBody(id, _adminMvLang);
     };
   });
-}
-
-// ===== 관리자 중국어 독음 전체 일괄 생성 =====
-// ===== 교범 독음 JSON 파일 → Firestore 일괄 업로드 =====
-async function uploadReadingsJson() {
-  if (!_db) { alert('Firebase 연결이 필요합니다.'); return; }
-  const fileInput = $('admin-readings-json-input');
-  const file = fileInput?.files?.[0];
-  if (!file) { alert('JSON 파일을 먼저 선택해주세요.'); return; }
-
-  let data;
-  try {
-    data = JSON.parse(await file.text());
-  } catch { alert('JSON 파싱 오류: 올바른 JSON 파일인지 확인해주세요.'); return; }
-
-  const keys = Object.keys(data);
-  if (!keys.length) { alert('JSON 데이터가 비어 있습니다.'); return; }
-
-  const btn = $('btn-admin-upload-json');
-  const statusEl = $('admin-readings-json-status');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 업로드 중...'; }
-  if (statusEl) { statusEl.textContent = `⏳ 총 ${keys.length}개 업로드 준비 중...`; statusEl.style.color = '#6366f1'; }
-
-  let success = 0, fail = 0;
-  for (let i = 0; i < keys.length; i++) {
-    const docId = keys[i];
-    const entry = data[docId];
-    if (btn) btn.textContent = `⏳ ${i + 1}/${keys.length}`;
-    if (statusEl) statusEl.textContent = `⏳ ${i + 1}/${keys.length} 업로드 중: ${docId}`;
-
-    const payload = {};
-    if (Array.isArray(entry.jaReadings) && entry.jaReadings.length) payload.jaReadings = entry.jaReadings;
-    if (Array.isArray(entry.caReadings) && entry.caReadings.length) payload.caReadings = entry.caReadings;
-    if (!Object.keys(payload).length) { console.warn('[교범독음] 스킵:', docId); continue; }
-
-    try {
-      await _db.collection('scripts').doc(docId).set(payload, { merge: true });
-      _scriptReadingsCache[docId] = { ..._scriptReadingsCache[docId], ...payload };
-      success++;
-      console.log('[완료] 교범 독음 업로드:', docId);
-    } catch (e) {
-      fail++;
-      console.error('[교범독음 업로드]', docId, '실패:', e.message);
-    }
-  }
-
-  const msg = `✅ ${success}개 완료${fail ? ` · ❌ ${fail}개 실패` : ''}`;
-  if (statusEl) { statusEl.textContent = msg; statusEl.style.color = fail ? '#dc2626' : '#16a34a'; }
-  if (btn) { btn.disabled = false; btn.textContent = '📥 Firestore에 업로드'; }
-  if (fileInput) fileInput.value = '';
-  showToast('교범 독음 업로드 완료!', 3000);
-  console.log('[완료] 교범 독음 JSON 업로드:', success, '성공,', fail, '실패');
 }
 
 // 로컬 모델 음성 자동 스캔 → Firestore scripts/{id}.modelFiles 저장
@@ -6011,11 +4096,6 @@ document.addEventListener('DOMContentLoaded', () => {
       tab.classList.add('active');
       const newLangCode = tab.dataset.lang;
       state.selectedLang = newLangCode;
-      console.log('[readings확인]', {
-        id: state.currentScript?.id,
-        jaReadings: state.currentScript?.jaReadings,
-        caReadings: state.currentScript?.caReadings
-      });
       if (state.currentScript) updatePrepContent();
     });
   });
@@ -6048,10 +4128,6 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById(`modal-lang-${tab.dataset.lang}`).classList.add('active');
     });
   });
-
-  // 독음 미리보기 버튼
-  document.getElementById('btn-preview-ja')?.addEventListener('click', () => _previewReadings('ja'));
-  document.getElementById('btn-preview-ca')?.addEventListener('click', () => _previewReadings('ca'));
 
   // PDF 모달 이벤트
   $('pdf-modal-close').addEventListener('click', closePdfModal);
@@ -6123,7 +4199,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ===== MODEL VOICE 이벤트 (언어별) =====
-  ['ko','en','ja','ca'].forEach(lang => {
+  ['ko','en'].forEach(lang => {
     document.getElementById(`mv-file-${lang}`)?.addEventListener('change', e => {
       const file = e.target.files[0];
       if (!file) return;
@@ -6192,11 +4268,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const lang = state.selectedLang;
     const cacheKey = `${s.id}_${lang}`;
     if (_studyGuideCache[cacheKey]) {
-      const cached = _studyGuideCache[cacheKey];
-      _renderStudyGuide(cached);
-      if (lang === 'ca' && cached.chineseReadings?.length) {
-        _renderChineseScriptWithReadings(s.langs[lang].text, cached.chineseReadings);
-      }
+      _renderStudyGuide(_studyGuideCache[cacheKey]);
       return;
     }
     const guideBtn = $('btn-gen-guide');
@@ -6212,9 +4284,6 @@ document.addEventListener('DOMContentLoaded', () => {
       _studyGuideCache[cacheKey] = guide;
       statusEl.classList.add('hidden');
       _renderStudyGuide(guide);
-      if (lang === 'ca' && guide.chineseReadings?.length) {
-        _renderChineseScriptWithReadings(s.langs[lang].text, guide.chineseReadings);
-      }
       guideBtn.textContent = '✅ 가이드 완성';
       // Firestore 자동 저장 (실패해도 무시)
       _saveGuideToFirestore(s.id, lang, guide);
@@ -6283,8 +4352,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ok) { _refreshAdminVersion(); _refreshAdminVersionList(); }
   });
   if ($('btn-admin-json-deploy')) $('btn-admin-json-deploy').addEventListener('click', deployJsonToFirestore);
-  if ($('btn-admin-upload-json')) $('btn-admin-upload-json').addEventListener('click', () => requireEditAuth(uploadReadingsJson));
-
   // ===== 사이드바 =====
   $('btn-toggle-sidebar').addEventListener('click', openSidebar);
   $('sidebar-overlay').addEventListener('click', closeSidebar);
@@ -6301,15 +4368,6 @@ document.addEventListener('DOMContentLoaded', () => {
       _detailLang = tab.dataset.lang;
       $('detail-lang-tabs').querySelectorAll('.detail-lang-tab').forEach(t => t.classList.toggle('active', t.dataset.lang===_detailLang));
       _renderDetailContent(s, _detailLang);
-      // readings 로드 후 재렌더 (탭/스크립트가 바뀌었으면 무시)
-      const capturedId = _selectedScriptId;
-      const capturedLang = _detailLang;
-      _loadAndAttachReadings(s).then(() => {
-        if (_selectedScriptId === capturedId && _detailLang === capturedLang) {
-          renderScriptText(s, capturedLang, $('detail-script-box'));
-          console.log('[detail] readings 재렌더링 완료');
-        }
-      });
     });
   });
 
@@ -6330,4 +4388,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-result-select')?.addEventListener('click', () => { stopModelComparison(); showScreen('screen-home'); });
   document.getElementById('btn-result-retry-2')?.addEventListener('click', () => { stopModelComparison(); if (state.currentScript) startPrep(state.currentScript); });
   $('btn-retry')?.addEventListener('click', () => { stopModelComparison(); if (state.currentScript) startPrep(state.currentScript); });
+
+  console.log('[완료] ja/ca 제거');
 });

@@ -65,8 +65,6 @@
           <div class="detail-lang-tabs" id="detail-lang-tabs">
             <button class="detail-lang-tab active" data-lang="ko">🇰🇷 한국어</button>
             <button class="detail-lang-tab" data-lang="en">🇺🇸 English</button>
-            <button class="detail-lang-tab" data-lang="ja">🇯🇵 日本語</button>
-            <button class="detail-lang-tab" data-lang="ca">🇨🇳 中文</button>
           </div>
           <div class="detail-script-box" id="detail-script-box"></div>
           <div class="detail-checkpoints hidden" id="detail-checkpoints"></div>
@@ -89,8 +87,6 @@
     <div class="lang-tabs" id="lang-tabs">
       <button class="lang-tab active" data-lang="ko">🇰🇷 한국어</button>
       <button class="lang-tab" data-lang="en">🇺🇸 English</button>
-      <button class="lang-tab" data-lang="ja">🇯🇵 日本語</button>
-      <button class="lang-tab" data-lang="ca">🇨🇳 中文</button>
     </div>
     <div class="prep-body">
       <div class="prep-read-hint">방송문을 충분히 읽으신 후 아래 버튼을 눌러 주세요</div>
@@ -171,7 +167,13 @@
         <div class="transcript-compare" id="transcript-compare"></div>
         <div class="rvc-divider"></div>
         <div class="rvc-audio-row">
-          <div class="rvc-audio-label">🎵 모델 음성</div>
+          <div class="rvc-model-label-row">
+            <div class="rvc-audio-label">🎵 모델 음성</div>
+            <div class="rvc-gender-toggle">
+              <button class="rvc-gender-btn active" id="rvc-gender-m" onclick="_rvcSetGender('M')">남</button>
+              <button class="rvc-gender-btn" id="rvc-gender-f" onclick="_rvcSetGender('F')">여</button>
+            </div>
+          </div>
           <div class="rvc-player">
             <button class="btn-icon sm rvc-play-btn" id="btn-play-model">▶ 재생</button>
             <div class="rvc-scrub-wrap">
@@ -312,8 +314,6 @@
         <div class="modal-lang-tabs" id="modal-lang-tabs">
           <button class="modal-lang-tab active" data-lang="ko">🇰🇷 한국어</button>
           <button class="modal-lang-tab" data-lang="en">🇺🇸 English</button>
-          <button class="modal-lang-tab" data-lang="ja">🇯🇵 日本語</button>
-          <button class="modal-lang-tab" data-lang="ca">🇨🇳 中文</button>
         </div>
         <div id="modal-lang-ko" class="modal-lang-panel active">
           <div class="modal-field">
@@ -352,41 +352,12 @@
             <textarea id="custom-text-en" rows="7" placeholder="Paste the English version of your announcement here..."></textarea>
           </div>
         </div>
-        <div id="modal-lang-ja" class="modal-lang-panel">
-          <div class="modal-field">
-            <label>放送原稿（日本語）<span class="optional">（任意）</span></label>
-            <textarea id="custom-text-ja" rows="6" placeholder="日本語の放送原稿をここに貼り付けてください..."></textarea>
-          </div>
-          <div class="modal-field" style="margin-top:10px">
-            <label>한글 독음 <span class="optional">(원문과 같은 줄 수로 입력)</span></label>
-            <textarea id="custom-reading-ja" rows="6" placeholder="미나사마&#10;토-키와 제주코-쿠-&#10;..."></textarea>
-            <div style="font-size:12px;color:var(--gray-400);margin-top:4px">💡 독음은 원문과 같은 줄 수로 입력. 저장 시 jaReadings 배열로 자동 변환됩니다.</div>
-            <button type="button" class="btn-preview-readings" id="btn-preview-ja">👁 미리보기</button>
-          </div>
-          <div id="preview-ja" class="readings-preview hidden"></div>
-        </div>
-        <div id="modal-lang-ca" class="modal-lang-panel">
-          <div class="modal-field">
-            <label>广播原文（中文）<span class="optional">（可选）</span></label>
-            <textarea id="custom-text-ca" rows="6" placeholder="请在此处粘贴中文广播原稿..."></textarea>
-          </div>
-          <div class="modal-field" style="margin-top:10px">
-            <label>병음 독음 <span class="optional">(원문과 같은 줄 수로 입력)</span></label>
-            <textarea id="custom-reading-ca" rows="6" placeholder="gèwèilǚkè&#10;nínhǎo..."></textarea>
-            <div style="font-size:12px;color:var(--gray-400);margin-top:4px">💡 독음은 원문과 같은 줄 수로 입력. 저장 시 caReadings 배열로 자동 변환됩니다.</div>
-            <button type="button" class="btn-preview-readings" id="btn-preview-ca">👁 미리보기</button>
-          </div>
-          <div id="preview-ca" class="readings-preview hidden"></div>
-        </div>
-
         <!-- 모델 음성 섹션 (언어별) -->
         <div class="model-voice-section" id="model-voice-section">
           <div class="mv-section-title">🎙 모델 음성 (언어별)</div>
           <div class="mv-lang-tabs" id="mv-lang-tabs">
             <button type="button" class="mv-lang-tab active" data-lang="ko">🇰🇷 한국어</button>
             <button type="button" class="mv-lang-tab" data-lang="en">🇺🇸 English</button>
-            <button type="button" class="mv-lang-tab" data-lang="ja">🇯🇵 日本語</button>
-            <button type="button" class="mv-lang-tab" data-lang="ca">🇨🇳 中文</button>
           </div>
           <div id="mv-panel-ko" class="mv-lang-panel active">
             <div class="mv-current hidden" id="mv-current-ko">
@@ -403,22 +374,6 @@
               <button type="button" class="btn-icon sm mv-del-btn" id="mv-del-en">✕ 삭제</button>
             </div>
             <label class="mv-upload-btn">📁 English voice file upload<input type="file" id="mv-file-en" accept="audio/*" style="display:none"></label>
-          </div>
-          <div id="mv-panel-ja" class="mv-lang-panel">
-            <div class="mv-current hidden" id="mv-current-ja">
-              <span class="mv-icon">🎵</span><span class="mv-name" id="mv-name-ja">등록됨</span>
-              <button type="button" class="btn-icon sm" id="mv-play-ja">▶ 재생</button>
-              <button type="button" class="btn-icon sm mv-del-btn" id="mv-del-ja">✕ 삭제</button>
-            </div>
-            <label class="mv-upload-btn">📁 日本語音声アップロード<input type="file" id="mv-file-ja" accept="audio/*" style="display:none"></label>
-          </div>
-          <div id="mv-panel-ca" class="mv-lang-panel">
-            <div class="mv-current hidden" id="mv-current-ca">
-              <span class="mv-icon">🎵</span><span class="mv-name" id="mv-name-ca">등록됨</span>
-              <button type="button" class="btn-icon sm" id="mv-play-ca">▶ 재생</button>
-              <button type="button" class="btn-icon sm mv-del-btn" id="mv-del-ca">✕ 삭제</button>
-            </div>
-            <label class="mv-upload-btn">📁 上传中文语音文件<input type="file" id="mv-file-ca" accept="audio/*" style="display:none"></label>
           </div>
           <div class="mv-hint">훈련생이 연습 준비 화면에서 모델 음성을 들을 수 있습니다</div>
         </div>
@@ -451,7 +406,7 @@
               파일 선택
               <input type="file" id="pdf-file-input" accept=".pdf" style="display:none">
             </label>
-            <div class="pdf-drop-sub">Gemini AI가 각 페이지를 직접 읽어<br>한국어·영어·일본어를 자동으로 분리합니다</div>
+            <div class="pdf-drop-sub">Gemini AI가 각 페이지를 직접 읽어<br>한국어·영어를 자동으로 분리합니다</div>
           </div>
         </div>
 
@@ -537,23 +492,6 @@
         </div>
       </section>
 
-      <!-- 교범 독음 JSON 업로드 섹션 -->
-      <section class="admin-section">
-        <div class="admin-section-title">📥 교범 독음 JSON 업로드</div>
-        <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">
-          <code>{"2-1-1":{"jaReadings":[...],"caReadings":[...]}}</code> 형식의 JSON 파일을 선택하면<br>
-          Firestore <code>scripts</code> 컬렉션에 일괄 업로드합니다 (merge:true).
-        </div>
-        <div class="admin-row-btns">
-          <label class="btn-icon" style="cursor:pointer;display:inline-block">
-            📂 파일 선택
-            <input type="file" id="admin-readings-json-input" accept=".json" style="display:none">
-          </label>
-          <button class="btn-primary" id="btn-admin-upload-json" style="background:#0369a1">📥 Firestore에 업로드</button>
-        </div>
-        <div id="admin-readings-json-status" style="margin-top:8px;font-size:13px"></div>
-      </section>
-
       <!-- 모델 음성 관리 섹션 -->
       <section class="admin-section">
         <div class="admin-section-title">🎙 모델 음성 관리</div>
@@ -572,8 +510,6 @@
           <div class="mv-lang-tabs" id="admin-mv-lang-tabs">
             <button type="button" class="mv-lang-tab active" data-lang="ko">🇰🇷 한국어</button>
             <button type="button" class="mv-lang-tab" data-lang="en">🇺🇸 English</button>
-            <button type="button" class="mv-lang-tab" data-lang="ja">🇯🇵 日本語</button>
-            <button type="button" class="mv-lang-tab" data-lang="ca">🇨🇳 中文</button>
           </div>
           <div id="admin-mv-body" style="margin-top:8px"></div>
         </div>
