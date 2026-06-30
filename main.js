@@ -163,26 +163,40 @@ function createModelVoicePlayer(containerId, opts = {}) {
       });
     };
 
-    // 일시정지 상태면 현재 위치에서 재개 (Bug 2: currentTime 유지)
-    if (_playerAudio && _playerAudio === _currentModelAudio && _currentModelAudio.paused) {
+    // _currentModelAudio 없으면 동기 캐시에서 즉시 생성 시도 (await 없음 → iOS 제스처 유지)
+    // initState()가 이미 _preload()로 생성했으면 이 분기는 건너뜀
+    if (!_currentModelAudio?.src) {
+      const syncUrl = _getCachedModelVoiceUrl(s.id, state.selectedLang);
+      if (syncUrl) {
+        _currentModelAudio = new Audio(syncUrl);
+        _currentModelAudio.setAttribute('playsinline', '');
+        window._modelAudioKeepAlive = _currentModelAudio;
+      }
+    }
+
+    // 일시정지 상태면 현재 위치에서 재개
+    if (_playerAudio && _playerAudio === _currentModelAudio && _currentModelAudio?.paused) {
       _safePlay(_currentModelAudio);
       playBtn.textContent = '⏸ 일시정지';
       return;
     }
-    // _currentModelAudio가 이미 있으면 재사용 (Bug 2: 새 Audio 생성 안 함)
-    if (_currentModelAudio && _currentModelAudio.src) {
+    // _currentModelAudio가 있으면 재사용 (initState/_preload 또는 위 동기 생성)
+    // — await가 없으므로 iOS 사용자 제스처 컨텍스트 완전 유지
+    if (_currentModelAudio?.src) {
       _playerAudio = _currentModelAudio;
       attachHandlers();
       _safePlay(_currentModelAudio);
       playBtn.textContent = '⏸ 일시정지';
       return;
     }
-    // 없는 경우에만 새로 생성
+    // 캐시 완전 미스(극히 드문 경우): await로 URL 획득
+    // iOS에서는 이 경우 제스처 컨텍스트 소멸로 play() 실패 가능 — 다음 클릭에 정상 작동
+    console.warn('[모델음성] 캐시 미스 — await로 URL 획득 시도 (iOS에서 재생 실패 가능)');
     const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
     if (!url) { setAvailable(false); return; }
     _currentModelAudio = new Audio(url);
     _currentModelAudio.setAttribute('playsinline', '');
-    window._modelAudioKeepAlive = _currentModelAudio; // 모바일 GC 방지
+    window._modelAudioKeepAlive = _currentModelAudio;
     _playerAudio = _currentModelAudio;
     attachHandlers();
     _safePlay(_currentModelAudio);
@@ -209,6 +223,15 @@ function createModelVoicePlayer(containerId, opts = {}) {
     });
   });
 
+  // URL 확보 즉시 Audio 객체 미리 생성
+  // → doPlay() 클릭 시 await 없이 _currentModelAudio.src 경로로 직행 (iOS 제스처 유지)
+  const _preload = (url) => {
+    if (!url || (_currentModelAudio && _currentModelAudio.src)) return;
+    _currentModelAudio = new Audio(url);
+    _currentModelAudio.setAttribute('playsinline', '');
+    window._modelAudioKeepAlive = _currentModelAudio;
+  };
+
   // 가용성 초기 확인 (기존 _currentModelAudio 있으면 현재 상태 즉시 반영)
   const initState = () => {
     if (_currentModelAudio && _currentModelAudio.src) {
@@ -224,10 +247,18 @@ function createModelVoicePlayer(containerId, opts = {}) {
     }
     const s = state.currentScript;
     if (!s) { setAvailable(false); return; }
-    const cached = _getCachedModelVoiceUrl(s.id, state.selectedLang);
     const local  = loadModelVoice(s.id, state.selectedLang);
-    if (cached || local) { setAvailable(true); return; }
-    _resolveModelVoiceUrl(s.id, state.selectedLang).then(url => setAvailable(!!url));
+    const cached = _getCachedModelVoiceUrl(s.id, state.selectedLang);
+    if (local || cached) {
+      _preload(local || cached); // 즉시 Audio 미리 생성
+      setAvailable(true);
+      return;
+    }
+    // 비동기: Firestore에서 URL 확보 후 Audio 미리 생성
+    _resolveModelVoiceUrl(s.id, state.selectedLang).then(url => {
+      _preload(url);
+      setAvailable(!!url);
+    });
   };
   initState();
 
