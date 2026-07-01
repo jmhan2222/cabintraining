@@ -4366,6 +4366,10 @@ async function _runBulkGuideGeneration() {
   let done = 0;
   let failed = 0;
 
+  const BATCH_SIZE = 15;
+  const BATCH_WAIT_SEC = 60;
+  let inBatchCount = 0;
+
   for (const id of ids) {
     const s = _allScripts.find(a => a.id === id);
     if (!s || !s.langs?.ko?.text) { done++; continue; }
@@ -4380,7 +4384,19 @@ async function _runBulkGuideGeneration() {
       failed++;
     }
     done++;
-    if (done < total) await new Promise(r => setTimeout(r, 1000));
+    inBatchCount++;
+
+    if (done >= total) break;
+
+    if (inBatchCount >= BATCH_SIZE) {
+      inBatchCount = 0;
+      for (let remain = BATCH_WAIT_SEC; remain > 0; remain--) {
+        if (progressEl) progressEl.textContent = `${done}개 완료. API 한도로 인해 ${BATCH_WAIT_SEC}초 대기 중... (${remain}초 남음)`;
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    } else {
+      await new Promise(r => setTimeout(r, 1000));
+    }
   }
 
   _adminGuideRunning = false;
