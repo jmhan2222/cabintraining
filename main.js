@@ -16,6 +16,7 @@ let _storage = null;
 let _geminiModel = null;
 let auth = null;
 const _mvUrlCache = {}; // { "scriptId_lang": url }
+let _guideUpdateNeededIds = new Set(); // guideUpdateNeeded: true 인 방송문 IDs
 
 function initFirebase() {
   try {
@@ -860,6 +861,7 @@ async function loadAndRenderHome() {
   _allScripts = [...firestoreScripts, ...customScripts];
 
   renderSidebar(_allScripts);
+  if (_db) _fetchGuideUpdateFlags().then(() => renderSidebar(_allScripts)).catch(() => {});
 }
 
 function _renderSidebarLoading() {
@@ -976,9 +978,11 @@ function _sidebarItemHtml(s) {
         : cnt >= 1
           ? `<span class="practice-badge pb-gray">🌱 ${cnt}회</span>`
           : '';
+  const updateBadge = _guideUpdateNeededIds.has(s.id)
+    ? '<span class="update-needed-badge">🔄 업데이트</span>' : '';
   return `<div class="sidebar-item${_selectedScriptId===s.id?' selected':''}" data-id="${s.id}">
     <span class="sidebar-item-section">${s._section||''}</span>
-    <span class="sidebar-item-title">${escHtml(s.title)}</span>
+    <span class="sidebar-item-title">${escHtml(s.title)}${updateBadge}</span>
     <span class="sidebar-item-langs">${langDots}${badge}</span>
   </div>`;
 }
@@ -1463,6 +1467,10 @@ async function startStudyMode() {
   $('study-guide-status').classList.add('hidden');
   $('btn-gen-guide').disabled = false;
   $('btn-gen-guide').textContent = '가이드 생성하기';
+  const _needsUpdate = _guideUpdateNeededIds.has(s.id) && isEditUnlocked();
+  $('study-guide-update-notice')?.classList.toggle('hidden', !_needsUpdate);
+  const _updateBtn = $('btn-guide-update');
+  if (_updateBtn) { _updateBtn.classList.toggle('hidden', !_needsUpdate); _updateBtn.disabled = false; _updateBtn.textContent = '🔄 업데이트'; }
 
   showScreen('screen-study');
 
@@ -3153,6 +3161,9 @@ async function saveScriptFromModal() {
     }
   }
 
+  if (_modalState.mode === 'edit' && _savedEditId) {
+    _markGuideUpdateNeeded(_savedEditId).catch(() => {});
+  }
   closeCustomModal();
   renderHome();
   console.log('[저장완료]', _savedEditId || '(새 방송문)');
@@ -4273,6 +4284,112 @@ function hideLaunchScreen() {
   }, totalMs);
 }
 
+// ===== GUIDE UPDATE FLAG =====
+async function _fetchGuideUpdateFlags() {
+  if (!_db) return;
+  try {
+    const snap = await _db.collection('scripts').where('guideUpdateNeeded', '==', true).get();
+    _guideUpdateNeededIds = new Set(snap.docs.map(d => d.id));
+  } catch (e) { console.warn('[가이드플래그] 로드 실패:', e.message); }
+}
+
+async function _markGuideUpdateNeeded(scriptId) {
+  if (!scriptId) return;
+  _guideUpdateNeededIds.add(scriptId);
+  renderSidebar(_allScripts);
+  if (!_db) return;
+  try {
+    await _db.collection('scripts').doc(scriptId).set({ guideUpdateNeeded: true }, { merge: true });
+  } catch (e) { console.warn('[가이드플래그] 마킹 실패:', e.message); }
+}
+
+async function _clearGuideUpdateNeeded(scriptId) {
+  if (!scriptId) return;
+  _guideUpdateNeededIds.delete(scriptId);
+  renderSidebar(_allScripts);
+  if (!_db) return;
+  try {
+    await _db.collection('scripts').doc(scriptId).update({ guideUpdateNeeded: false });
+  } catch (e) { console.warn('[가이드플래그] 삭제 실패:', e.message); }
+}
+
+// ===== ADMIN BULK GUIDE =====
+let _adminGuideRunning = false;
+
+async function _loadAdminGuideStatuses() {
+  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+  const listEl = $('admin-guide-script-list');
+  const bodyEl = $('admin-guide-status-body');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="padding:10px;font-size:13px;color:var(--gray-400)">상태 로딩 중...</div>';
+  bodyEl.classList.remove('hidden');
+
+  await _fetchGuideUpdateFlags();
+
+  const results = await Promise.all(_allScripts.map(async s => {
+    try {
+      const snap = await _db.collection('scripts').doc(s.id).collection('studyGuide').doc('ko').get();
+      return { s, hasGuide: snap.exists, needsUpdate: _guideUpdateNeededIds.has(s.id) };
+    } catch { return { s, hasGuide: false, needsUpdate: false }; }
+  }));
+
+  let html = '';
+  for (const { s, hasGuide, needsUpdate } of results) {
+    const statusBadge = !hasGuide
+      ? '<span class="admin-guide-badge badge-guide-none">❌ 미생성</span>'
+      : needsUpdate
+        ? '<span class="admin-guide-badge badge-guide-update">🔄 업데이트 필요</span>'
+        : '<span class="admin-guide-badge badge-guide-done">✅ 완성</span>';
+    html += `<label class="admin-guide-item">
+      <input type="checkbox" class="admin-guide-chk" value="${escHtml(s.id)}" ${needsUpdate || !hasGuide ? 'checked' : ''}>
+      <span class="admin-guide-item-title">${escHtml(s.title)}</span>
+      ${statusBadge}
+    </label>`;
+  }
+  listEl.innerHTML = html || '<div style="padding:10px;font-size:13px;color:var(--gray-400)">방송문이 없습니다.</div>';
+}
+
+async function _runBulkGuideGeneration() {
+  if (_adminGuideRunning) return;
+  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+  const checked = Array.from(document.querySelectorAll('.admin-guide-chk:checked'));
+  if (!checked.length) { showToast('방송문을 선택해주세요.', 2000); return; }
+
+  _adminGuideRunning = true;
+  const progressEl = $('admin-bulk-guide-progress');
+  const btn = $('btn-admin-bulk-guide');
+  if (progressEl) progressEl.classList.remove('hidden');
+  if (btn) btn.disabled = true;
+
+  const ids = checked.map(c => c.value);
+  const total = ids.length;
+  let done = 0;
+  let failed = 0;
+
+  for (const id of ids) {
+    const s = _allScripts.find(a => a.id === id);
+    if (!s || !s.langs?.ko?.text) { done++; continue; }
+    if (progressEl) progressEl.textContent = `⏳ ${done + 1}/${total} 생성 중... (${escHtml(s.title)})`;
+    try {
+      const guide = await callGeminiGuide(s.langs.ko.text, 'ko');
+      await _saveGuideToFirestore(s.id, 'ko', guide);
+      await _clearGuideUpdateNeeded(s.id);
+      _studyGuideCache[`${s.id}_ko`] = guide;
+    } catch (e) {
+      console.error(`[일괄가이드] ${s.id} 실패:`, e.message);
+      failed++;
+    }
+    done++;
+    if (done < total) await new Promise(r => setTimeout(r, 1000));
+  }
+
+  _adminGuideRunning = false;
+  if (btn) btn.disabled = false;
+  if (progressEl) progressEl.classList.add('hidden');
+  showToast(failed > 0 ? `${done - failed}/${total} 완료, ${failed}개 실패` : `${total}개 가이드 생성 완료 ✓`, 4000);
+  _loadAdminGuideStatuses();
+}
+
 // ===== GUIDE MANAGEMENT =====
 const _GUIDE_DEFAULT_TEXTS = [
   {
@@ -4629,6 +4746,39 @@ document.addEventListener('DOMContentLoaded', () => {
       createModelVoicePlayer('study-model-player', { noGender: true });
     });
   });
+  // 가이드 업데이트 (관리자 전용)
+  $('btn-guide-update')?.addEventListener('click', async () => {
+    const s = state.currentScript;
+    if (!s) return;
+    const lang = state.selectedLang;
+    const cacheKey = `${s.id}_${lang}`;
+    const updateBtn = $('btn-guide-update');
+    const statusEl = $('study-guide-status');
+    updateBtn.disabled = true;
+    updateBtn.textContent = '⏳ 업데이트 중...';
+    statusEl.textContent = 'AI가 최신 내용으로 분석 중...';
+    statusEl.className = 'study-guide-loading';
+    statusEl.classList.remove('hidden');
+    $('study-guide-result').classList.add('hidden');
+    try {
+      const guide = await callGeminiGuide(s.langs[lang].text, lang);
+      _studyGuideCache[cacheKey] = guide;
+      statusEl.classList.add('hidden');
+      _renderStudyGuide(guide);
+      $('btn-gen-guide').textContent = '✅ 가이드 완성';
+      _saveGuideToFirestore(s.id, lang, guide);
+      await _clearGuideUpdateNeeded(s.id);
+      $('study-guide-update-notice')?.classList.add('hidden');
+      updateBtn.classList.add('hidden');
+      showToast('업데이트 완료 ✓');
+    } catch (e) {
+      statusEl.textContent = '업데이트 실패. 다시 시도해주세요.';
+      statusEl.className = 'study-guide-error';
+      updateBtn.disabled = false;
+      updateBtn.textContent = '🔄 업데이트';
+    }
+  });
+
   // 가이드 생성
   $('btn-gen-guide').addEventListener('click', async () => {
     const s = state.currentScript;
@@ -4711,6 +4861,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===== 관리자 패널 =====
   $('btn-open-admin').addEventListener('click', openAdminScreen);
   $('btn-admin-back').addEventListener('click', () => { showScreen('screen-home'); loadAndRenderHome(); });
+  // 관리자 일괄 가이드 생성
+  $('btn-admin-load-guide-status')?.addEventListener('click', _loadAdminGuideStatuses);
+  $('btn-admin-bulk-guide')?.addEventListener('click', _runBulkGuideGeneration);
+  $('btn-admin-guide-select-all')?.addEventListener('click', () => {
+    document.querySelectorAll('.admin-guide-chk').forEach(c => c.checked = true);
+  });
+  $('btn-admin-guide-deselect-all')?.addEventListener('click', () => {
+    document.querySelectorAll('.admin-guide-chk').forEach(c => c.checked = false);
+  });
+
   if ($('btn-admin-scan-mv')) $('btn-admin-scan-mv').addEventListener('click', _scanLocalModelVoices);
   if ($('btn-admin-reset-scan-mv')) $('btn-admin-reset-scan-mv').addEventListener('click', _resetAndRescanModelVoices);
   if ($('btn-save-firebase-cfg')) $('btn-save-firebase-cfg').addEventListener('click', () => {

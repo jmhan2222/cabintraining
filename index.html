@@ -289,8 +289,12 @@
       <div class="study-guide-section">
         <div class="study-guide-header">
           <span class="study-guide-title">💡 이 방송문 핵심 포인트</span>
-          <button class="btn-primary study-gen-btn" id="btn-gen-guide">가이드 생성하기</button>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn-primary study-gen-btn hidden" id="btn-guide-update">🔄 업데이트</button>
+            <button class="btn-primary study-gen-btn" id="btn-gen-guide">가이드 생성하기</button>
+          </div>
         </div>
+        <div id="study-guide-update-notice" class="hidden study-guide-update-notice">💡 방송문이 수정되었습니다. 최신 내용으로 가이드를 업데이트해주세요.</div>
         <div id="study-guide-status" class="hidden"></div>
         <div id="study-guide-result" class="hidden"></div>
       </div>
@@ -549,6 +553,26 @@
         <div class="admin-section-title">📋 버전 관리</div>
         <div id="admin-version-list" class="admin-version-list">
           <div style="color:var(--gray-400);font-size:13px">Firebase 연결 후 버전 목록이 표시됩니다.</div>
+        </div>
+      </section>
+
+      <!-- 가이드 일괄 생성 섹션 -->
+      <section class="admin-section">
+        <div class="admin-section-title">🤖 가이드 일괄 생성</div>
+        <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">전체 방송문의 AI 학습 가이드를 일괄 생성하거나 업데이트합니다.</div>
+        <div class="admin-row-btns">
+          <button class="btn-primary" id="btn-admin-load-guide-status">📋 가이드 상태 로드</button>
+        </div>
+        <div id="admin-guide-status-body" class="hidden" style="margin-top:12px">
+          <div class="admin-row-btns" style="margin-bottom:8px">
+            <button class="btn-icon sm" id="btn-admin-guide-select-all">전체 선택</button>
+            <button class="btn-icon sm" id="btn-admin-guide-deselect-all">전체 해제</button>
+          </div>
+          <div id="admin-guide-script-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm)"></div>
+          <div class="admin-row-btns" style="margin-top:10px">
+            <button class="btn-primary" id="btn-admin-bulk-guide">🤖 선택한 방송문 가이드 생성/업데이트</button>
+          </div>
+          <div id="admin-bulk-guide-progress" class="hidden" style="margin-top:8px;font-size:13px;color:var(--gray-600);padding:4px 0"></div>
         </div>
       </section>
 
