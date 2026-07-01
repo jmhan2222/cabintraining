@@ -2459,3 +2459,65 @@ html, body {
   #ls-title { height: 44px !important; }
   #ls-cursor { height: 28px !important; }
 }
+
+/* ===== GUIDE MODAL ===== */
+.guide-modal-box { max-width: 520px; width: 94%; }
+.guide-modal-body { padding: 0 4px; max-height: 72vh; overflow-y: auto; }
+.guide-section {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.guide-section-header {
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 14px;
+  letter-spacing: 0.3px;
+}
+.guide-section-body {
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  line-height: 1.6;
+}
+.guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.guide-step:last-child { margin-bottom: 0; }
+.guide-step-num {
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.guide-list {
+  padding-left: 18px;
+  margin: 0;
+}
+.guide-list li { margin-bottom: 6px; }
+.guide-list li:last-child { margin-bottom: 0; }
+.guide-faq { margin-bottom: 10px; }
+.guide-faq:last-child { margin-bottom: 0; }
+.guide-faq-q {
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 3px;
+}
+.guide-faq-a {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  padding-left: 10px;
+  border-left: 3px solid var(--color-border);
+}

@@ -133,7 +133,7 @@ function createModelVoicePlayer(containerId, opts = {}) {
       if (!_currentModelAudio) return;
       const dur = _currentModelAudio.duration || 0;
       const cur = _currentModelAudio.currentTime || 0;
-      if (dur > 0) { scrub.max = dur; scrub.value = cur; }
+      if (dur > 0) scrub.value = (cur / dur) * 100;
       timeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
     };
     const onEnd = () => {
@@ -206,8 +206,8 @@ function createModelVoicePlayer(containerId, opts = {}) {
   playBtn.addEventListener('click', doPlay);
 
   scrub.addEventListener('input', () => {
-    if (_playerAudio && _playerAudio === _currentModelAudio) {
-      _currentModelAudio.currentTime = parseFloat(scrub.value);
+    if (_currentModelAudio && _currentModelAudio.duration) {
+      _currentModelAudio.currentTime = (parseFloat(scrub.value) / 100) * _currentModelAudio.duration;
     }
   });
 
@@ -238,7 +238,7 @@ function createModelVoicePlayer(containerId, opts = {}) {
       setAvailable(true);
       const dur = _currentModelAudio.duration || 0;
       const cur = _currentModelAudio.currentTime || 0;
-      if (dur > 0) { scrub.max = dur; scrub.value = cur; }
+      if (dur > 0) scrub.value = (cur / dur) * 100;
       if (cur > 0 || dur > 0) timeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
       playBtn.textContent = _currentModelAudio.paused ? '▶ 재생' : '⏸ 일시정지';
       _playerAudio = _currentModelAudio;
@@ -4549,6 +4549,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('sidebar-overlay').addEventListener('click', closeSidebar);
   $('btn-sidebar-add').addEventListener('click', () => requireEditAuth(openAddModal));
   $('btn-sidebar-pdf').addEventListener('click', () => requireEditAuth(openPdfModal));
+  $('btn-sidebar-guide').addEventListener('click', () => $('guide-modal').classList.remove('hidden'));
+  $('guide-modal-close').addEventListener('click', () => $('guide-modal').classList.add('hidden'));
+  $('guide-modal').addEventListener('click', (e) => { if (e.target === $('guide-modal')) $('guide-modal').classList.add('hidden'); });
   _setupSidebarSearch();
 
   // 상세 패널 언어 탭
