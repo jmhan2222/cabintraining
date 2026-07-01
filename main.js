@@ -4273,6 +4273,182 @@ function hideLaunchScreen() {
   }, totalMs);
 }
 
+// ===== GUIDE MANAGEMENT =====
+const _GUIDE_DEFAULT_TEXTS = [
+  {
+    title: '🎯 이 앱의 목적',
+    content: '기내방송 발음·억양·속도를 스스로 훈련하는 AI 기반 자가학습 플랫폼입니다.'
+  },
+  {
+    title: '📋 학습 순서 추천',
+    content: 'STEP 1 학습모드 → 방송문 선택 → 모델음성 듣기 (남/여)\nSTEP 2 핵심 포인트 확인 → AI 가이드 생성\nSTEP 3 연습하기 → 직접 녹음 → AI 분석 결과 확인\nSTEP 4 드릴모드 → 구간 반복 연습'
+  },
+  {
+    title: '🎙 녹음 팁',
+    content: '• 마이크와 15cm 거리 유지\n• 방송문 끝을 내리면 더 안정적으로 들림\n• 숨을 고르고 첫 단어를 또렷하게 시작'
+  },
+  {
+    title: '📊 AI 분석 결과 보는 법',
+    content: '• 발음 정확도 / 억양 / 속도 3가지 항목으로 평가\n• 80점 이상 목표로 반복 연습 권장'
+  },
+  {
+    title: '❓ 자주 묻는 질문',
+    content: 'Q. 녹음이 안 돼요\n→ 설정 › Safari(또는 앱) › 마이크 허용을 확인하세요.\n\nQ. AI 분석이 실패해요\n→ 네트워크 연결을 확인한 후 다시 시도해 주세요.\n\nQ. 모델음성이 안 들려요\n→ 음소거 해제 및 볼륨을 확인하세요.'
+  }
+];
+
+let _guideSections = null; // null = Firestore 미로드
+
+// 서식 기호(STEP, •, Q., →)를 해석해 HTML로 변환
+function _guideTextToHtml(text) {
+  if (!text) return '';
+  const lines = text.split('\n');
+  let html = '';
+  let inList = false;
+  for (const line of lines) {
+    if (!line.trim()) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += '<div style="height:6px"></div>';
+      continue;
+    }
+    const stepMatch = line.match(/^(STEP\s*\d+)\s+(.*)/);
+    if (stepMatch) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div class="guide-step"><span class="guide-step-num">${stepMatch[1]}</span><span>${stepMatch[2]}</span></div>`;
+      continue;
+    }
+    if (/^[•\-]\s/.test(line)) {
+      if (!inList) { html += '<ul class="guide-list">'; inList = true; }
+      html += `<li>${line.slice(2)}</li>`;
+      continue;
+    }
+    if (/^Q\./.test(line)) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div class="guide-faq-q">${line}</div>`;
+      continue;
+    }
+    if (/^→/.test(line)) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div class="guide-faq-a">${line.slice(1).trim()}</div>`;
+      continue;
+    }
+    if (inList) { html += '</ul>'; inList = false; }
+    html += `<p>${line}</p>`;
+  }
+  if (inList) html += '</ul>';
+  return html;
+}
+
+function _renderGuideBody() {
+  const body = $('guide-modal-body');
+  const editBtn = $('btn-guide-edit');
+  if (!body || !_guideSections) return;
+  const unlocked = isEditUnlocked();
+  if (editBtn) editBtn.classList.toggle('hidden', unlocked);
+
+  body.innerHTML = '';
+  _guideSections.forEach((sec, idx) => {
+    const div = document.createElement('div');
+    div.className = 'guide-section';
+    div.dataset.idx = idx;
+
+    const header = document.createElement('div');
+    header.className = 'guide-section-header';
+    const titleSpan = document.createElement('span');
+    titleSpan.textContent = sec.title;
+    header.appendChild(titleSpan);
+
+    if (unlocked) {
+      const secEditBtn = document.createElement('button');
+      secEditBtn.className = 'guide-sec-edit-btn';
+      secEditBtn.textContent = '✏️';
+      secEditBtn.title = '이 섹션 편집';
+      secEditBtn.addEventListener('click', () => _enterSectionEdit(div, idx));
+      header.appendChild(secEditBtn);
+    }
+
+    const bodyDiv = document.createElement('div');
+    bodyDiv.className = 'guide-section-body';
+    bodyDiv.innerHTML = _guideTextToHtml(sec.content);
+
+    div.appendChild(header);
+    div.appendChild(bodyDiv);
+    body.appendChild(div);
+  });
+}
+
+function _enterSectionEdit(sectionDiv, idx) {
+  if (sectionDiv.classList.contains('guide-editing')) return;
+  sectionDiv.classList.add('guide-editing');
+
+  const bodyDiv = sectionDiv.querySelector('.guide-section-body');
+  const originalHtml = bodyDiv.innerHTML;
+  const sec = _guideSections[idx];
+
+  const textarea = document.createElement('textarea');
+  textarea.className = 'guide-edit-textarea';
+  textarea.value = sec.content;
+  const autoResize = () => { textarea.style.height = 'auto'; textarea.style.height = textarea.scrollHeight + 'px'; };
+  textarea.addEventListener('input', autoResize);
+
+  const btnRow = document.createElement('div');
+  btnRow.className = 'guide-edit-btnrow';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn-icon sm';
+  cancelBtn.textContent = '취소';
+  cancelBtn.addEventListener('click', () => {
+    sectionDiv.classList.remove('guide-editing');
+    bodyDiv.innerHTML = originalHtml;
+    btnRow.remove();
+  });
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'btn-primary sm';
+  saveBtn.textContent = '저장';
+  saveBtn.addEventListener('click', async () => {
+    saveBtn.disabled = true;
+    saveBtn.textContent = '저장 중...';
+    const newContent = textarea.value;
+    _guideSections[idx] = { ..._guideSections[idx], content: newContent };
+    try {
+      if (_db) await _db.collection('guide').doc('main').set({ sections: _guideSections });
+      showToast('저장되었습니다 ✓');
+      sectionDiv.classList.remove('guide-editing');
+      bodyDiv.innerHTML = _guideTextToHtml(newContent);
+      btnRow.remove();
+    } catch (e) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '저장';
+      showToast('저장 실패: ' + e.message, 4000);
+    }
+  });
+
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(saveBtn);
+  bodyDiv.innerHTML = '';
+  bodyDiv.appendChild(textarea);
+  bodyDiv.appendChild(btnRow);
+  requestAnimationFrame(autoResize);
+}
+
+async function _openGuideModal() {
+  $('guide-modal').classList.remove('hidden');
+  if (!_guideSections) {
+    const body = $('guide-modal-body');
+    if (body) body.innerHTML = '<div class="guide-loading">불러오는 중...</div>';
+    let data = null;
+    if (_db) {
+      try {
+        const snap = await _db.collection('guide').doc('main').get();
+        if (snap.exists && Array.isArray(snap.data().sections)) data = snap.data().sections;
+      } catch (e) { console.warn('[가이드] Firestore 로드 실패:', e); }
+    }
+    _guideSections = data || _GUIDE_DEFAULT_TEXTS.map(s => ({ ...s }));
+  }
+  _renderGuideBody();
+}
+
 // ===== EVENTS =====
 document.addEventListener('DOMContentLoaded', () => {
   hideLaunchScreen();
@@ -4549,9 +4725,10 @@ document.addEventListener('DOMContentLoaded', () => {
   $('sidebar-overlay').addEventListener('click', closeSidebar);
   $('btn-sidebar-add').addEventListener('click', () => requireEditAuth(openAddModal));
   $('btn-sidebar-pdf').addEventListener('click', () => requireEditAuth(openPdfModal));
-  $('btn-sidebar-guide').addEventListener('click', () => $('guide-modal').classList.remove('hidden'));
+  $('btn-sidebar-guide').addEventListener('click', _openGuideModal);
   $('guide-modal-close').addEventListener('click', () => $('guide-modal').classList.add('hidden'));
   $('guide-modal').addEventListener('click', (e) => { if (e.target === $('guide-modal')) $('guide-modal').classList.add('hidden'); });
+  $('btn-guide-edit').addEventListener('click', () => requireEditAuth(() => _renderGuideBody()));
   _setupSidebarSearch();
 
   // 상세 패널 언어 탭

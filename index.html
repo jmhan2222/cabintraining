@@ -616,66 +616,13 @@
     <div class="modal-box guide-modal-box">
       <div class="modal-header">
         <div class="modal-title">📖 CabinVoice Pro 자가학습 가이드</div>
-        <button class="modal-close" id="guide-modal-close">✕</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn-icon sm" id="btn-guide-edit" title="가이드 편집">✏️ 편집</button>
+          <button class="modal-close" id="guide-modal-close">✕</button>
+        </div>
       </div>
-      <div class="modal-body guide-modal-body">
-
-        <div class="guide-section">
-          <div class="guide-section-header">🎯 이 앱의 목적</div>
-          <div class="guide-section-body">
-            <p>기내방송 발음·억양·속도를 스스로 훈련하는 AI 기반 자가학습 플랫폼입니다.</p>
-          </div>
-        </div>
-
-        <div class="guide-section">
-          <div class="guide-section-header">📋 학습 순서 추천</div>
-          <div class="guide-section-body">
-            <div class="guide-step"><span class="guide-step-num">STEP 1</span><span>학습모드 → 방송문 선택 → 모델음성 듣기 (남/여)</span></div>
-            <div class="guide-step"><span class="guide-step-num">STEP 2</span><span>핵심 포인트 확인 → AI 가이드 생성</span></div>
-            <div class="guide-step"><span class="guide-step-num">STEP 3</span><span>연습하기 → 직접 녹음 → AI 분석 결과 확인</span></div>
-            <div class="guide-step"><span class="guide-step-num">STEP 4</span><span>드릴모드 → 구간 반복 연습</span></div>
-          </div>
-        </div>
-
-        <div class="guide-section">
-          <div class="guide-section-header">🎙 녹음 팁</div>
-          <div class="guide-section-body">
-            <ul class="guide-list">
-              <li>마이크와 15cm 거리 유지</li>
-              <li>방송문 끝을 내리면 더 안정적으로 들림</li>
-              <li>숨을 고르고 첫 단어를 또렷하게 시작</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="guide-section">
-          <div class="guide-section-header">📊 AI 분석 결과 보는 법</div>
-          <div class="guide-section-body">
-            <ul class="guide-list">
-              <li>발음 정확도 / 억양 / 속도 3가지 항목으로 평가</li>
-              <li>80점 이상 목표로 반복 연습 권장</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="guide-section">
-          <div class="guide-section-header">❓ 자주 묻는 질문</div>
-          <div class="guide-section-body">
-            <div class="guide-faq">
-              <div class="guide-faq-q">Q. 녹음이 안 돼요</div>
-              <div class="guide-faq-a">설정 › Safari(또는 앱) › 마이크 허용을 확인하세요.</div>
-            </div>
-            <div class="guide-faq">
-              <div class="guide-faq-q">Q. AI 분석이 실패해요</div>
-              <div class="guide-faq-a">네트워크 연결을 확인한 후 다시 시도해 주세요.</div>
-            </div>
-            <div class="guide-faq">
-              <div class="guide-faq-q">Q. 모델음성이 안 들려요</div>
-              <div class="guide-faq-a">음소거 해제 및 볼륨을 확인하세요.</div>
-            </div>
-          </div>
-        </div>
-
+      <div class="modal-body guide-modal-body" id="guide-modal-body">
+        <!-- JS로 동적 렌더링 -->
       </div>
     </div>
   </div>
