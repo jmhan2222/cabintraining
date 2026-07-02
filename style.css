@@ -1864,9 +1864,11 @@ html, body {
 .ai-pron-details    { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
 .ai-pron-detail-item { font-size: 12px; color: var(--color-primary); background: #EEF2FF; border-radius: var(--radius-sm); padding: 5px 10px; line-height: 1.5; }
 .ai-pron-errors { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
-.ai-pron-error-item { font-size: 12px; color: #991B1B; background: #FFF1F2; border-radius: var(--radius-sm); padding: 5px 10px; line-height: 1.5; }
+.ai-pron-errors-title { font-size: 12px; font-weight: 700; color: var(--color-text-secondary); margin-bottom: 2px; }
+.ai-pron-error-item { font-size: 12px; color: #991B1B; background: #FFF1F2; border-radius: var(--radius-sm); padding: 6px 10px; line-height: 1.5; }
+.ai-pron-error-line1 { font-weight: 600; }
 .ai-pron-correct { color: #15803d; font-weight: 700; }
-.ai-pron-error-desc { color: #6B7280; font-size: 11px; }
+.ai-pron-error-desc { color: #6B7280; font-size: 11px; margin-top: 2px; }
 
 /* matchRate 경고 카드 */
 .ai-match-card { border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }

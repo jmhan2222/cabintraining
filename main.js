@@ -3836,17 +3836,24 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
 - 속도 피드백에서 '더 빠르게', '속도를 높여', '빠릿하게', '템포를 올려' 사용
   (기내방송의 흔한 문제는 너무 빠름. 속도 개선 피드백은 항상 '여유 있게' 방향으로)
 
-[문안 완주 체크 — 최우선 적용]
-채점 전 반드시:
-1. 원문 핵심 문장 수 vs AI 인식 문장 수 비교
-2. 완주율 계산:
-   - 90%↑: 정상 채점
-   - 70~89%: 유창성 문안숙지 -3점, 전체 -5점
-   - 50~69%: 유창성 문안숙지 -5점, 전체 60점 상한
-   - 50%미만: 전체 50점 상한,
-     유창성 feedback에 '방송문을 끝까지 완주하지 못했습니다' 명시
-3. 원문에 없는 내용 인식 시:
-   발음 feedback에 명시, missedKeywords에 '방송문과 다른 내용이 녹음되었습니다' 포함
+[채점 전 필수 확인 1 — 묵음/빈 녹음 체크, 최우선 적용]
+STT 인식 결과가 5단어 미만이거나 원본 방송문과 전혀 관련 없는 내용이면:
+- score를 10 이하로 설정 (아래 채점 기준·카테고리 배점은 적용하지 말 것)
+- encouragement 필드에 "음성이 감지되지 않았습니다. 방송문을 읽고 다시 제출해주세요."를 그대로 명시
+- categories 각 항목의 good/feedback/practiceTip, goodPoints, missedKeywords, nextFocus, practiceMethod는 모두 빈 문자열 또는 빈 배열로 반환 — 다른 피드백을 일체 생성하지 말 것
+- 절대 칭찬하지 말 것
+
+[채점 전 필수 확인 2 — 방송문 일치도(matchRate), 최우선 적용]
+원문에서 핵심 단어를 추출(조사·어미·접속사 제외, [목적지][편명][공항명] 등 변수는 어떤 단어가 와도 정상 처리, [생략 가능][필요 시][선택] 등 선택 문안은 제외)하고
+STT 인식 결과와 대조해 matchRate = 인식된 핵심단어 수 / 전체 핵심단어 수 × 100 (0-100 정수)를 계산하세요.
+
+일치도별 채점 기준 (반드시 준수, 확인 1이 적용된 경우는 제외):
+- 90% 이상: 정상 채점, 감점 없음
+- 70~89%: 유창성 "문안 숙지" 항목 -5점. nextFocus 또는 유창성 feedback에 일치도 관련 언급
+- 50~69%: score를 60 이하로 제한. encouragement 또는 nextFocus에 "일부 내용이 누락됐습니다" 명시
+- 30~49%: score를 40 이하로 제한. "방송문의 절반 이상이 누락됐습니다" 명시
+- 30% 미만: score를 20 이하로 제한. "방송문과 전혀 다른 내용이 감지됩니다. 방송문을 숙지하고 다시 시도해주세요." 명시
+계산한 matchRate를 JSON "matchRate" 필드에 반드시 포함하세요.
 
 [카테고리 good 필드 작성 규칙]
 각 카테고리의 good 필드는 이 음성에서 실제로 확인된 경우에만 구체적으로 작성.
@@ -3910,24 +3917,41 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
 피드백에서 선택 문안 누락 언급 금지.
 단, 핵심 안전 키워드([목적지], 편명, 실제 안전 지시사항)는 여전히 체크.
 
-[채점 전 필수 확인 1 — 묵음/빈 녹음 체크]
-음성이 사실상 묵음이거나 3초 미만인 경우:
-- score를 0으로 설정하고 grade를 "미취득"으로 설정
-- feedback에 "녹음된 음성이 너무 짧거나 들리지 않습니다" 명시
-- 아래 채점 기준 적용하지 않음
+[채점 전 필수 확인 3 — 발음 정밀 분석]
+음성 파일을 직접 듣고 아래 항목을 실제로 확인해서 채점하세요. 들리지 않은 항목은 평가하지 말 것.
 
-[채점 전 필수 확인 2 — 방송문 일치도 (matchRate)]
-원문과 실제 발화 내용을 비교하여 matchRate(0-100 정수)를 계산하세요:
-- 원문의 핵심 문장/단어 중 실제로 발화된 비율 (%)
-- [생략 가능] · [선택] · [필요 시] 등 선택 문안은 분모에서 제외
-- 계산한 matchRate를 JSON "matchRate" 필드에 반드시 포함하세요
+한국어 발음 정밀 체크:
+- 장음 처리: '비행기'→'비ː행기' 장음 여부
+- 연음: '있습니다'→'있씁니다' 정확한지
+- 받침 탈락: '합니다'→'하니다' 오류 여부
+- 모음 정확성: ㅢ/ㅚ/ㅐ/ㅔ 구분
+- 어미 처리: '~니다' '~세요' 끝 흐려짐 여부
+- 경음화: '학교'→'학꾜' 자동 경음화 여부
 
-[채점 전 필수 확인 3 — 발음 정밀 분석 (pronunciationErrors)]
-실제 발음 오류를 분석하여 pronunciationErrors 배열로 반환하세요:
+영어 발음 정밀 체크:
+- 한국어 억양 개입 여부 (모든 단어 동일 강도로 읽으면 감점)
+- 주요 단어 발음: fasten→파슨O/패스튼X, oxygen→옥시전O/악시전X, passengers→패신저스O, lavatory→래버토리O, emergency→이머전씨O, seatbelt→시트벨트O
+- th 발음 처리 여부
+- 끝 자음 처리(d/t/n 등)
+- 강세 위치 정확성
+
+발음 오류 유형별 감점:
+- 핵심 단어 오발음 (의미 변화): -3점/개
+- 연음/받침 오류: -1점/개
+- 최대 감점: -10점
+
+실제 발음 오류를 pronunciationErrors 배열로 반환하세요:
 - word: 잘못 발음된 단어 또는 음절
 - correct: 올바른 발음 (한국어 또는 IPA 표기)
 - error: 오류 유형 간략 설명 (예: "장음 미처리", "연음 오류", "th 발음 누락")
 - 오류가 없으면 빈 배열 [] 반환
+
+[채점 신뢰도 원칙]
+1. 실제 음성에서 들은 것만 평가
+2. 들리지 않은 항목은 평가하지 말 것
+3. 잘한 점이 확인되지 않으면 good 필드 빈 문자열
+4. 관대한 채점 절대 금지
+5. 발음이 명확하지 않으면 낮은 점수
 
 ${criteria}
 ${cpText}
@@ -3981,19 +4005,8 @@ ${script}`;
 }
 
 중요: atmosphere(분위기·목소리) score는 반드시 1 이상의 정수를 반환하세요.
-음성이 존재하는 한 0점은 절대 불가합니다.
-발성·톤·친근함 각 항목에 최소 점수 기준을 적용하세요.
-
-[6] 발음 채점 추가 기준:
-STT 인식 결과에서 아래 유형은 실제 발음 오류로 판단하고 감점:
-- 초성 오류: 손→스, 비→피 등 자음 혼동
-- 모음 오류: 여→야, 이→에 등
-- 받침 탈락: 있습니다→이습니다
-감점 기준:
-- 오류 1~2개: 최대 2점 감점
-- 오류 3개 이상: 최대 5점 감점
-- 단순 STT 인식 실패(조사 변형 등)는 제외
-- 전반적으로 기내방송 수준이면 높은 점수 유지`;
+음성이 존재하는 한 0점은 절대 불가합니다. (단, 확인 1의 묵음/빈 녹음 규칙이 적용된 경우는 예외)
+발성·톤·친근함 각 항목에 최소 점수 기준을 적용하세요.`;
 
   // ── 1차 시도: /api/gemini 프록시 경유로 audio inlineData 전달 ──
   const audioPrompt = `피드백 필수 규칙:
@@ -4110,19 +4123,19 @@ function renderAiResult(ai, isAdmin) {
     pronunciation: { name: '발음',         icon: '🗣',  max: maxScores.pronunciation }
   };
 
-  // matchRate 경고 카드 (90% 미만일 때만 표시)
+  // 방송문 일치도 카드 (90% 미만일 때만 표시, AI 상세 분석 최상단)
   const matchRate = typeof ai.matchRate === 'number' ? ai.matchRate : null;
   let matchRateHtml = '';
   if (matchRate !== null && matchRate < 90) {
     if (matchRate >= 70) {
       matchRateHtml = `<div class="ai-match-card ai-match-warn">
-        <div class="ai-match-title">⚠️ 방송문 일치율 ${matchRate}%</div>
-        <div class="ai-match-desc">방송문 일부가 누락되었습니다. 전체 완주 연습을 더 해보세요.</div>
+        <div class="ai-match-title">📋 방송문 일치도: ${matchRate}%</div>
+        <div class="ai-match-desc">일부 내용이 누락됐습니다.</div>
       </div>`;
     } else {
       matchRateHtml = `<div class="ai-match-card ai-match-danger">
-        <div class="ai-match-title">🔴 방송문 일치율 ${matchRate}%</div>
-        <div class="ai-match-desc">방송문 상당 부분이 누락되었습니다. 방송문을 충분히 숙지한 후 다시 연습해주세요.</div>
+        <div class="ai-match-title">⚠️ 방송문 일치도: ${matchRate}%</div>
+        <div class="ai-match-desc">방송문의 절반 이상이 누락됐습니다. 방송문을 충분히 숙지 후 다시 시도해주세요.</div>
       </div>`;
     }
   }
@@ -4153,9 +4166,15 @@ function renderAiResult(ai, isAdmin) {
     const pronDetails = (key === 'pronunciation' && cat.details?.length)
       ? cat.details.map(d => `<div class="ai-pron-detail-item">💬 ${escHtml(d)}</div>`).join('') : '';
     const pronErrors = (key === 'pronunciation' && ai.pronunciationErrors?.length)
-      ? `<div class="ai-pron-errors">${ai.pronunciationErrors.map(e =>
-          `<div class="ai-pron-error-item">❌ <strong>${escHtml(e.word)}</strong> → <span class="ai-pron-correct">${escHtml(e.correct)}</span> <span class="ai-pron-error-desc">(${escHtml(e.error)})</span></div>`
-        ).join('')}</div>` : '';
+      ? `<div class="ai-pron-errors">
+          <div class="ai-pron-errors-title">🔍 발음 오류 상세</div>
+          ${ai.pronunciationErrors.map(e =>
+            `<div class="ai-pron-error-item">
+              <div class="ai-pron-error-line1">❌ '${escHtml(e.word)}' → ✅ '${escHtml(e.correct)}'</div>
+              <div class="ai-pron-error-desc">${escHtml(e.error)}</div>
+            </div>`
+          ).join('')}
+        </div>` : '';
     return `<div class="ai-cat-card ${bgCls}">
       <div class="ai-cat-card-header">
         <span class="ai-cat-card-icon">${m.icon}</span>
@@ -4235,8 +4254,8 @@ function renderAiResult(ai, isAdmin) {
 
   sec.innerHTML = `
     <div class="ai-result-heading">🤖 AI 상세 분석</div>
-    ${gradeHeaderHtml}
     ${matchRateHtml}
+    ${gradeHeaderHtml}
     ${fluencyCardHtml}
     <div class="blur-wrapper">
       <div class="blur-section">
