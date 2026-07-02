@@ -2307,6 +2307,29 @@ function _sgToggleEdit(section) {
 let _currentModelAudio = null;
 let _drill = { sentences: [], idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
 
+// 드릴 모드 녹음 상태 완전 초기화 — 문장 전환, 드릴 진입/종료, 뒤로가기에서 공통 호출
+// 진행 중이던 MediaRecorder/MediaStream을 확실히 정리해 스트림 누수를 막는다
+function _resetDrillRecordingState() {
+  if (_drill.mr) {
+    // 이미 떠난 녹음의 onstop이 나중에 늦게 발동해 화면을 오염시키지 않도록 콜백 해제
+    _drill.mr.onstop = null;
+    _drill.mr.ondataavailable = null;
+    if (_drill.mr.state !== 'inactive') _drill.mr.stop();
+  }
+  stopMicStream(_drill.stream);
+  _drill.stream = null;
+  _drill.mr = null;
+  _drill.chunks = [];
+  _drill.recording = false;
+
+  const recBtn = $('btn-drill-record');
+  if (recBtn) {
+    recBtn.disabled = false;
+    recBtn.textContent = '🎤 따라읽기 시작';
+    recBtn.onclick = _drillStartRec;
+  }
+}
+
 async function startDrillMode() {
   const s = state.currentScript;
   const lang = s?.langs[state.selectedLang];
@@ -2315,12 +2338,14 @@ async function startDrillMode() {
   if (!url) { showToast('모델 음성이 없습니다. 학습 모드를 먼저 확인해주세요.', 3000); return; }
   const sentences = splitSentences(lang.text).filter(s => s.length > 2);
   if (!sentences.length) { showToast('방송문이 없습니다'); return; }
+  _resetDrillRecordingState(); // 이전 드릴 세션의 녹음이 남아있다면 완전 정리
   _drill = { sentences, idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
   showScreen('screen-drill');
   _drillRender();
 }
 
 function _drillRender() {
+  _resetDrillRecordingState();
   const { sentences, idx } = _drill;
   $('drill-progress-text').textContent = `${idx + 1} / ${sentences.length}`;
   $('drill-progress-fill').style.width = `${((idx + 1) / sentences.length) * 100}%`;
@@ -2328,9 +2353,6 @@ function _drillRender() {
   $('drill-actions').classList.remove('hidden');
   $('drill-compare').classList.add('hidden');
   $('drill-complete').classList.add('hidden');
-  const recBtn = $('btn-drill-record');
-  recBtn.textContent = '🎤 따라읽기 시작';
-  recBtn.onclick = _drillStartRec;
   // [2] 같은 방송문 내 문장 전환 시 audio 객체 유지 — URL 동일하므로 재사용
   // (새 URL이면 doPlay 첫 호출 시 createModelVoicePlayer 내부에서 자동 교체됨)
   if (_currentModelAudio) { _currentModelAudio.pause(); }
@@ -2344,11 +2366,11 @@ async function _drillStartRec() {
   const mvpPlay = $('drill-model-player-play');
   if (mvpPlay) { mvpPlay.textContent = '▶ 재생'; }
 
-  // 이전 스트림 정리 (백그라운드 복귀 시 stale 참조 방지)
-  if (_drill.stream) {
-    stopMicStream(_drill.stream);
-    _drill.stream = null;
-  }
+  const recBtn = $('btn-drill-record');
+  if (recBtn) recBtn.disabled = true; // 처리 중 중복 클릭 방지
+
+  // 이전 녹음 잔여 상태 완전 정리 (백그라운드 복귀 시 stale 참조 및 스트림 누수 방지)
+  _resetDrillRecordingState();
 
   // iOS PWA: getUserMedia는 반드시 첫 번째 await로 — 이 위치가 안전
   const isPWA = window.matchMedia('(display-mode: standalone)').matches
@@ -2366,10 +2388,16 @@ async function _drillStartRec() {
     const mr = new MediaRecorder(stream, _drillRecOpts);
     _drill.mr = mr;
     mr.ondataavailable = e => { if (e.data.size > 0) _drill.chunks.push(e.data); };
-    mr.onstop = () => {
+    mr.onstop = async () => {
+      // Blob 생성이 끝난 뒤에만 마이크를 해제한다 — 조기 해제 시 마지막 데이터가 유실됨
       _drill.myBlob = new Blob(_drill.chunks, { type: mr.mimeType || 'audio/webm' });
       if (_drill.myAudioUrl) URL.revokeObjectURL(_drill.myAudioUrl);
       _drill.myAudioUrl = URL.createObjectURL(_drill.myBlob);
+
+      stopMicStream(_drill.stream);
+      _drill.stream = null;
+      await _releaseAudioSession(); // iOS 오디오 세션 전환 대기 후 복원
+
       // [1] 비교 화면은 0:00부터 새로 듣기 — currentTime만 초기화, 객체·src 유지
       if (_currentModelAudio) { _currentModelAudio.currentTime = 0; }
       $('drill-actions').classList.add('hidden');
@@ -2379,21 +2407,24 @@ async function _drillStartRec() {
     };
     mr.start();
     _drill.recording = true;
-    const btn = $('btn-drill-record');
-    btn.textContent = '⏹ 녹음 중지';
-    btn.onclick = _drillStopRec;
+    if (recBtn) {
+      recBtn.disabled = false;
+      recBtn.textContent = '⏹ 녹음 중지';
+      recBtn.onclick = _drillStopRec;
+    }
   } catch (e) {
+    if (recBtn) recBtn.disabled = false;
     console.error('[마이크] 드릴 권한 오류:', e.name, e.message, '| PWA:', isPWA);
     alert(`마이크 접근 권한이 필요합니다.\n오류: ${e.name}`);
   }
 }
 
-async function _drillStopRec() {
-  stopMicStream(_drill.stream);
-  if (_drill.mr?.state !== 'inactive') _drill.mr.stop();
+function _drillStopRec() {
+  if (!_drill.mr || _drill.mr.state === 'inactive') return;
+  const recBtn = $('btn-drill-record');
+  if (recBtn) { recBtn.disabled = true; recBtn.textContent = '⏳ 처리 중...'; }
   _drill.recording = false;
-
-  await _releaseAudioSession();
+  _drill.mr.stop(); // 스트림 정리·오디오 세션 복원·화면 전환은 onstop에서 일괄 처리
 }
 
 function _drillNext() {
@@ -5394,14 +5425,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ===== 드릴 모드 =====
+  // btn-drill-record는 시작/중지에 따라 _drillRender()/_resetDrillRecordingState()에서
+  // .onclick을 동적으로 토글한다 — 여기서 addEventListener로 별도 고정 바인딩하면
+  // 클릭마다 두 핸들러가 동시에 발동해 녹음 중 스트림이 끊기므로 고정 리스너를 두지 않는다.
   $('btn-drill-mode').addEventListener('click', startDrillMode);
   $('btn-back-drill').addEventListener('click', () => {
-    stopMicStream(_drill.stream);
+    _resetDrillRecordingState();
     if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio = null; }
     if (state.currentScript) showScreen('screen-prep');
     else showScreen('screen-home');
   });
-  $('btn-drill-record').addEventListener('click', _drillStartRec);
   $('btn-drill-play-my').addEventListener('click', async () => {
     if (!_drill.myAudioUrl) return;
     await resumeAudioContext();
