@@ -156,9 +156,10 @@ function createModelVoicePlayer(containerId, opts = {}) {
       playBtn.textContent = '▶ 재생';
       return;
     }
-    const _safePlay = (audio) => {
+    const _safePlay = async (audio) => {
       // readyState < 2 이면 재로드 후 재생 (백그라운드 복귀 시 stale 상태 대응)
       if (audio.readyState < 2) audio.load();
+      await resumeAudioContext();
       return audio.play().catch(err => {
         console.error('[모델음성] 재생 실패:', err.name, err.message);
       });
@@ -556,6 +557,40 @@ let state = {
   audioBlob: null,
   _sampleInterval: null
 };
+
+// ===== 오디오 세션 공통 헬퍼 (iOS 마이크 사용 후 재생 볼륨 저하 방지) =====
+// 마이크 스트림 종료 공통 처리 — 모든 녹음 종료 시점에서 호출
+function stopMicStream(stream) {
+  if (!stream) return;
+  stream.getTracks().forEach(track => track.stop());
+}
+
+// 오디오 재생 전 공통 복원 — 모든 audio.play() 호출 직전에 호출
+async function resumeAudioContext() {
+  if (state.audioContext?.state === 'suspended') {
+    await state.audioContext.resume().catch(() => {});
+  }
+}
+
+// 공유 AudioContext 확보 — 마이크를 쓰는 모든 녹음 플로우(연습하기/드릴 모드)에서
+// 호출해야 resumeAudioContext()가 실제로 복원할 대상을 가짐
+function _ensureAudioContext() {
+  if (state.audioContext) return state.audioContext;
+  const AudioCtx = /** @type {any} */ (window).AudioContext || /** @type {any} */ (window).webkitAudioContext;
+  state.audioContext = new AudioCtx();
+  return state.audioContext;
+}
+
+// 녹음 종료 직후 공통 시퀀스: iOS 오디오 세션 전환 대기 후 AudioContext 복원
+async function _releaseAudioSession() {
+  await _audioSessionDelay();
+  await resumeAudioContext();
+}
+
+// 마이크 종료 후 오디오 재생 사이 대기 (iOS 오디오 세션 전환 대기)
+function _audioSessionDelay() {
+  return new Promise(resolve => setTimeout(resolve, 300));
+}
 
 // ===== DOM =====
 const $ = id => document.getElementById(id);
@@ -1260,7 +1295,7 @@ async function startRecording() {
 
   // 이전 스트림/AudioContext 정리 (백그라운드 복귀 시 stale 참조 방지)
   if (state.stream) {
-    state.stream.getTracks().forEach(t => t.stop());
+    stopMicStream(state.stream);
     state.stream = null;
   }
   if (state.audioContext) {
@@ -1448,7 +1483,7 @@ function setupSpeechRecognition(langCode) {
   state.recognition = recog;
 }
 
-function stopRecording() {
+async function stopRecording() {
   clearInterval(state.recordTimerInterval);
   clearInterval(state._sampleInterval);
   cancelAnimationFrame(state.animFrameId);
@@ -1502,8 +1537,11 @@ function stopRecording() {
     finish();
   }
 
-  state.stream?.getTracks().forEach(t => t.stop());
-  if (state.audioContext) { state.audioContext.close(); state.audioContext = null; }
+  stopMicStream(state.stream);
+  state.stream = null;
+
+  // AudioContext는 여기서 닫지 않고 유지 — 다음 startRecording()에서 정리됨
+  await _releaseAudioSession();
 }
 
 // ===== 3단계 배점 (연습 도구 기준) =====
@@ -1534,6 +1572,9 @@ async function startStudyMode() {
   if (!s) return;
   const lang = s.langs[state.selectedLang];
   if (!lang) return;
+
+  // PWA 백그라운드 복귀 시 모델음성이 작게 들리는 문제 방지
+  resumeAudioContext();
 
   $('study-title-bar').textContent = s.title;
   const langCode = state.selectedLang;
@@ -2210,7 +2251,7 @@ async function _drillStartRec() {
 
   // 이전 스트림 정리 (백그라운드 복귀 시 stale 참조 방지)
   if (_drill.stream) {
-    _drill.stream.getTracks().forEach(t => t.stop());
+    stopMicStream(_drill.stream);
     _drill.stream = null;
   }
 
@@ -2222,6 +2263,9 @@ async function _drillStartRec() {
     _drill.chunks = [];
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     _drill.stream = stream;
+    // 드릴 모드만 단독으로 사용해도 resumeAudioContext()가 동작하도록 공유 AudioContext 확보
+    const ctx = _ensureAudioContext();
+    if (ctx.state === 'suspended') { await ctx.resume().catch(() => {}); }
     const _drillRecOpts = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? { mimeType: 'audio/webm;codecs=opus' } : {};
     const mr = new MediaRecorder(stream, _drillRecOpts);
@@ -2249,10 +2293,12 @@ async function _drillStartRec() {
   }
 }
 
-function _drillStopRec() {
-  _drill.stream?.getTracks().forEach(t => t.stop());
+async function _drillStopRec() {
+  stopMicStream(_drill.stream);
   if (_drill.mr?.state !== 'inactive') _drill.mr.stop();
   _drill.recording = false;
+
+  await _releaseAudioSession();
 }
 
 function _drillNext() {
@@ -2407,6 +2453,7 @@ async function playModelVoice() {
     _rvcModelAudio.pause(); if (btn) btn.textContent = '▶ 재생'; return;
   }
   if (_rvcModelAudio && _rvcModelAudio.paused) {
+    await resumeAudioContext();
     _rvcModelAudio.play().catch(()=>{}); if (btn) btn.textContent = '⏸ 일시정지'; return;
   }
   const s = state.currentScript;
@@ -2418,11 +2465,12 @@ async function playModelVoice() {
   _rvcModelAudio.setAttribute('playsinline', '');
   if (btn) btn.textContent = '⏸ 일시정지';
   _rvcAttachScrub(_rvcModelAudio, 'rvc-model-scrub', 'rvc-model-time', 'btn-play-model');
+  await resumeAudioContext();
   _rvcModelAudio.play().catch(()=>{});
   console.log('[완료] 모델 음성 재생');
 }
 
-function playMyRecording() {
+async function playMyRecording() {
   _cmpStop();
   const btn = $('btn-play-my');
   // 토글
@@ -2430,6 +2478,7 @@ function playMyRecording() {
     _rvcMyAudio.pause(); if (btn) btn.textContent = '▶ 재생'; return;
   }
   if (_rvcMyAudio && _rvcMyAudio.paused) {
+    await resumeAudioContext();
     _rvcMyAudio.play().catch(()=>{}); if (btn) btn.textContent = '⏸ 일시정지'; return;
   }
   if (!_lastRecordingUrl) { showToast('녹음 파일 없음'); return; }
@@ -2438,6 +2487,7 @@ function playMyRecording() {
   if (btn) btn.textContent = '⏸ 일시정지';
   _rvcAttachScrub(_rvcMyAudio, 'rvc-my-scrub', 'rvc-my-time', 'btn-play-my');
   _rvcMyAudio.onended = () => { if (btn) btn.textContent = '▶ 재생'; };
+  await resumeAudioContext();
   _rvcMyAudio.play().catch(e => {
     console.error('[내음성] 재생 오류:', e);
     showToast('재생 실패. 브라우저 설정을 확인해주세요.', 'error');
@@ -2457,22 +2507,25 @@ async function startModelComparison() {
   $('btn-compare-stop').classList.remove('hidden');
   $('btn-compare-voice').classList.add('hidden');
   console.log('[비교모드] 모델 vs 내 음성 비교 시작');
+  await resumeAudioContext();
   _cmpCycle();
 }
 
-function _cmpCycle() {
+async function _cmpCycle() {
   if (!_cmp.active) return;
   const url = _getCachedModelVoiceUrl(state.currentScript.id, state.selectedLang)
     || _mvUrlCache[`${state.currentScript.id}_${state.selectedLang}_${_currentGender}`];
   $('compare-status-text').textContent = '🎵 모델 음성 재생 중...';
+  await resumeAudioContext();
   const a = new Audio(url);
   _cmp.audio = a;
   a.play().catch(() => {});
   a.onended = () => {
     if (!_cmp.active) return;
-    _cmp.timeout = setTimeout(() => {
+    _cmp.timeout = setTimeout(async () => {
       if (!_cmp.active) return;
       $('compare-status-text').textContent = '🎤 내 녹음 재생 중...';
+      await resumeAudioContext();
       const b = new Audio(_lastRecordingUrl);
       b.setAttribute('playsinline', '');
       _cmp.audio = b;
@@ -2674,6 +2727,8 @@ function measureAmpPeaks(samples) {
 // eslint-disable-next-line no-unused-vars
 function showResults(result, transcript) {
   showScreen('screen-result');
+  // iOS 오디오 세션 복원 (녹음 직후 재생 볼륨 저하 방지)
+  resumeAudioContext();
   stopModelComparison();
   // 결과 화면 진입 시 음성 객체 초기화
   if (_rvcModelAudio) { _rvcModelAudio.pause(); _rvcModelAudio = null; }
@@ -5144,14 +5199,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===== 드릴 모드 =====
   $('btn-drill-mode').addEventListener('click', startDrillMode);
   $('btn-back-drill').addEventListener('click', () => {
-    _drill.stream?.getTracks().forEach(t => t.stop());
+    stopMicStream(_drill.stream);
     if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio = null; }
     if (state.currentScript) showScreen('screen-prep');
     else showScreen('screen-home');
   });
   $('btn-drill-record').addEventListener('click', _drillStartRec);
-  $('btn-drill-play-my').addEventListener('click', () => {
+  $('btn-drill-play-my').addEventListener('click', async () => {
     if (!_drill.myAudioUrl) return;
+    await resumeAudioContext();
     const a = new Audio(_drill.myAudioUrl);
     a.setAttribute('playsinline', '');
     a.play().catch(e => { console.error('[드릴] 내음성 재생 오류:', e); showToast('음성 재생에 실패했습니다.', 'error'); });
@@ -5255,17 +5311,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // iOS PWA 백그라운드 복귀 시 AudioContext 재개
   // visibilitychange만으로 부족한 경우를 위해 pageshow도 함께 등록
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && state.audioContext?.state === 'suspended') {
-      state.audioContext.resume().catch(() => {});
-      console.log('[PWA] visibilitychange → AudioContext resume');
-    }
+    if (document.visibilityState === 'visible') resumeAudioContext();
   });
-  window.addEventListener('pageshow', () => {
-    if (state.audioContext?.state === 'suspended') {
-      state.audioContext.resume().catch(() => {});
-      console.log('[PWA] pageshow → AudioContext resume');
-    }
-  });
+  window.addEventListener('pageshow', () => { resumeAudioContext(); });
 
   console.log('[완료] ja/ca 제거');
 });
