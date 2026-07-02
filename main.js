@@ -737,7 +737,7 @@ function logout() {
   localStorage.removeItem(EMP_STORAGE_KEY);
   sessionStorage.removeItem(EMP_STORAGE_KEY);
   removeWatermark();
-  document.body.classList.remove('cvp-protected', 'cvp-devtools-open');
+  document.body.classList.remove('cvp-protected');
   $('login-empid-input').value = '';
   $('login-error').classList.add('hidden');
   showScreen('screen-login');
@@ -833,18 +833,6 @@ function _initContentProtection() {
   });
 
   window.addEventListener('beforeprint', e => { if (!isEditUnlocked()) e.preventDefault(); });
-
-  // 개발자 도구 열림 감지 (창 크기 변화 기반) → 화면 블러 처리
-  const DEVTOOLS_THRESHOLD = 160;
-  setInterval(() => {
-    if (!isLoggedIn() || isEditUnlocked()) {
-      document.body.classList.remove('cvp-devtools-open');
-      return;
-    }
-    const opened = window.outerWidth - window.innerWidth > DEVTOOLS_THRESHOLD ||
-                   window.outerHeight - window.innerHeight > DEVTOOLS_THRESHOLD;
-    document.body.classList.toggle('cvp-devtools-open', opened);
-  }, 1000);
 }
 
 // ===== MODEL VOICE (localStorage) =====

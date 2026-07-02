@@ -2718,10 +2718,6 @@ body.cvp-protected * {
   -webkit-touch-callout: none !important;
   user-select: none !important;
 }
-body.cvp-protected.cvp-devtools-open {
-  filter: blur(10px);
-  transition: filter 0.15s ease;
-}
 @media print {
   body.cvp-protected { display: none !important; }
 }
