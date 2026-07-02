@@ -1508,13 +1508,18 @@ html, body {
   border: 1px solid var(--color-border); border-radius: var(--radius-sm);
 }
 .admin-user-item {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 9px 12px; border-bottom: 1px solid var(--color-border);
   font-size: 13px;
 }
 .admin-user-item:last-child { border-bottom: none; }
 .admin-user-item-id   { font-weight: 600; color: var(--color-text-primary); }
-.admin-user-item-date { flex: 1; color: var(--color-text-tertiary); font-size: 12px; }
+.admin-user-item-name { color: var(--color-text-secondary); font-size: 12px; }
+.admin-user-item-date { flex: 1; min-width: 120px; color: var(--color-text-tertiary); font-size: 12px; }
+.admin-user-item-badge {
+  font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
+  background: rgba(255,59,48,0.10); color: var(--color-fail); white-space: nowrap; flex-shrink: 0;
+}
 .admin-user-del-btn   { flex-shrink: 0; }
 
 /* ===== LOGIN SCREEN ===== */

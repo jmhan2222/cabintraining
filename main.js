@@ -631,8 +631,8 @@ function unlockEdit() {
   _updateProtectionState(); // 관리자 인증 즉시 콘텐츠 보호 해제
 }
 let _authCallback = null;
-function requireEditAuth(cb) {
-  if (isEditUnlocked()) { cb(); return; }
+function requireEditAuth(cb, opts = {}) {
+  if (isEditUnlocked() && !opts.forcePrompt) { cb(); return; }
   _authCallback = cb;
   $('auth-pw-input').value = '';
   $('auth-error').classList.add('hidden');
@@ -684,6 +684,11 @@ async function _recordAccessLog(empId) {
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       device: navigator.userAgent,
     });
+    // allowedUsers에 마지막 접속 시각 반영 (관리자 사용자 목록에서 조회용)
+    await _db.collection('allowedUsers').doc(empId).set(
+      { lastAccessAt: firebase.firestore.FieldValue.serverTimestamp() },
+      { merge: true }
+    );
   } catch (e) { console.warn('[접속로그] 기록 실패:', e.message); }
 }
 
@@ -4445,8 +4450,11 @@ async function deployJsonToFirestore() {
 }
 
 // ===== ADMIN: 사용자 관리 (allowedUsers) =====
-let _adminAllowedUsers = []; // [{id, createdAt}]
+const ADMIN_USER_INACTIVE_DAYS = 30;
+let _adminAllowedUsers = []; // [{id, name, createdAt, lastAccessAt}]
 let _adminExcelParsedIds = [];
+let _adminUserSearchText = '';
+let _adminUserSortMode = 'registered';
 
 async function _loadAdminUserList() {
   if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
@@ -4455,9 +4463,10 @@ async function _loadAdminUserList() {
   listEl.innerHTML = '<div style="padding:10px;font-size:13px;color:var(--gray-400)">로딩 중...</div>';
   try {
     const snap = await _db.collection('allowedUsers').get();
-    _adminAllowedUsers = snap.docs
-      .map(d => ({ id: d.id, createdAt: d.data().createdAt }))
-      .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    _adminAllowedUsers = snap.docs.map(d => {
+      const data = d.data();
+      return { id: d.id, name: data.name || '', createdAt: data.createdAt, lastAccessAt: data.lastAccessAt || null };
+    });
   } catch (e) {
     listEl.innerHTML = `<div style="padding:10px;font-size:13px;color:var(--color-fail)">조회 실패: ${escHtml(e.message)}</div>`;
     return;
@@ -4465,39 +4474,88 @@ async function _loadAdminUserList() {
   _renderAdminUserList();
 }
 
+function _isAdminUserInactive(u) {
+  const last = u.lastAccessAt?.toMillis?.();
+  if (!last) return true; // 한 번도 접속 안 함
+  return (Date.now() - last) / 86400000 >= ADMIN_USER_INACTIVE_DAYS;
+}
+
+function _sortedFilteredAdminUsers() {
+  const q = _adminUserSearchText.trim().toLowerCase();
+  let list = !q
+    ? _adminAllowedUsers
+    : _adminAllowedUsers.filter(u => u.id.toLowerCase().includes(q) || u.name.toLowerCase().includes(q));
+
+  list = [...list];
+  const lastMs = u => u.lastAccessAt?.toMillis?.() ?? -1;
+  if (_adminUserSortMode === 'recent') {
+    list.sort((a, b) => lastMs(b) - lastMs(a));
+  } else if (_adminUserSortMode === 'inactive') {
+    list.sort((a, b) => lastMs(a) - lastMs(b));
+  } else {
+    list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+  }
+  return list;
+}
+
 function _renderAdminUserList() {
   const listEl = $('admin-user-list');
   if (!listEl) return;
   $('admin-user-count').textContent = _adminAllowedUsers.length;
-  if (!_adminAllowedUsers.length) {
-    listEl.innerHTML = '<div style="padding:10px;font-size:13px;color:var(--gray-400)">등록된 사번이 없습니다.</div>';
-    return;
+
+  const list = _sortedFilteredAdminUsers();
+  if (!list.length) {
+    listEl.innerHTML = `<div style="padding:10px;font-size:13px;color:var(--gray-400)">${_adminAllowedUsers.length ? '검색 결과가 없습니다.' : '등록된 사번이 없습니다.'}</div>`;
+  } else {
+    listEl.innerHTML = list.map(u => {
+      const regDate  = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('ko-KR') : '-';
+      const lastDate = u.lastAccessAt?.toDate ? u.lastAccessAt.toDate().toLocaleDateString('ko-KR') : '미접속';
+      const inactive = _isAdminUserInactive(u);
+      return `<div class="admin-user-item">
+        <span class="admin-user-item-id">${escHtml(u.id)}</span>
+        ${u.name ? `<span class="admin-user-item-name">${escHtml(u.name)}</span>` : ''}
+        <span class="admin-user-item-date">등록일: ${escHtml(regDate)} · 마지막 접속: ${escHtml(lastDate)}</span>
+        ${inactive ? `<span class="admin-user-item-badge">⚠️ 장기 미접속</span>` : ''}
+        <button class="btn-icon sm admin-user-del-btn" data-id="${escHtml(u.id)}" data-name="${escHtml(u.name)}">✕ 삭제</button>
+      </div>`;
+    }).join('');
+    listEl.querySelectorAll('.admin-user-del-btn').forEach(btn => {
+      btn.addEventListener('click', () => _deleteAdminUser(btn.dataset.id, btn.dataset.name));
+    });
   }
-  listEl.innerHTML = _adminAllowedUsers.map(u => {
-    const dateStr = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('ko-KR') : '-';
-    return `<div class="admin-user-item">
-      <span class="admin-user-item-id">${escHtml(u.id)}</span>
-      <span class="admin-user-item-date">등록일: ${escHtml(dateStr)}</span>
-      <button class="btn-icon sm admin-user-del-btn" data-id="${escHtml(u.id)}">✕ 삭제</button>
-    </div>`;
-  }).join('');
-  listEl.querySelectorAll('.admin-user-del-btn').forEach(btn => {
-    btn.addEventListener('click', () => _deleteAdminUser(btn.dataset.id));
-  });
+
+  _renderAdminUserSummary();
+}
+
+function _renderAdminUserSummary() {
+  const summaryEl = $('admin-user-summary');
+  if (!summaryEl) return;
+  const total = _adminAllowedUsers.length;
+  const thisMonth = _kstDateStr().slice(0, 7); // YYYY-MM
+  const activeThisMonth = _adminAllowedUsers.filter(u => {
+    const d = u.lastAccessAt?.toDate?.();
+    return d && _kstDateStr(d).slice(0, 7) === thisMonth;
+  }).length;
+  const inactiveCount = _adminAllowedUsers.filter(_isAdminUserInactive).length;
+  summaryEl.textContent = `총 ${total}명 등록 / 이번 달 접속 ${activeThisMonth}명 / 장기 미접속 ${inactiveCount}명`;
 }
 
 async function _addAdminUser() {
   const input = $('admin-user-add-input');
+  const nameInput = $('admin-user-name-input');
   const empId = input.value.trim();
+  const name = nameInput ? nameInput.value.trim() : '';
   if (!empId) return;
   if (!/^\d+$/.test(empId)) { showToast('사번은 숫자만 입력해주세요.', 2000); return; }
   if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
   try {
     await _db.collection('allowedUsers').doc(empId).set({
       employeeId: empId,
+      name,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     input.value = '';
+    if (nameInput) nameInput.value = '';
     showToast('추가되었습니다 ✓');
     _loadAdminUserList();
   } catch (e) {
@@ -4505,15 +4563,44 @@ async function _addAdminUser() {
   }
 }
 
-async function _deleteAdminUser(empId) {
-  if (!confirm(`사번 ${empId}를 삭제하시겠습니까? 삭제 즉시 접근이 차단됩니다.`)) return;
+async function _deleteAdminUser(empId, name) {
+  const label = name ? `${name}(사번: ${empId})` : `사번 ${empId}`;
+  if (!confirm(`${label}을 삭제하시겠습니까?\n삭제 즉시 접근이 차단됩니다.`)) return;
   try {
     await _db.collection('allowedUsers').doc(empId).delete();
-    showToast('삭제되었습니다 ✓');
+    showToast('접근 차단 완료');
     _loadAdminUserList();
   } catch (e) {
     showToast(`삭제 실패: ${e.message}`, 3000);
   }
+}
+
+async function _deleteAllAdminUsers() {
+  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+  if (!_adminAllowedUsers.length) { showToast('삭제할 사용자가 없습니다.', 2000); return; }
+  if (!confirm('전체 사용자를 삭제하시겠습니까?')) return;
+
+  requireEditAuth(async () => {
+    const btn = $('btn-admin-user-delete-all');
+    if (btn) { btn.disabled = true; btn.textContent = '삭제 중...'; }
+    try {
+      const snap = await _db.collection('allowedUsers').get();
+      const docs = snap.docs;
+      const BATCH_LIMIT = 400;
+      for (let i = 0; i < docs.length; i += BATCH_LIMIT) {
+        const batch = _db.batch();
+        docs.slice(i, i + BATCH_LIMIT).forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+      showToast('전체 삭제 완료. 새 명단을 업로드해주세요.', 4000);
+      $('admin-user-empty-cta')?.classList.remove('hidden');
+      _loadAdminUserList();
+    } catch (e) {
+      showToast(`전체 삭제 실패: ${e.message}`, 3000);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '🗑 전체 삭제'; }
+    }
+  }, { forcePrompt: true });
 }
 
 function _handleAdminUserExcel(file) {
@@ -4560,16 +4647,18 @@ async function _bulkAddAdminUsers() {
       toAdd.slice(i, i + BATCH_LIMIT).forEach(id => {
         batch.set(_db.collection('allowedUsers').doc(id), {
           employeeId: id,
+          name: '',
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       });
       await batch.commit();
     }
-    showToast(`${toAdd.length}명 등록 완료 / ${skipped}명 중복 스킵`, 3500);
+    showToast(`${toAdd.length}명 등록 완료`, 3500);
     _adminExcelParsedIds = [];
     $('admin-user-excel-preview').classList.add('hidden');
     $('btn-admin-user-bulk-add').classList.add('hidden');
     $('admin-user-excel-input').value = '';
+    $('admin-user-empty-cta')?.classList.add('hidden');
     _loadAdminUserList();
   } catch (e) {
     showToast(`일괄 등록 실패: ${e.message}`, 3000);
@@ -4577,6 +4666,24 @@ async function _bulkAddAdminUsers() {
     btn.disabled = false;
     btn.textContent = '일괄 등록';
   }
+}
+
+function _downloadAdminUserListCsv() {
+  if (!_adminAllowedUsers.length) { showToast('등록된 사번이 없습니다.', 2000); return; }
+  const header = '사번,이름,등록일,마지막 접속일\n';
+  const rows = _adminAllowedUsers.map(u => {
+    const regDate  = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('ko-KR') : '';
+    const lastDate = u.lastAccessAt?.toDate ? u.lastAccessAt.toDate().toLocaleDateString('ko-KR') : '';
+    return `${u.id},${u.name || ''},${regDate},${lastDate}`;
+  }).join('\n');
+  const csv = '﻿' + header + rows;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `allowedUsers_${_kstDateStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ===== ADMIN: 접속 로그 조회 =====
@@ -5361,11 +5468,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cleaned !== el.value) el.value = cleaned;
   });
   $('admin-user-add-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') _addAdminUser(); });
+  $('admin-user-name-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') _addAdminUser(); });
   $('btn-admin-user-add')?.addEventListener('click', _addAdminUser);
   $('admin-user-excel-input')?.addEventListener('change', e => {
     if (e.target.files[0]) _handleAdminUserExcel(e.target.files[0]);
   });
   $('btn-admin-user-bulk-add')?.addEventListener('click', _bulkAddAdminUsers);
+  $('admin-user-search')?.addEventListener('input', () => {
+    _adminUserSearchText = $('admin-user-search').value;
+    _renderAdminUserList();
+  });
+  $('admin-user-sort')?.addEventListener('change', () => {
+    _adminUserSortMode = $('admin-user-sort').value;
+    _renderAdminUserList();
+  });
+  $('btn-admin-user-delete-all')?.addEventListener('click', _deleteAllAdminUsers);
+  $('btn-admin-user-download')?.addEventListener('click', _downloadAdminUserListCsv);
   $('btn-admin-log-load')?.addEventListener('click', _loadAdminAccessLogs);
   $('btn-admin-log-csv')?.addEventListener('click', _downloadAdminLogCsv);
 
