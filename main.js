@@ -773,7 +773,7 @@ function applyWatermark(employeeId) {
   const ctx = canvas.getContext('2d');
   ctx.rotate(-30 * Math.PI / 180);
   ctx.font = '600 13px Arial';
-  ctx.fillStyle = 'rgba(128,128,128,0.06)';
+  ctx.fillStyle = 'rgba(128,128,128,0.08)';
   ctx.fillText(text, 10, 100);
 
   layer.style.cssText = `
