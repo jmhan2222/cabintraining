@@ -1502,6 +1502,86 @@ html, body {
 .admin-version-date  { font-size: 12px; color: var(--color-text-tertiary); }
 .admin-version-count { font-size: 12px; color: var(--color-primary); font-weight: 600; }
 
+.admin-user-list {
+  display: flex; flex-direction: column;
+  max-height: 300px; overflow-y: auto;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+}
+.admin-user-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+}
+.admin-user-item:last-child { border-bottom: none; }
+.admin-user-item-id   { font-weight: 600; color: var(--color-text-primary); }
+.admin-user-item-date { flex: 1; color: var(--color-text-tertiary); font-size: 12px; }
+.admin-user-del-btn   { flex-shrink: 0; }
+
+/* ===== LOGIN SCREEN ===== */
+#screen-login.screen {
+  background: #000;
+  align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+}
+.login-glow {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 60%, rgba(255,107,0,0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 30% 40%, rgba(0,52,121,0.3) 0%, transparent 60%);
+}
+.login-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.login-card {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; align-items: center;
+  width: 100%; max-width: 340px; padding: 32px 28px;
+}
+.login-logo {
+  width: 52px; height: 52px; border-radius: 14px;
+  background: linear-gradient(135deg, #FF6B00, #ff9500);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 900; color: #fff; margin-bottom: 20px;
+}
+.login-brand { font-size: 32px; font-weight: 800; color: #fff; letter-spacing: -1px; margin-bottom: 28px; }
+.login-brand .login-pro { color: #FF6B00; }
+.login-form { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+.login-input {
+  width: 100%; padding: 14px 16px; border-radius: 12px;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05);
+  color: #fff; font-size: 16px; outline: none;
+  text-align: center; letter-spacing: 1px;
+  transition: border-color .2s ease, background .2s ease;
+}
+.login-input::placeholder { color: rgba(255,255,255,0.35); letter-spacing: normal; }
+.login-input:focus { border-color: #FF6B00; background: rgba(255,255,255,0.08); }
+.login-error { color: #ff5c5c; font-size: 13px; text-align: center; }
+.login-auto-row {
+  display: flex; align-items: center; gap: 8px;
+  color: rgba(255,255,255,0.6); font-size: 13px;
+  padding: 2px; cursor: pointer; user-select: none;
+}
+.login-auto-row input { accent-color: #FF6B00; width: 16px; height: 16px; }
+.login-btn {
+  margin-top: 4px; padding: 14px; border: none; border-radius: 12px;
+  background: linear-gradient(135deg, #FF6B00, #ff9500);
+  color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
+  transition: opacity .2s ease, transform .1s ease;
+}
+.login-btn:hover:not(:disabled) { opacity: 0.92; }
+.login-btn:active:not(:disabled) { transform: scale(0.98); }
+.login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.login-footer {
+  margin-top: 26px; font-size: 12px; color: rgba(255,255,255,0.3);
+  text-align: center; letter-spacing: 0.3px;
+}
+
 /* ===== PREP SCREEN UPDATED ===== */
 .prep-topbar {
   display: flex; align-items: center; justify-content: space-between;

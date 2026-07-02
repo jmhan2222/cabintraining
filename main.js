@@ -613,6 +613,98 @@ function _confirmAuth() {
   }
 }
 
+// ===== EMPLOYEE LOGIN AUTH =====
+const EMP_STORAGE_KEY = 'cvp_employee_id';
+
+function getStoredEmployeeId() {
+  return localStorage.getItem(EMP_STORAGE_KEY) || sessionStorage.getItem(EMP_STORAGE_KEY) || null;
+}
+function isLoggedIn() { return !!getStoredEmployeeId(); }
+
+// 한국 표준시(KST) 기준 YYYY-MM-DD (접속 로그 "당일" 판정용)
+function _kstDateStr(d = new Date()) {
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
+}
+
+async function _checkAllowedEmployee(empId) {
+  const doc = await _db.collection('allowedUsers').doc(empId).get();
+  return doc.exists;
+}
+
+async function _recordAccessLog(empId) {
+  if (!_db) return;
+  try {
+    const dateStr = _kstDateStr();
+    const logId = `${empId}_${dateStr}`;
+    const ref = _db.collection('accessLogs').doc(logId);
+    const snap = await ref.get();
+    if (snap.exists) return; // 당일 이미 기록됨
+    await ref.set({
+      employeeId: empId,
+      date: dateStr,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      device: navigator.userAgent,
+    });
+  } catch (e) { console.warn('[접속로그] 기록 실패:', e.message); }
+}
+
+async function attemptLogin() {
+  const input = $('login-empid-input');
+  const btn = $('login-submit-btn');
+  const errorEl = $('login-error');
+  const empId = input.value.trim();
+  errorEl.classList.add('hidden');
+  if (!empId) {
+    errorEl.textContent = '사번을 입력해 주세요.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '확인 중...';
+  try {
+    if (!_db) initFirebase();
+    const allowed = await _checkAllowedEmployee(empId);
+    if (!allowed) {
+      errorEl.textContent = '등록되지 않은 사번입니다.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    if ($('login-auto-checkbox').checked) {
+      localStorage.setItem(EMP_STORAGE_KEY, empId);
+      sessionStorage.removeItem(EMP_STORAGE_KEY);
+    } else {
+      sessionStorage.setItem(EMP_STORAGE_KEY, empId);
+      localStorage.removeItem(EMP_STORAGE_KEY);
+    }
+    _recordAccessLog(empId);
+    enterApp();
+  } catch (e) {
+    console.error('[로그인] 오류:', e);
+    errorEl.textContent = '로그인 중 오류가 발생했습니다. 다시 시도해 주세요.';
+    errorEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '로그인';
+  }
+}
+
+function logout() {
+  localStorage.removeItem(EMP_STORAGE_KEY);
+  sessionStorage.removeItem(EMP_STORAGE_KEY);
+  $('login-empid-input').value = '';
+  $('login-error').classList.add('hidden');
+  showScreen('screen-login');
+  setTimeout(() => $('login-empid-input')?.focus(), 60);
+}
+
+function enterApp() {
+  initFirebase();
+  renderHome();
+  showScreen('screen-home');
+}
+
 // ===== MODEL VOICE (localStorage) =====
 let _mvAudioUrl = null;
 let _modalMvLang = 'ko'; // 모달에서 현재 선택된 언어 탭
@@ -3990,6 +4082,7 @@ function openAdminScreen() {
     _refreshAdminVersion();
     _refreshAdminVersionList();
     _setupAdminMvSection();
+    _loadAdminUserList();
     showScreen('screen-admin');
   });
 }
@@ -4192,6 +4285,198 @@ async function deployJsonToFirestore() {
   } finally {
     btn.disabled = false; btn.textContent = 'Firestore에 업로드';
   }
+}
+
+// ===== ADMIN: 사용자 관리 (allowedUsers) =====
+let _adminAllowedUsers = []; // [{id, createdAt}]
+let _adminExcelParsedIds = [];
+
+async function _loadAdminUserList() {
+  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+  const listEl = $('admin-user-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="padding:10px;font-size:13px;color:var(--gray-400)">로딩 중...</div>';
+  try {
+    const snap = await _db.collection('allowedUsers').get();
+    _adminAllowedUsers = snap.docs
+      .map(d => ({ id: d.id, createdAt: d.data().createdAt }))
+      .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+  } catch (e) {
+    listEl.innerHTML = `<div style="padding:10px;font-size:13px;color:var(--color-fail)">조회 실패: ${escHtml(e.message)}</div>`;
+    return;
+  }
+  _renderAdminUserList();
+}
+
+function _renderAdminUserList() {
+  const listEl = $('admin-user-list');
+  if (!listEl) return;
+  $('admin-user-count').textContent = _adminAllowedUsers.length;
+  if (!_adminAllowedUsers.length) {
+    listEl.innerHTML = '<div style="padding:10px;font-size:13px;color:var(--gray-400)">등록된 사번이 없습니다.</div>';
+    return;
+  }
+  listEl.innerHTML = _adminAllowedUsers.map(u => {
+    const dateStr = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('ko-KR') : '-';
+    return `<div class="admin-user-item">
+      <span class="admin-user-item-id">${escHtml(u.id)}</span>
+      <span class="admin-user-item-date">등록일: ${escHtml(dateStr)}</span>
+      <button class="btn-icon sm admin-user-del-btn" data-id="${escHtml(u.id)}">✕ 삭제</button>
+    </div>`;
+  }).join('');
+  listEl.querySelectorAll('.admin-user-del-btn').forEach(btn => {
+    btn.addEventListener('click', () => _deleteAdminUser(btn.dataset.id));
+  });
+}
+
+async function _addAdminUser() {
+  const input = $('admin-user-add-input');
+  const empId = input.value.trim();
+  if (!empId) return;
+  if (!/^\d+$/.test(empId)) { showToast('사번은 숫자만 입력해주세요.', 2000); return; }
+  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+  try {
+    await _db.collection('allowedUsers').doc(empId).set({
+      employeeId: empId,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    input.value = '';
+    showToast('추가되었습니다 ✓');
+    _loadAdminUserList();
+  } catch (e) {
+    showToast(`추가 실패: ${e.message}`, 3000);
+  }
+}
+
+async function _deleteAdminUser(empId) {
+  if (!confirm(`사번 ${empId}를 삭제하시겠습니까? 삭제 즉시 접근이 차단됩니다.`)) return;
+  try {
+    await _db.collection('allowedUsers').doc(empId).delete();
+    showToast('삭제되었습니다 ✓');
+    _loadAdminUserList();
+  } catch (e) {
+    showToast(`삭제 실패: ${e.message}`, 3000);
+  }
+}
+
+function _handleAdminUserExcel(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      const ids = rows
+        .map(r => String(r[0] ?? '').trim())
+        .filter(v => v && /^\d+$/.test(v));
+      _adminExcelParsedIds = [...new Set(ids)];
+      const previewEl = $('admin-user-excel-preview');
+      previewEl.classList.remove('hidden');
+      previewEl.textContent = _adminExcelParsedIds.length
+        ? `파싱된 사번 ${_adminExcelParsedIds.length}개: ${_adminExcelParsedIds.slice(0, 20).join(', ')}${_adminExcelParsedIds.length > 20 ? ' ...' : ''}`
+        : '유효한 사번을 찾지 못했습니다. 첫 번째 열에 사번이 있는지 확인해주세요.';
+      $('btn-admin-user-bulk-add').classList.toggle('hidden', !_adminExcelParsedIds.length);
+    } catch (err) {
+      showToast(`파일 파싱 실패: ${err.message}`, 3000);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function _bulkAddAdminUsers() {
+  if (!_adminExcelParsedIds.length) return;
+  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+  const btn = $('btn-admin-user-bulk-add');
+  btn.disabled = true;
+  btn.textContent = '등록 중...';
+  try {
+    const snap = await _db.collection('allowedUsers').get();
+    const existingIds = new Set(snap.docs.map(d => d.id));
+
+    const toAdd = _adminExcelParsedIds.filter(id => !existingIds.has(id));
+    const skipped = _adminExcelParsedIds.length - toAdd.length;
+
+    const BATCH_LIMIT = 400;
+    for (let i = 0; i < toAdd.length; i += BATCH_LIMIT) {
+      const batch = _db.batch();
+      toAdd.slice(i, i + BATCH_LIMIT).forEach(id => {
+        batch.set(_db.collection('allowedUsers').doc(id), {
+          employeeId: id,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      await batch.commit();
+    }
+    showToast(`${toAdd.length}명 등록 완료 / ${skipped}명 중복 스킵`, 3500);
+    _adminExcelParsedIds = [];
+    $('admin-user-excel-preview').classList.add('hidden');
+    $('btn-admin-user-bulk-add').classList.add('hidden');
+    $('admin-user-excel-input').value = '';
+    _loadAdminUserList();
+  } catch (e) {
+    showToast(`일괄 등록 실패: ${e.message}`, 3000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '일괄 등록';
+  }
+}
+
+// ===== ADMIN: 접속 로그 조회 =====
+let _adminLogRows = [];
+
+async function _loadAdminAccessLogs() {
+  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+  const period = $('admin-log-period').value;
+  const listEl = $('admin-log-list');
+  listEl.innerHTML = '<div style="padding:10px;font-size:13px;color:var(--gray-400)">로딩 중...</div>';
+  try {
+    let query = _db.collection('accessLogs');
+    if (period === 'today') {
+      query = query.where('date', '==', _kstDateStr());
+    } else {
+      const days = parseInt(period, 10);
+      const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      query = query.where('date', '>=', _kstDateStr(from));
+    }
+    const snap = await query.get();
+
+    const lastSeen = {};
+    snap.docs.forEach(d => {
+      const data = d.data();
+      const empId = data.employeeId;
+      const date = data.date || '';
+      if (!empId) return;
+      if (!lastSeen[empId] || date > lastSeen[empId]) lastSeen[empId] = date;
+    });
+    _adminLogRows = Object.entries(lastSeen)
+      .map(([employeeId, lastDate]) => ({ employeeId, lastDate }))
+      .sort((a, b) => b.lastDate.localeCompare(a.lastDate));
+
+    $('admin-log-summary').textContent = `총 활성 사용자: ${_adminLogRows.length}명`;
+    listEl.innerHTML = _adminLogRows.length
+      ? _adminLogRows.map(r => `<div class="admin-user-item">
+          <span class="admin-user-item-id">${escHtml(r.employeeId)}</span>
+          <span class="admin-user-item-date">마지막 접속: ${escHtml(r.lastDate)}</span>
+        </div>`).join('')
+      : '<div style="padding:10px;font-size:13px;color:var(--gray-400)">접속 기록이 없습니다.</div>';
+  } catch (e) {
+    listEl.innerHTML = `<div style="padding:10px;font-size:13px;color:var(--color-fail)">조회 실패: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function _downloadAdminLogCsv() {
+  if (!_adminLogRows.length) { showToast('먼저 조회해주세요.', 2000); return; }
+  const header = '사번,마지막 접속일\n';
+  const rows = _adminLogRows.map(r => `${r.employeeId},${r.lastDate}`).join('\n');
+  const csv = '﻿' + header + rows;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `accessLogs_${_kstDateStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ===== LAUNCH SCREEN ANIMATION =====
@@ -4586,9 +4871,12 @@ async function _openGuideModal() {
 document.addEventListener('DOMContentLoaded', () => {
   hideLaunchScreen();
 
-  initFirebase();
-  renderHome();
-  showScreen('screen-home');
+  if (isLoggedIn()) {
+    enterApp();
+  } else {
+    showScreen('screen-login');
+    setTimeout(() => $('login-empid-input')?.focus(), 700);
+  }
 
   // 언어 탭
   $('lang-tabs').querySelectorAll('.lang-tab').forEach(tab => {
@@ -4673,6 +4961,17 @@ document.addEventListener('DOMContentLoaded', () => {
   $('auth-pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') _confirmAuth(); });
   $('auth-modal').addEventListener('click', e => {
     if (e.target === $('auth-modal')) { $('auth-modal').classList.add('hidden'); _authCallback = null; }
+  });
+
+  // ===== 로그인 화면 이벤트 =====
+  $('login-empid-input').addEventListener('input', () => {
+    const cleaned = $('login-empid-input').value.replace(/[^0-9]/g, '');
+    if (cleaned !== $('login-empid-input').value) $('login-empid-input').value = cleaned;
+  });
+  $('login-empid-input').addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+  $('login-submit-btn').addEventListener('click', attemptLogin);
+  $('btn-logout').addEventListener('click', () => {
+    if (confirm('로그아웃 하시겠습니까?')) logout();
   });
 
   // ===== TABLE INSERT 이벤트 =====
@@ -4896,6 +5195,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ok) { _refreshAdminVersion(); _refreshAdminVersionList(); }
   });
   if ($('btn-admin-json-deploy')) $('btn-admin-json-deploy').addEventListener('click', deployJsonToFirestore);
+
+  // ===== 관리자 - 사용자 관리 =====
+  $('admin-user-add-input')?.addEventListener('input', () => {
+    const el = $('admin-user-add-input');
+    const cleaned = el.value.replace(/[^0-9]/g, '');
+    if (cleaned !== el.value) el.value = cleaned;
+  });
+  $('admin-user-add-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') _addAdminUser(); });
+  $('btn-admin-user-add')?.addEventListener('click', _addAdminUser);
+  $('admin-user-excel-input')?.addEventListener('change', e => {
+    if (e.target.files[0]) _handleAdminUserExcel(e.target.files[0]);
+  });
+  $('btn-admin-user-bulk-add')?.addEventListener('click', _bulkAddAdminUsers);
+  $('btn-admin-log-load')?.addEventListener('click', _loadAdminAccessLogs);
+  $('btn-admin-log-csv')?.addEventListener('click', _downloadAdminLogCsv);
+
   // ===== 사이드바 =====
   $('btn-toggle-sidebar').addEventListener('click', openSidebar);
   $('sidebar-overlay').addEventListener('click', closeSidebar);

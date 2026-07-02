@@ -16,6 +16,7 @@
   <link href='/style.css' rel='stylesheet'>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -69,8 +70,28 @@
     </div>
   </div>
 
+  <!-- ===== SCREEN 0: LOGIN ===== -->
+  <div id="screen-login" class="screen login-screen">
+    <div class="login-glow"></div>
+    <div class="login-grid"></div>
+    <div class="login-card">
+      <div class="login-logo">V</div>
+      <div class="login-brand">Voice<span class="login-pro">Pro</span></div>
+      <div class="login-form">
+        <input type="text" id="login-empid-input" class="login-input" placeholder="사번을 입력하세요" inputmode="numeric" pattern="[0-9]*" maxlength="20" autocomplete="off">
+        <div class="login-error hidden" id="login-error">등록되지 않은 사번입니다.</div>
+        <label class="login-auto-row">
+          <input type="checkbox" id="login-auto-checkbox" checked>
+          <span>자동 로그인</span>
+        </label>
+        <button class="login-btn" id="login-submit-btn">로그인</button>
+      </div>
+      <div class="login-footer">JEJU AIR 객실훈련팀 전용 서비스입니다</div>
+    </div>
+  </div>
+
   <!-- ===== SCREEN 1: HOME ===== -->
-  <div id="screen-home" class="screen active">
+  <div id="screen-home" class="screen">
     <header class="app-header">
       <div class="header-left">
         <div class="logo-mark">✈</div>
@@ -82,6 +103,7 @@
       <div class="header-right">
         <div class="header-badge" id="rev-badge">OPIc 방식</div>
         <button class="btn-admin-icon" id="btn-open-admin" title="관리자 패널">⚙</button>
+        <button class="btn-admin-icon" id="btn-logout" title="로그아웃">🚪</button>
       </div>
     </header>
 
@@ -597,6 +619,47 @@
           </div>
           <div id="admin-mv-body" style="margin-top:8px"></div>
         </div>
+      </section>
+
+      <!-- 사용자 관리 섹션 -->
+      <section class="admin-section">
+        <div class="admin-section-title">👥 사용자 관리</div>
+        <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">허용된 사번만 로그인할 수 있습니다.</div>
+
+        <div class="admin-row-btns">
+          <input type="text" id="admin-user-add-input" class="admin-input" placeholder="사번 입력" style="max-width:200px" inputmode="numeric" pattern="[0-9]*">
+          <button class="btn-primary sm" id="btn-admin-user-add">＋ 추가</button>
+        </div>
+
+        <div class="admin-row-btns" style="margin-top:14px">
+          <label class="btn-icon" style="cursor:pointer;display:inline-block">
+            📂 엑셀 파일 업로드
+            <input type="file" id="admin-user-excel-input" accept=".xlsx,.csv" style="display:none">
+          </label>
+          <button class="btn-primary hidden" id="btn-admin-user-bulk-add">일괄 등록</button>
+        </div>
+        <div id="admin-user-excel-preview" class="hidden" style="margin-top:10px;font-size:13px;color:var(--gray-600);line-height:1.6"></div>
+
+        <div style="margin-top:16px">
+          <div style="font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:6px">등록된 사번 (<span id="admin-user-count">0</span>명)</div>
+          <div id="admin-user-list" class="admin-user-list"></div>
+        </div>
+      </section>
+
+      <!-- 접속 로그 조회 섹션 -->
+      <section class="admin-section">
+        <div class="admin-section-title">📊 접속 로그 조회</div>
+        <div class="admin-row-btns">
+          <select id="admin-log-period" class="admin-input">
+            <option value="today">오늘</option>
+            <option value="7">최근 7일</option>
+            <option value="30" selected>최근 30일</option>
+          </select>
+          <button class="btn-primary" id="btn-admin-log-load">조회</button>
+          <button class="btn-icon" id="btn-admin-log-csv">⬇ CSV 다운로드</button>
+        </div>
+        <div id="admin-log-summary" style="margin-top:10px;font-size:14px;font-weight:600;color:var(--color-text-primary)"></div>
+        <div id="admin-log-list" class="admin-user-list" style="margin-top:10px"></div>
       </section>
 
     </div>
