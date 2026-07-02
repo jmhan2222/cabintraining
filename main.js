@@ -626,7 +626,10 @@ const _modalState = { mode: 'add', editId: null, editSource: null };
 // ===== AUTH =====
 const EDIT_PW = 'jmhan2222';
 function isEditUnlocked() { return sessionStorage.getItem('cvp_edit_unlocked') === '1'; }
-function unlockEdit() { sessionStorage.setItem('cvp_edit_unlocked', '1'); }
+function unlockEdit() {
+  sessionStorage.setItem('cvp_edit_unlocked', '1');
+  _updateProtectionState(); // 관리자 인증 즉시 콘텐츠 보호 해제
+}
 let _authCallback = null;
 function requireEditAuth(cb) {
   if (isEditUnlocked()) { cb(); return; }
@@ -728,6 +731,8 @@ async function attemptLogin() {
 function logout() {
   localStorage.removeItem(EMP_STORAGE_KEY);
   sessionStorage.removeItem(EMP_STORAGE_KEY);
+  removeWatermark();
+  document.body.classList.remove('cvp-protected', 'cvp-devtools-open');
   $('login-empid-input').value = '';
   $('login-error').classList.add('hidden');
   showScreen('screen-login');
@@ -738,6 +743,103 @@ function enterApp() {
   initFirebase();
   renderHome();
   showScreen('screen-home');
+  const empId = getStoredEmployeeId();
+  if (empId) _startWatermarkGuard(empId);
+  _initContentProtection();
+}
+
+// ===== 동적 워터마크 =====
+let _wmGuardStarted = false;
+
+function applyWatermark(employeeId) {
+  const existing = document.getElementById('wm-layer');
+  if (existing) existing.remove();
+
+  const layer = document.createElement('div');
+  layer.id = 'wm-layer';
+
+  const today = new Date().toLocaleDateString('ko-KR');
+  const text = `${employeeId}  ${today}`;
+
+  // 캔버스로 워터마크 패턴 생성
+  const canvas = document.createElement('canvas');
+  canvas.width = 300;
+  canvas.height = 150;
+  const ctx = canvas.getContext('2d');
+  ctx.rotate(-30 * Math.PI / 180);
+  ctx.font = '600 13px Arial';
+  ctx.fillStyle = 'rgba(128,128,128,0.06)';
+  ctx.fillText(text, 10, 100);
+
+  layer.style.cssText = `
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-image: url(${canvas.toDataURL()});
+    background-repeat: repeat;
+    pointer-events: none;
+    z-index: 9999;
+    user-select: none;
+  `;
+  document.body.appendChild(layer);
+}
+
+function removeWatermark() {
+  document.getElementById('wm-layer')?.remove();
+}
+
+// 워터마크 레이어를 지우거나 숨겨도 500ms마다 감시해 자동 복원
+function _startWatermarkGuard(employeeId) {
+  applyWatermark(employeeId);
+  if (_wmGuardStarted) return;
+  _wmGuardStarted = true;
+  setInterval(() => {
+    const currentEmpId = getStoredEmployeeId();
+    if (!currentEmpId) return; // 로그아웃 상태면 감시 중단
+    if (!document.getElementById('wm-layer')) {
+      applyWatermark(currentEmpId);
+    }
+  }, 500);
+}
+
+// ===== 콘텐츠 보호 (일반 학습자 전용, 관리자는 미적용) =====
+let _protectionInitialized = false;
+
+function _updateProtectionState() {
+  document.body.classList.toggle('cvp-protected', isLoggedIn() && !isEditUnlocked());
+}
+
+function _initContentProtection() {
+  _updateProtectionState();
+  if (_protectionInitialized) return;
+  _protectionInitialized = true;
+
+  document.addEventListener('copy', e => { if (!isEditUnlocked()) e.preventDefault(); });
+  document.addEventListener('selectstart', e => { if (!isEditUnlocked()) e.preventDefault(); });
+  document.addEventListener('contextmenu', e => { if (!isEditUnlocked()) e.preventDefault(); });
+  document.addEventListener('dragstart', e => { if (!isEditUnlocked()) e.preventDefault(); });
+
+  document.addEventListener('keydown', e => {
+    if (isEditUnlocked()) return;
+    if (e.key === 'F12') e.preventDefault();
+    if (e.ctrlKey && e.shiftKey && e.key === 'I') e.preventDefault();
+    if (e.ctrlKey && e.shiftKey && e.key === 'J') e.preventDefault();
+    if (e.ctrlKey && e.key === 'U') e.preventDefault();
+  });
+
+  window.addEventListener('beforeprint', e => { if (!isEditUnlocked()) e.preventDefault(); });
+
+  // 개발자 도구 열림 감지 (창 크기 변화 기반) → 화면 블러 처리
+  const DEVTOOLS_THRESHOLD = 160;
+  setInterval(() => {
+    if (!isLoggedIn() || isEditUnlocked()) {
+      document.body.classList.remove('cvp-devtools-open');
+      return;
+    }
+    const opened = window.outerWidth - window.innerWidth > DEVTOOLS_THRESHOLD ||
+                   window.outerHeight - window.innerHeight > DEVTOOLS_THRESHOLD;
+    document.body.classList.toggle('cvp-devtools-open', opened);
+  }, 1000);
 }
 
 // ===== MODEL VOICE (localStorage) =====
