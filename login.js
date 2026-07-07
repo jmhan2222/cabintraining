@@ -303,6 +303,11 @@ console.log('[Login] login.js 로드됨');
       .addEventListener('click', function() {
         el.remove();
         console.log('[Login] 보안 동의 완료');
+        if (typeof enterApp === 'function') {
+          enterApp();
+        } else if (typeof showScreen === 'function') {
+          showScreen('screen-home');
+        }
       });
   }
 
