@@ -101,19 +101,23 @@ console.log('[Login] login.js 로드됨');
       btn.disabled = true;
 
       try {
-        if (!_db) {
-          try { initFirebase(); } catch(e) {}
+        if (!window._db && typeof initFirebase === 'function') {
+          initFirebase();
+        }
+        if (!window._db) {
+          // Firebase 전역 객체로 직접 초기화 시도
+          try {
+            window._db = firebase.firestore();
+            console.log('[Login] _db 직접 초기화 성공');
+          } catch(e) {
+            console.error('[Login] _db 초기화 실패:', e);
+            err.textContent = '연결 오류. 새로고침 후 다시 시도해주세요.';
+            btn.textContent = '로그인'; btn.disabled = false;
+            return;
+          }
         }
 
-        if (!_db) {
-          err.textContent = '연결 오류. 새로고침 후 다시 시도해주세요.';
-          btn.textContent = '로그인'; btn.disabled = false;
-          return;
-        }
-
-        console.log('[Login] _db 준비 완료');
-
-        const doc = await _db
+        const doc = await window._db
           .collection('allowedUsers').doc(empId).get();
 
         if (!doc.exists || !doc.data().active) {
@@ -136,7 +140,7 @@ console.log('[Login] login.js 로드됨');
         }));
 
         try {
-          await _db.collection('allowedUsers').doc(empId)
+          await window._db.collection('allowedUsers').doc(empId)
             .update({
               lastLogin: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -233,7 +237,7 @@ console.log('[Login] login.js 로드됨');
         }
 
         try {
-          await _db.collection('allowedUsers').doc(empId)
+          await window._db.collection('allowedUsers').doc(empId)
             .update({ password: np1, mustChangePassword: false });
           el.remove();
           showSecurityNotice();
