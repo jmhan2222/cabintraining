@@ -722,7 +722,8 @@ async function attemptLogin() {
       localStorage.removeItem(EMP_STORAGE_KEY);
     }
     _recordAccessLog(empId);
-    enterApp();
+    // 보안 팝업 표시 후 메인 화면 진입
+    showSecurityPopup(empId, () => enterApp());
   } catch (e) {
     console.error('[로그인] 오류:', e);
     errorEl.textContent = '로그인 중 오류가 발생했습니다. 다시 시도해 주세요.';
@@ -751,6 +752,109 @@ function enterApp() {
   const empId = getStoredEmployeeId();
   if (empId) _startWatermarkGuard(empId);
   _initContentProtection();
+}
+
+// ===== 보안 안내 팝업 =====
+function showSecurityPopup(empId, onAgree) {
+  // 기존 오버레이 제거 (중복 방지)
+  document.getElementById('security-popup-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'security-popup-overlay';
+  overlay.style.cssText = `
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 99998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  `;
+
+  overlay.innerHTML = `
+    <div style="
+      background: white;
+      border-radius: 16px;
+      padding: 28px 24px;
+      max-width: 360px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    ">
+      <div style="
+        text-align: center;
+        margin-bottom: 20px;
+      ">
+        <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+        <h2 style="
+          font-size: 16px;
+          font-weight: 700;
+          color: #C0392B;
+          line-height: 1.4;
+          margin: 0;
+        ">보안 안내 및 무단 배포 금지</h2>
+      </div>
+
+      <p style="
+        font-size: 13px;
+        color: #333;
+        line-height: 1.7;
+        margin-bottom: 16px;
+      ">본 플랫폼은 당사 임직원의 교육 및 훈련을 위해
+운영되는 <strong>사내 자산</strong>입니다.</p>
+
+      <div style="
+        background: #FFF5F5;
+        border-left: 3px solid #C0392B;
+        border-radius: 0 8px 8px 0;
+        padding: 12px 14px;
+        margin-bottom: 16px;
+      ">
+        <p style="
+          font-size: 13px;
+          color: #003479;
+          font-weight: 600;
+          line-height: 1.8;
+          margin: 0;
+        ">▶ 개인 사번/비밀번호 공유 금지<br>
+▶ 사이트 내 모든 자료의 외부 유출 및 무단 배포 금지</p>
+      </div>
+
+      <p style="
+        font-size: 12px;
+        color: #666;
+        line-height: 1.7;
+        margin-bottom: 20px;
+      ">위 사항을 위반할 경우, 당사 보안
+규정 위반으로 개인 정보 관리에
+만전을 기해 주시기 바랍니다.<br><br>
+본 시스템에 로그인하는 것은 위
+보안 사항을 준수할 것에 <strong>동의하는 것으로 간주</strong>됩니다.</p>
+
+      <button id="security-agree-btn" style="
+        width: 100%;
+        padding: 14px;
+        background: #FF6B00;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        letter-spacing: 1px;
+      ">동의합니다</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('security-agree-btn').addEventListener('click', () => {
+    overlay.remove();
+    localStorage.setItem('securityAgreed', JSON.stringify({ agreed: true, agreedAt: Date.now(), empId }));
+    console.log('[보안팝업] 동의:', empId);
+    if (typeof onAgree === 'function') onAgree();
+  });
+
+  console.log('[완료] 보안 안내 팝업 표시');
 }
 
 // ===== 동적 워터마크 =====
@@ -4490,9 +4594,9 @@ async function deployJsonToFirestore() {
 // ===== ADMIN: 사용자 관리 (allowedUsers) =====
 const ADMIN_USER_INACTIVE_DAYS = 30;
 let _adminAllowedUsers = []; // [{id, name, createdAt, lastAccessAt}]
-let _adminExcelParsedIds = [];
 let _adminUserSearchText = '';
 let _adminUserSortMode = 'registered';
+
 
 async function _loadAdminUserList() {
   if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
@@ -4641,69 +4745,140 @@ async function _deleteAllAdminUsers() {
   }, { forcePrompt: true });
 }
 
-function _handleAdminUserExcel(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, { type: 'array' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-      const ids = rows
-        .map(r => String(r[0] ?? '').trim())
-        .filter(v => v && /^\d+$/.test(v));
-      _adminExcelParsedIds = [...new Set(ids)];
-      const previewEl = $('admin-user-excel-preview');
-      previewEl.classList.remove('hidden');
-      previewEl.textContent = _adminExcelParsedIds.length
-        ? `파싱된 사번 ${_adminExcelParsedIds.length}개: ${_adminExcelParsedIds.slice(0, 20).join(', ')}${_adminExcelParsedIds.length > 20 ? ' ...' : ''}`
-        : '유효한 사번을 찾지 못했습니다. 첫 번째 열에 사번이 있는지 확인해주세요.';
-      $('btn-admin-user-bulk-add').classList.toggle('hidden', !_adminExcelParsedIds.length);
-    } catch (err) {
-      showToast(`파일 파싱 실패: ${err.message}`, 3000);
+
+// ===== 직원 일괄 등록 =====
+
+// CSV/직접 입력 텍스트 파싱 → [{empId, name, password}]
+function _parseBulkCsvData(text, autoPw) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const result = [];
+  for (const line of lines) {
+    // 헤더 행 감지 (사번이 숫자가 아닌 경우 스킵)
+    const parts = line.split(',').map(p => p.trim());
+    const rawId = parts[0] || '';
+    if (!rawId || !/^\d+$/.test(rawId)) continue;
+    const empId = rawId;
+    const name = parts[1] || '';
+    let password = parts[2] || '';
+    if (!password || autoPw) {
+      password = empId.slice(-4) + 'jeju';
     }
-  };
-  reader.readAsArrayBuffer(file);
+    result.push({ empId, name, password });
+  }
+  return result;
 }
 
-async function _bulkAddAdminUsers() {
-  if (!_adminExcelParsedIds.length) return;
-  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
-  const btn = $('btn-admin-user-bulk-add');
-  btn.disabled = true;
-  btn.textContent = '등록 중...';
-  try {
-    const snap = await _db.collection('allowedUsers').get();
-    const existingIds = new Set(snap.docs.map(d => d.id));
+// 파싱 데이터 미리보기 테이블 렌더
+async function _renderBulkPreview(parsedData) {
+  const tbody = $('admin-bulk-preview-tbody');
+  const summary = $('admin-bulk-preview-summary');
+  const wrap = $('admin-bulk-preview-wrap');
+  if (!tbody || !summary || !wrap) return;
 
-    const toAdd = _adminExcelParsedIds.filter(id => !existingIds.has(id));
-    const skipped = _adminExcelParsedIds.length - toAdd.length;
-
-    const BATCH_LIMIT = 400;
-    for (let i = 0; i < toAdd.length; i += BATCH_LIMIT) {
-      const batch = _db.batch();
-      toAdd.slice(i, i + BATCH_LIMIT).forEach(id => {
-        batch.set(_db.collection('allowedUsers').doc(id), {
-          employeeId: id,
-          name: '',
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      });
-      await batch.commit();
-    }
-    showToast(`${toAdd.length}명 등록 완료`, 3500);
-    _adminExcelParsedIds = [];
-    $('admin-user-excel-preview').classList.add('hidden');
-    $('btn-admin-user-bulk-add').classList.add('hidden');
-    $('admin-user-excel-input').value = '';
-    $('admin-user-empty-cta')?.classList.add('hidden');
-    _loadAdminUserList();
-  } catch (e) {
-    showToast(`일괄 등록 실패: ${e.message}`, 3000);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '일괄 등록';
+  // Firestore에서 기존 사번 목록 조회
+  let existingIds = new Set();
+  if (_db) {
+    try {
+      const snap = await _db.collection('allowedUsers').get();
+      existingIds = new Set(snap.docs.map(d => d.id));
+    } catch (e) { console.warn('[일괄등록] 기존 사용자 조회 실패:', e.message); }
   }
+
+  let newCount = 0, updateCount = 0, errorCount = 0;
+  tbody.innerHTML = parsedData.map(({ empId, name, password }) => {
+    const isNew = !existingIds.has(empId);
+    const isError = !empId || !/^\d+$/.test(empId);
+    let statusText, statusStyle;
+    if (isError) { statusText = '오류'; statusStyle = 'color:#C0392B;font-weight:700'; errorCount++; }
+    else if (isNew) { statusText = '신규'; statusStyle = 'color:#003479;font-weight:600'; newCount++; }
+    else { statusText = '업데이트'; statusStyle = 'color:var(--color-warning);font-weight:600'; updateCount++; }
+    return `<tr style="border-bottom:1px solid var(--color-border)">
+      <td style="padding:5px 10px">${escHtml(empId)}</td>
+      <td style="padding:5px 10px">${escHtml(name)}</td>
+      <td style="padding:5px 10px;font-family:monospace">${escHtml(password)}</td>
+      <td style="padding:5px 10px;${statusStyle}">${statusText}</td>
+    </tr>`;
+  }).join('');
+
+  summary.textContent = `신규 ${newCount}명 / 업데이트 ${updateCount}명 / 오류 ${errorCount}건`;
+  wrap.classList.remove('hidden');
+  $('btn-admin-user-bulk-add').disabled = parsedData.length === 0;
+  console.log('[완료] 일괄 등록 미리보기');
+}
+
+// 파싱 소스 가져오기 (CSV 파일 또는 textarea)
+let _bulkParsedData = [];
+
+async function _handleAdminUserExcel(file) {
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(data), { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    // 또 CSV라면 SheetJS가 같은 방식으로 처리
+    const csvText = rows.map(r => r.join(',')).join('\n');
+    const autoPw = $('admin-bulk-auto-pw')?.checked || false;
+    _bulkParsedData = _parseBulkCsvData(csvText, autoPw);
+    if ($('admin-bulk-paste-textarea')) $('admin-bulk-paste-textarea').value = csvText;
+    await _renderBulkPreview(_bulkParsedData);
+  } catch (err) {
+    showToast(`파일 파싱 실패: ${err.message}`, 3000);
+  }
+}
+
+async function bulkRegisterEmployees(data) {
+  if (!data.length) return;
+  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+
+  const progWrap = $('admin-bulk-progress-wrap');
+  const progText = $('admin-bulk-progress-text');
+  const progBar  = $('admin-bulk-progress-bar');
+  const btn      = $('btn-admin-user-bulk-add');
+
+  if (progWrap) progWrap.classList.remove('hidden');
+  if (btn) { btn.disabled = true; btn.textContent = '등록 중...'; }
+
+  const total = data.length;
+  let success = 0, failed = 0;
+
+  // 500개단 batch 쮸 한하
+  const BATCH_LIMIT = 500;
+  for (let i = 0; i < total; i += BATCH_LIMIT) {
+    const batch = _db.batch();
+    const chunk = data.slice(i, i + BATCH_LIMIT);
+    for (const emp of chunk) {
+      if (!emp.empId || !emp.password) { failed++; continue; }
+      const ref = _db.collection('allowedUsers').doc(emp.empId);
+      batch.set(ref, {
+        employeeId: emp.empId,
+        name: emp.name || '',
+        password: emp.password,
+        active: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastLogin: null
+      }, { merge: true });
+      success++;
+    }
+    await batch.commit();
+
+    // 진행률 업데이트
+    const done = Math.min(i + BATCH_LIMIT, total);
+    const pct = Math.round((done / total) * 100);
+    if (progText) progText.textContent = `${done} / ${total} 등록 중...`;
+    if (progBar)  progBar.style.width = pct + '%';
+  }
+
+  if (progWrap) progWrap.classList.add('hidden');
+  if (btn) { btn.disabled = false; btn.textContent = '📋 일괄 등록 시작'; }
+
+  showToast(`✅ ${success}명 등록 완료, ${failed}명 실패`, 4000);
+  _bulkParsedData = [];
+  $('admin-bulk-preview-wrap')?.classList.add('hidden');
+  $('admin-bulk-paste-textarea') && ($('admin-bulk-paste-textarea').value = '');
+  $('admin-user-excel-input') && ($('admin-user-excel-input').value = '');
+  $('admin-user-empty-cta')?.classList.add('hidden');
+  _loadAdminUserList();
+  console.log('[완료] 직원 일괄 등록');
 }
 
 function _downloadAdminUserListCsv() {
@@ -5513,7 +5688,29 @@ document.addEventListener('DOMContentLoaded', () => {
   $('admin-user-excel-input')?.addEventListener('change', e => {
     if (e.target.files[0]) _handleAdminUserExcel(e.target.files[0]);
   });
-  $('btn-admin-user-bulk-add')?.addEventListener('click', _bulkAddAdminUsers);
+  $('btn-admin-user-bulk-add')?.addEventListener('click', () => {
+    if (_bulkParsedData.length) {
+      bulkRegisterEmployees(_bulkParsedData);
+    }
+  });
+  $('btn-admin-bulk-preview')?.addEventListener('click', async () => {
+    const textarea = $('admin-bulk-paste-textarea');
+    const autoPw = $('admin-bulk-auto-pw')?.checked || false;
+    const text = textarea ? textarea.value.trim() : '';
+    if (!text) { showToast('입력된 데이터가 없습니다.', 2000); return; }
+    _bulkParsedData = _parseBulkCsvData(text, autoPw);
+    if (!_bulkParsedData.length) { showToast('유효한 사번 데이터가 없습니다.', 2000); return; }
+    await _renderBulkPreview(_bulkParsedData);
+  });
+  $('admin-bulk-auto-pw')?.addEventListener('change', async () => {
+    if (_bulkParsedData.length) {
+      const autoPw = $('admin-bulk-auto-pw')?.checked || false;
+      const textarea = $('admin-bulk-paste-textarea');
+      const text = textarea ? textarea.value.trim() : '';
+      _bulkParsedData = _parseBulkCsvData(text, autoPw);
+      await _renderBulkPreview(_bulkParsedData);
+    }
+  });
   $('admin-user-search')?.addEventListener('input', () => {
     _adminUserSearchText = $('admin-user-search').value;
     _renderAdminUserList();
