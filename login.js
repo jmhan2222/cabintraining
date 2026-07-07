@@ -101,10 +101,11 @@ console.log('[Login] login.js 로드됨');
 
       try {
         let tries = 0;
-        while (!window._db && tries < 20) {
-          await new Promise(r => setTimeout(r, 300));
+        while (!window._db && tries < 30) {
+          await new Promise(r => setTimeout(r, 500));
           tries++;
         }
+        console.log('[Login] _db:', !!window._db, tries);
         if (!window._db) {
           err.textContent = '연결 오류. 새로고침 후 다시 시도해주세요.';
           btn.textContent = '로그인'; btn.disabled = false;
