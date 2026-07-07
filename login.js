@@ -1,3 +1,4 @@
+console.log('[Login] login.js 로드됨');
 (function() {
   const KEY = 'vp_s';
 
