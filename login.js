@@ -101,17 +101,17 @@ console.log('[Login] login.js 로드됨');
       btn.disabled = true;
 
       try {
-        let tries = 0;
-        while (!_db && tries < 30) {
-          await new Promise(r => setTimeout(r, 500));
-          tries++;
+        if (!_db) {
+          try { initFirebase(); } catch(e) {}
         }
-        console.log('[Login] _db:', !!_db, tries);
+
         if (!_db) {
           err.textContent = '연결 오류. 새로고침 후 다시 시도해주세요.';
           btn.textContent = '로그인'; btn.disabled = false;
           return;
         }
+
+        console.log('[Login] _db 준비 완료');
 
         const doc = await _db
           .collection('allowedUsers').doc(empId).get();
