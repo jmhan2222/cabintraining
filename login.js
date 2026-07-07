@@ -147,6 +147,16 @@ console.log('[Login] login.js 로드됨');
         } catch(e) {}
 
         el.remove();
+        console.log('[Login] 로그인 성공 후 화면 전환');
+
+        // 홈 화면 표시
+        if (typeof showScreen === 'function') {
+          showScreen('screen-home');
+        } else if (typeof renderHome === 'function') {
+          renderHome();
+          const home = document.getElementById('screen-home');
+          if (home) home.style.display = 'block';
+        }
         console.log('[Login] 성공:', empId);
 
         if (doc.data().mustChangePassword) {
