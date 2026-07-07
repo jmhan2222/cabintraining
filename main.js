@@ -744,12 +744,19 @@ async function attemptLogin() {
 function logout() {
   localStorage.removeItem(EMP_STORAGE_KEY);
   sessionStorage.removeItem(EMP_STORAGE_KEY);
+  localStorage.removeItem('vp_s');
+  localStorage.removeItem('vp_session');
   removeWatermark();
   document.body.classList.remove('cvp-protected');
   $('login-empid-input').value = '';
   $('login-error').classList.add('hidden');
-  // showScreen('screen-login'); // login.js가 담당
-  setTimeout(() => $('login-empid-input')?.focus(), 60);
+  
+  // 로그인 화면 표시
+  if (typeof showLogin === 'function') {
+    showLogin();
+  } else {
+    location.reload();
+  }
 }
 
 function enterApp() {
