@@ -748,7 +748,7 @@ function logout() {
   document.body.classList.remove('cvp-protected');
   $('login-empid-input').value = '';
   $('login-error').classList.add('hidden');
-  showScreen('screen-login');
+  // showScreen('screen-login'); // login.js가 담당
   setTimeout(() => $('login-empid-input')?.focus(), 60);
 }
 
@@ -5358,7 +5358,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (isLoggedIn()) {
     enterApp();
   } else {
-    showScreen('screen-login');
+    // showScreen('screen-login'); // login.js가 담당
     setTimeout(() => $('login-empid-input')?.focus(), 700);
   }
 
