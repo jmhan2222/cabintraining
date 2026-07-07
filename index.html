@@ -627,10 +627,15 @@
         <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">허용된 사번만 로그인할 수 있습니다.</div>
 
         <!-- 개별 추가 -->
-        <div class="admin-row-btns">
-          <input type="text" id="admin-user-add-input" class="admin-input" placeholder="사번 입력" style="max-width:160px" inputmode="numeric" pattern="[0-9]*">
-          <input type="text" id="admin-user-name-input" class="admin-input" placeholder="이름 (선택)" style="max-width:140px">
-          <button class="btn-primary sm" id="btn-admin-user-add">＋ 추가</button>
+        <div style="background:rgba(0,52,121,0.04); border:1px solid var(--color-border); border-radius:10px; padding:16px; margin-bottom:16px;">
+          <div style="font-size:13px; font-weight:700; color:var(--color-text-primary); margin-bottom:10px">👤 직원 개별 등록</div>
+          <div class="admin-row-btns" style="flex-wrap:wrap; gap:10px; margin-bottom:8px;">
+            <input type="text" id="admin-user-add-input" class="admin-input" placeholder="사번" style="width:120px" inputmode="numeric" pattern="[0-9]*">
+            <input type="text" id="admin-user-name-input" class="admin-input" placeholder="이름" style="width:120px">
+            <input type="text" id="admin-user-pw-input" class="admin-input" placeholder="비밀번호 (선택)" style="width:160px">
+          </div>
+          <div style="font-size:11px; color:var(--gray-500); margin-bottom:10px">(비워두면 초기 비밀번호 자동 설정)</div>
+          <button class="btn-primary sm" id="btn-admin-user-add">등록</button>
         </div>
 
         <!-- 일괄 등록 UI -->

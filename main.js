@@ -4865,9 +4865,12 @@ async function bulkRegisterEmployees(data) {
       const ref = _db.collection('allowedUsers').doc(emp.empId);
       batch.set(ref, {
         employeeId: emp.empId,
+        empId: emp.empId,
         name: emp.name || '',
         password: emp.password,
         active: true,
+        mustChangePassword: emp.empId !== '1603064',
+        isAdmin: emp.empId === '1603064',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         lastLogin: null
       }, { merge: true });
