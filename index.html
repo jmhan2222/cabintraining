@@ -641,7 +641,7 @@
         <!-- 일괄 등록 UI -->
         <div style="margin-top:18px;padding:16px;background:rgba(0,52,121,0.04);border:1px solid var(--color-border);border-radius:10px">
           <div style="font-size:13px;font-weight:700;color:var(--color-text-primary);margin-bottom:10px">📥 직원 일괄 등록</div>
-          <div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">CSV 형식: <code>사번,이름,비밀번호</code> &nbsp; 예) <code>123456,홍길동,jeju1234</code></div>
+          <div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">CSV 형식: <code>사번,이름</code> &nbsp; 예) <code>1603064,홍길동</code></div>
 
           <div class="admin-row-btns" style="margin-bottom:10px">
             <label class="btn-icon" style="cursor:pointer;display:inline-block">
@@ -651,11 +651,11 @@
           </div>
 
           <div style="font-size:12px;color:var(--gray-500);margin-bottom:6px">또는 아래에 직접 붙여넣기:</div>
-          <textarea id="admin-bulk-paste-textarea" rows="5" class="admin-input" style="width:100%;resize:vertical;font-size:12px;font-family:monospace;margin-bottom:10px" placeholder="123456,홍길동,jeju1234&#10;234567,김철수,air2025&#10;345678,이영희,pass123"></textarea>
+          <textarea id="admin-bulk-paste-textarea" rows="5" class="admin-input" style="width:100%;resize:vertical;font-size:12px;font-family:monospace;margin-bottom:10px" placeholder="1603064,홍길동&#10;234567,김철수&#10;345678,이영희"></textarea>
 
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--color-text-secondary);margin-bottom:10px;cursor:pointer">
             <input type="checkbox" id="admin-bulk-auto-pw" style="width:15px;height:15px">
-            <span>☑ 비밀번호 자동 생성 (사번 뒤 4자리 + jeju) — 예) 3456jeju</span>
+            <span>☑ 초기 비밀번호 자동 생성: Jeju + 사번 앞 4자리<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;예) 사번 1603064 → 초기 비밀번호: Jeju1603</span>
           </label>
 
           <div class="admin-row-btns">
