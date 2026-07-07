@@ -293,14 +293,17 @@ console.log('[Login] login.js 로드됨');
   // 런칭스크린 사라진 후 세션 체크
   function waitAndCheck() {
     const launch = document.getElementById('launch-screen');
+    console.log('[Login] waitAndCheck 실행, launch:', !!launch);
     const isVisible = launch &&
       launch.style.display !== 'none' &&
       launch.style.opacity !== '0' &&
       !launch.classList.contains('hidden');
+    console.log('[Login] isVisible:', isVisible);
     if (isVisible) {
       setTimeout(waitAndCheck, 300);
       return;
     }
+    console.log('[Login] 세션 체크 시작');
     if (!getSession()) showLogin();
   }
 
