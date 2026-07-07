@@ -5353,6 +5353,17 @@ async function _openGuideModal() {
 
 // ===== EVENTS =====
 document.addEventListener('DOMContentLoaded', () => {
+  // vp_s 세션 체크 후 즉시 앱 복구
+  const s = localStorage.getItem('vp_s');
+  if (s) {
+    try {
+      const p = JSON.parse(s);
+      if (Date.now() < p.exp) {
+        enterApp();
+      }
+    } catch(e) {}
+  }
+
   hideLaunchScreen();
 
   if (isLoggedIn()) {
