@@ -84,6 +84,7 @@ console.log('[Login] login.js 로드됨');
     };
 
     async function doLogin() {
+      console.log('[Login] _db 직접:', typeof _db, !!_db);
       const empRaw = document.getElementById('vp-eid').value.trim();
       const pw = document.getElementById('vp-pw').value.trim();
       const err = document.getElementById('vp-err');
@@ -101,18 +102,18 @@ console.log('[Login] login.js 로드됨');
 
       try {
         let tries = 0;
-        while (!window._db && tries < 30) {
+        while (!_db && tries < 30) {
           await new Promise(r => setTimeout(r, 500));
           tries++;
         }
-        console.log('[Login] _db:', !!window._db, tries);
-        if (!window._db) {
+        console.log('[Login] _db:', !!_db, tries);
+        if (!_db) {
           err.textContent = '연결 오류. 새로고침 후 다시 시도해주세요.';
           btn.textContent = '로그인'; btn.disabled = false;
           return;
         }
 
-        const doc = await window._db
+        const doc = await _db
           .collection('allowedUsers').doc(empId).get();
 
         if (!doc.exists || !doc.data().active) {
@@ -135,7 +136,7 @@ console.log('[Login] login.js 로드됨');
         }));
 
         try {
-          await window._db.collection('allowedUsers').doc(empId)
+          await _db.collection('allowedUsers').doc(empId)
             .update({
               lastLogin: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -232,7 +233,7 @@ console.log('[Login] login.js 로드됨');
         }
 
         try {
-          await window._db.collection('allowedUsers').doc(empId)
+          await _db.collection('allowedUsers').doc(empId)
             .update({ password: np1, mustChangePassword: false });
           el.remove();
           showSecurityNotice();
