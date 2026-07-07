@@ -723,7 +723,14 @@ async function attemptLogin() {
     }
     _recordAccessLog(empId);
     // 보안 팝업 표시 후 메인 화면 진입
-    showSecurityPopup(empId, () => enterApp());
+    showSecurityPopup(empId, () => {
+      const _vpSession = localStorage.getItem('vp_s');
+      if (!_vpSession) {
+        console.log('[Auth] 세션 없음 - 로그인 필요');
+        return;
+      }
+      enterApp();
+    });
   } catch (e) {
     console.error('[로그인] 오류:', e);
     errorEl.textContent = '로그인 중 오류가 발생했습니다. 다시 시도해 주세요.';
