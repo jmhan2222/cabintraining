@@ -292,13 +292,15 @@
   // 런칭스크린 사라진 후 세션 체크
   function waitAndCheck() {
     const launch = document.getElementById('launch-screen');
-    if (launch) {
+    const isVisible = launch &&
+      launch.style.display !== 'none' &&
+      launch.style.opacity !== '0' &&
+      !launch.classList.contains('hidden');
+    if (isVisible) {
       setTimeout(waitAndCheck, 300);
       return;
     }
-    if (!getSession()) {
-      showLogin();
-    }
+    if (!getSession()) showLogin();
   }
 
   if (document.readyState === 'loading') {
