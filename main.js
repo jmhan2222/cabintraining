@@ -3865,7 +3865,7 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
       return JSON.parse(localStorage.getItem('vp_s') || '{}').empId || 'guest';
     } catch(e) { return 'guest'; }
   })();
-  const _dailyKey = 'vp_daily_' + _empId + '_' + _today;
+  const _dailyKey = 'vp_daily2_' + _empId + '_' + _today;
   const _count = parseInt(localStorage.getItem(_dailyKey) || '0');
 
   if (_count >= 5) {
@@ -3873,8 +3873,7 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
     showScreen('screen-home');
     throw new Error('LIMIT_EXCEEDED');
   }
-  localStorage.setItem(_dailyKey, _count + 1);
-  console.log('[채점] 오늘 채점 횟수:', _count + 1, '/ 8회');
+  // 성공적인 결과 응답 시에만 차감하기 위해 여기서의 선증가는 제거합니다.
 
   console.log('audioBlob size:', audioBlob?.size, 'type:', audioBlob?.type);
   const model = await getGeminiModel();
@@ -4248,7 +4247,11 @@ ${sharedJson}`;
     const data = JSON.parse(text);
     const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
     const m = raw.match(/\{[\s\S]*\}/);
-    if (m) return JSON.parse(m[0]);
+    if (m) {
+      localStorage.setItem(_dailyKey, _count + 1);
+      console.log('[채점] 오늘 채점 횟수:', _count + 1, '/ 5회');
+      return JSON.parse(m[0]);
+    }
     throw new Error('응답 JSON 파싱 실패');
   } catch (e) {
     if (e.name === 'AbortError') {
@@ -4279,7 +4282,14 @@ ${sharedJson}`;
     const raw = result.response.text().trim();
     const m = raw.match(/\{[\s\S]*\}/);
     if (!m) return null;
-    try { return JSON.parse(m[0]); } catch { return null; }
+    try {
+      const resData = JSON.parse(m[0]);
+      localStorage.setItem(_dailyKey, _count + 1);
+      console.log('[채점] 오늘 채점 횟수:', _count + 1, '/ 5회');
+      return resData;
+    } catch {
+      return null;
+    }
   } finally {
     clearTimeout(_textTimeoutId);
   }
