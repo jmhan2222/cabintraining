@@ -3842,6 +3842,24 @@ function blobToBase64(blob) {
 }
 
 async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
+  // 1인당 일일 채점 횟수 제한 (8회)
+  const _today = new Date().toDateString();
+  const _empId = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('vp_s') || '{}').empId || 'guest';
+    } catch(e) { return 'guest'; }
+  })();
+  const _dailyKey = 'vp_daily_' + _empId + '_' + _today;
+  const _count = parseInt(localStorage.getItem(_dailyKey) || '0');
+
+  if (_count >= 8) {
+    showToast('오늘 AI 채점 횟수(8회)를 모두 사용했습니다.\n내일 다시 시도해주세요.', 5000);
+    showScreen('screen-home');
+    throw new Error('LIMIT_EXCEEDED');
+  }
+  localStorage.setItem(_dailyKey, _count + 1);
+  console.log('[채점] 오늘 채점 횟수:', _count + 1, '/ 8회');
+
   console.log('audioBlob size:', audioBlob?.size, 'type:', audioBlob?.type);
   const model = await getGeminiModel();
   const langName = { ko:'한국어', en:'영어' }[langCode] || '한국어';
