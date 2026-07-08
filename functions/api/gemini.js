@@ -18,7 +18,7 @@ export async function onRequestPost(context) {
     return Response.json({ error: '잘못된 요청 형식입니다.' }, { status: 400 });
   }
 
-  const model = body.model || 'gemini-2.5-flash';
+  const model = body.model || 'gemini-1.5-flash';
   const contents = body.contents;
 
   if (!contents) {
@@ -28,26 +28,46 @@ export async function onRequestPost(context) {
   const geminiBody = { contents };
   if (body.generationConfig) geminiBody.generationConfig = body.generationConfig;
 
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(geminiBody)
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 50000);
+
+  try {
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiBody),
+        signal: controller.signal
+      }
+    );
+
+    clearTimeout(timeout);
+
+    const data = await geminiRes.json();
+
+    if (!geminiRes.ok) {
+      return Response.json(
+        { 
+          error: data?.error?.message || `Gemini API 오류 (HTTP ${geminiRes.status})`,
+          details: data?.error || data
+        },
+        { status: geminiRes.status }
+      );
     }
-  );
 
-  const data = await geminiRes.json();
-
-  if (!geminiRes.ok) {
+    return Response.json(data);
+  } catch(e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') {
+      return Response.json(
+        { error: '분석 시간이 초과됐습니다. 다시 시도해주세요.' },
+        { status: 408 }
+      );
+    }
     return Response.json(
-      { 
-        error: data?.error?.message || `Gemini API 오류 (HTTP ${geminiRes.status})`,
-        details: data?.error || data
-      },
-      { status: geminiRes.status }
+      { error: e.message },
+      { status: 500 }
     );
   }
-
-  return Response.json(data);
 }
