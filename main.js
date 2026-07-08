@@ -1622,8 +1622,16 @@ async function startRecording() {
   const _recOpts = _getSupportedMimeType();
   console.log('[녹음] mimeType:', _recOpts.mimeType || '기본값');
   state.mediaRecorder = new MediaRecorder(state.stream, _recOpts);
-  state.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) state.audioChunks.push(e.data); };
-  state.mediaRecorder.start(100);
+  state.mediaRecorder.ondataavailable = e => { 
+    if (e.data && e.data.size > 0) {
+      state.audioChunks.push(e.data);
+      console.log('[녹음] 청크 수집:', 
+        state.audioChunks.length, '개',
+        (e.data.size/1024).toFixed(1) + 'KB');
+    }
+  };
+  // iOS PWA: 250ms마다 청크 수집
+  state.mediaRecorder.start(250);
 
   drawWaveform();
   startAudioSampling();
@@ -1760,9 +1768,20 @@ async function stopRecording() {
   $('loading-overlay').classList.remove('hidden');
   _startOverlayTimers();
 
-  const finish = () => {
+  const finish = async () => {
     const mimeType = state.mediaRecorder?.mimeType || 'audio/mp4';
+    console.log('[녹음완료] 총 청크수:', 
+      state.audioChunks.length,
+      '| mimeType:', mimeType);
+
+    // iOS PWA: 청크가 없으면 잠시 대기
+    if (state.audioChunks.length === 0) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+
     state.audioBlob = new Blob(state.audioChunks, { type: mimeType });
+    console.log('[녹음완료] Blob 크기:', 
+      (state.audioBlob.size/1024/1024).toFixed(2) + 'MB');
     // ① 녹음 시간 3초 미만 차단
     if (duration < 3) {
       _completeOverlay();
