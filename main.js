@@ -625,6 +625,7 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   $(id).classList.add('active');
   $(id).scrollTop = 0;
+  _applyAdminVisibility();
 }
 
 // ===== BUILTIN OVERRIDES (localStorage) =====
@@ -652,6 +653,26 @@ const _modalState = { mode: 'add', editId: null, editSource: null };
 // ===== AUTH =====
 const EDIT_PW = 'jmhan2222';
 function isEditUnlocked() { return sessionStorage.getItem('cvp_edit_unlocked') === '1'; }
+
+// 로그인 세션(vp_s)의 isAdmin 플래그 확인 (현재는 1603064 사번만 true)
+// ※ 버튼 노출 여부만 제어할 뿐, 실제 편집 실행은 기존 requireEditAuth(비밀번호 확인)를 그대로 거침
+function _isAdminSession() {
+  try {
+    return JSON.parse(localStorage.getItem('vp_s') || '{}').isAdmin === true;
+  } catch (e) { return false; }
+}
+// 관리자 전용 UI(⚙ 관리자 패널 버튼, ✏️ 편집 버튼)를 관리자 세션에서만 보이게 처리.
+// showScreen()에서 화면 전환마다 항상 호출되므로, 로그인 직후/세션 복원/화면 이동
+// 등 어떤 경로로 진입해도 빠짐없이 적용됨.
+function _applyAdminVisibility() {
+  const admin = _isAdminSession();
+  const adminBtn = document.getElementById('btn-open-admin');
+  if (adminBtn) adminBtn.style.display = admin ? '' : 'none';
+  const guideEditBtn = document.getElementById('btn-guide-edit');
+  if (guideEditBtn) guideEditBtn.style.display = admin ? '' : 'none';
+  const detailEditBtn = document.getElementById('detail-edit-btn');
+  if (detailEditBtn && !admin) detailEditBtn.classList.add('hidden');
+}
 function unlockEdit() {
   sessionStorage.setItem('cvp_edit_unlocked', '1');
   _updateProtectionState(); // 관리자 인증 즉시 콘텐츠 보호 해제
@@ -1442,7 +1463,7 @@ function selectScript(id) {
 
   // 편집 버튼 (인증된 경우)
   const editBtn = $('detail-edit-btn');
-  editBtn.classList.remove('hidden');
+  editBtn.classList.toggle('hidden', !_isAdminSession());
   editBtn.dataset.id = id;
   editBtn.dataset.source = s._custom ? 'custom' : 'builtin';
 
@@ -5536,6 +5557,7 @@ function _enterSectionEdit(sectionDiv, idx) {
 
 async function _openGuideModal() {
   $('guide-modal').classList.remove('hidden');
+  _applyAdminVisibility();
   if (!_guideSections) {
     const body = $('guide-modal-body');
     if (body) body.innerHTML = '<div class="guide-loading">불러오는 중...</div>';
