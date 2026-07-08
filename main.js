@@ -4278,7 +4278,6 @@ ${sharedJson}`;
     }
     throw new Error('응답 JSON 파싱 실패');
   } catch (e) {
-    showToast('오류코드: ' + (e?.message || String(e)).substring(0, 80), 8000);
     if (e.name === 'AbortError') {
       console.warn('audio 채점 타임아웃(60초), STT 방식으로 전환');
     } else {
