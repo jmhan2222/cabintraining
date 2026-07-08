@@ -1650,7 +1650,10 @@ async function startRecording() {
     return {};
   };
   const _recOpts = _getSupportedMimeType();
-  console.log('[녹음] mimeType:', _recOpts.mimeType || '기본값');
+  // 음성 채점용 비트레이트를 64kbps로 제한 (음질은 음성 인식/분석에 충분, 파일 용량은 크게 감소)
+  // → 파일이 작을수록 Gemini 전송/분석 시간이 줄어 동시접속 시 타임아웃 확률이 낮아짐
+  _recOpts.audioBitsPerSecond = 64000;
+  console.log('[녹음] mimeType:', _recOpts.mimeType || '기본값', '| 비트레이트: 64kbps');
   state.mediaRecorder = new MediaRecorder(state.stream, _recOpts);
   state.mediaRecorder.ondataavailable = e => { 
     if (e.data && e.data.size > 0) {
@@ -1965,21 +1968,21 @@ JSON 외 어떤 텍스트도 포함하지 말 것.
 
 // ─── Gemini API fetch 재시도 유틸리티 ──────────────────────────────────────
 // 503/429 발생 시 지수 백오프 재시도 (최대 3회)
-async function fetchWithRetry(url, options, { maxRetries = 3, statusEl = null } = {}) {
+async function fetchWithRetry(url, options, { maxRetries = 5, statusEl = null } = {}) {
   for (let i = 0; i < maxRetries; i++) {
     let res;
     try {
       res = await fetch(url, options);
     } catch (e) {
       if (i === maxRetries - 1) throw e;
-      const delay = Math.pow(2, i) * 1000;
+      const delay = Math.min(Math.pow(2, i) * 1000, 8000); // 최대 8초로 상한
       console.log(`[재시도] 네트워크 오류, ${i + 1}번째 재시도 ${delay}ms 후`);
       if (statusEl) statusEl.textContent = `⏳ 연결 오류. 재시도 중... (${i + 1}/${maxRetries})`;
       await new Promise(r => setTimeout(r, delay));
       continue;
     }
     if ((res.status === 503 || res.status === 429) && i < maxRetries - 1) {
-      const delay = Math.pow(2, i) * 1000;
+      const delay = Math.min(Math.pow(2, i) * 1000, 8000); // 최대 8초로 상한
       console.log(`[재시도] HTTP ${res.status}, ${i + 1}번째 재시도 ${delay}ms 후`);
       if (statusEl) statusEl.textContent = `⏳ 서버가 바쁩니다. 잠시 후 재시도합니다... (${i + 1}/${maxRetries})`;
       await new Promise(r => setTimeout(r, delay));
