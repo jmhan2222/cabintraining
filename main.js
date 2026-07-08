@@ -665,6 +665,11 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   $(id).classList.add('active');
   $(id).scrollTop = 0;
+  // .screen 요소 자체가 아니라 페이지(window/body)가 스크롤되는 구조라,
+  // 위 scrollTop 초기화만으로는 실제 스크롤 위치가 안 바뀜 — 창 스크롤을 직접 리셋
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
   _applyAdminVisibility();
 }
 
