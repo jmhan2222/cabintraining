@@ -1603,8 +1603,24 @@ async function startRecording() {
   state.sourceNode = state.audioContext.createMediaStreamSource(state.stream);
   state.sourceNode.connect(state.analyser);
 
-  const _recOpts = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-    ? { mimeType: 'audio/webm;codecs=opus' } : {};
+  const _getSupportedMimeType = () => {
+    const types = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4;codecs=aac',
+      'audio/mp4',
+      'audio/aac',
+      ''
+    ];
+    for (const type of types) {
+      if (!type || MediaRecorder.isTypeSupported(type)) {
+        return type ? { mimeType: type } : {};
+      }
+    }
+    return {};
+  };
+  const _recOpts = _getSupportedMimeType();
+  console.log('[녹음] mimeType:', _recOpts.mimeType || '기본값');
   state.mediaRecorder = new MediaRecorder(state.stream, _recOpts);
   state.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) state.audioChunks.push(e.data); };
   state.mediaRecorder.start(100);
@@ -1745,7 +1761,7 @@ async function stopRecording() {
   _startOverlayTimers();
 
   const finish = () => {
-    const mimeType = state.mediaRecorder?.mimeType || 'audio/webm';
+    const mimeType = state.mediaRecorder?.mimeType || 'audio/mp4';
     state.audioBlob = new Blob(state.audioChunks, { type: mimeType });
     // ① 녹음 시간 3초 미만 차단
     if (duration < 3) {
@@ -2527,14 +2543,14 @@ async function _drillStartRec() {
     // 드릴 모드만 단독으로 사용해도 resumeAudioContext()가 동작하도록 공유 AudioContext 확보
     const ctx = _ensureAudioContext();
     if (ctx.state === 'suspended') { await ctx.resume().catch(() => {}); }
-    const _drillRecOpts = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? { mimeType: 'audio/webm;codecs=opus' } : {};
+    const _drillRecOpts = _getSupportedMimeType();
+    console.log('[드릴녹음] mimeType:', _drillRecOpts.mimeType || '기본값');
     const mr = new MediaRecorder(stream, _drillRecOpts);
     _drill.mr = mr;
     mr.ondataavailable = e => { if (e.data.size > 0) _drill.chunks.push(e.data); };
     mr.onstop = async () => {
       // Blob 생성이 끝난 뒤에만 마이크를 해제한다 — 조기 해제 시 마지막 데이터가 유실됨
-      _drill.myBlob = new Blob(_drill.chunks, { type: mr.mimeType || 'audio/webm' });
+      _drill.myBlob = new Blob(_drill.chunks, { type: mr.mimeType || 'audio/mp4' });
       if (_drill.myAudioUrl) URL.revokeObjectURL(_drill.myAudioUrl);
       _drill.myAudioUrl = URL.createObjectURL(_drill.myBlob);
 
