@@ -1199,33 +1199,70 @@ function buildCustomLang(text, cpStr, langCode) {
 }
 
 // ===== HOME / SIDEBAR =====
+// 일일 AI 채점 한도(5회) — Firestore를 서버 기준 저장소로 사용해 PC/모바일 등
+// 어떤 기기·브라우저로 접속해도 동일한 사번(empId)이면 같은 카운트를 공유하게 함.
+// (기존에는 localStorage에만 저장되어 기기별로 카운트가 따로 놀았음)
+function _getEmpId() {
+  try {
+    return JSON.parse(localStorage.getItem('vp_s') || '{}').empId || 'guest';
+  } catch (e) { return 'guest'; }
+}
+function _getLocalDateKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+async function _getDailyUsageCount(empId) {
+  const localKey = 'vp_daily3_' + empId + '_' + _getLocalDateKey();
+  if (!_db && !initFirebase()) {
+    // Firestore 연결 불가(오프라인 등) 시에만 로컬 값으로 대체
+    return parseInt(localStorage.getItem(localKey) || '0');
+  }
+  try {
+    const docId = empId + '_' + _getLocalDateKey();
+    const snap = await _db.collection('dailyUsage').doc(docId).get();
+    return snap.exists ? (snap.data().count || 0) : 0;
+  } catch (e) {
+    console.warn('[일일한도] Firestore 조회 실패, 로컬 값으로 대체:', e);
+    return parseInt(localStorage.getItem(localKey) || '0');
+  }
+}
+async function _incrementDailyUsage(empId) {
+  const localKey = 'vp_daily3_' + empId + '_' + _getLocalDateKey();
+  const prevLocal = parseInt(localStorage.getItem(localKey) || '0');
+  localStorage.setItem(localKey, prevLocal + 1); // 오프라인 폴백용 로컬 백업
+  if (!_db && !initFirebase()) return;
+  try {
+    const docId = empId + '_' + _getLocalDateKey();
+    await _db.collection('dailyUsage').doc(docId).set({
+      count: firebase.firestore.FieldValue.increment(1),
+      empId,
+      date: _getLocalDateKey(),
+      lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  } catch (e) {
+    console.warn('[일일한도] Firestore 기록 실패(로컬에는 반영됨):', e);
+  }
+}
+
 function updateAIUsageBadge() {
   const badge = document.getElementById('ai-usage-badge');
   const usedEl = document.getElementById('ai-used-count');
   const remainEl = document.getElementById('ai-remaining-count');
   if (!badge || !usedEl || !remainEl) return;
 
-  const today = new Date().toDateString();
-  const empId = (() => {
-    try {
-      return JSON.parse(
-        localStorage.getItem('vp_s') || '{}'
-      ).empId || 'guest';
-    } catch(e) { return 'guest'; }
-  })();
-  const key = 'vp_daily3_' + empId + '_' + today;
-  const used = parseInt(localStorage.getItem(key) || '0');
-  const remaining = Math.max(0, 5 - used);
-
-  usedEl.textContent = used;
-  remainEl.textContent = remaining;
-  remainEl.style.color = remaining <= 1 ? '#FF3B30' : '#003479';
-  remainEl.style.fontWeight = '700';
-  badge.style.cssText = 
-    'display:flex!important;background:#F5F5F7;' +
-    'color:#6E6E73;border:1px solid #E5E5EA;' +
-    'border-radius:8px;padding:4px 10px;' +
-    'font-size:12px;align-items:center;gap:4px;';
+  const empId = _getEmpId();
+  _getDailyUsageCount(empId).then(used => {
+    const remaining = Math.max(0, 5 - used);
+    usedEl.textContent = used;
+    remainEl.textContent = remaining;
+    remainEl.style.color = remaining <= 1 ? '#FF3B30' : '#003479';
+    remainEl.style.fontWeight = '700';
+    badge.style.cssText =
+      'display:flex!important;background:#F5F5F7;' +
+      'color:#6E6E73;border:1px solid #E5E5EA;' +
+      'border-radius:8px;padding:4px 10px;' +
+      'font-size:12px;align-items:center;gap:4px;';
+  });
 }
 
 // ===== HOME / SIDEBAR =====
@@ -3915,15 +3952,9 @@ function blobToBase64(blob) {
 }
 
 async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
-  // 1인당 일일 채점 횟수 제한 (8회)
-  const _today = new Date().toDateString();
-  const _empId = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('vp_s') || '{}').empId || 'guest';
-    } catch(e) { return 'guest'; }
-  })();
-  const _dailyKey = 'vp_daily3_' + _empId + '_' + _today;
-  const _count = parseInt(localStorage.getItem(_dailyKey) || '0');
+  // 1인당 일일 채점 횟수 제한 (5회) — Firestore 기준, 기기/브라우저 상관없이 동일 사번이면 공유
+  const _empId = _getEmpId();
+  const _count = await _getDailyUsageCount(_empId);
 
   if (_count >= 5) {
     const _limitOverlay = document.createElement('div');
@@ -4335,7 +4366,7 @@ ${sharedJson}`;
     const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
     const m = raw.match(/\{[\s\S]*\}/);
     if (m) {
-      localStorage.setItem(_dailyKey, _count + 1);
+      await _incrementDailyUsage(_empId);
       updateAIUsageBadge();
       console.log('[채점] 오늘 채점 횟수:', _count + 1, '/ 5회');
       return JSON.parse(m[0]);
@@ -4372,7 +4403,7 @@ ${sharedJson}`;
     if (!m) return null;
     try {
       const resData = JSON.parse(m[0]);
-      localStorage.setItem(_dailyKey, _count + 1);
+      await _incrementDailyUsage(_empId);
       updateAIUsageBadge();
       console.log('[채점] 오늘 채점 횟수:', _count + 1, '/ 5회');
       return resData;
