@@ -159,11 +159,16 @@ console.log('[Login] login.js 로드됨');
         }
         console.log('[Login] 성공:', empId);
 
-        if (doc.data().mustChangePassword) {
+        const mustChange = doc.data().mustChangePassword;
+        console.log('[Login] mustChangePassword:', mustChange);
+
+        if (mustChange === true) {
           showChangePw(empId, doc.data().password);
-        } else {
-          showSecurityNotice();
+          return;
         }
+
+        // mustChangePassword가 없거나 false면 보안 팝업
+        showSecurityNotice();
 
       } catch(e) {
         console.error('[Login] 오류:', e);
