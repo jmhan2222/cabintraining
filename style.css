@@ -1296,6 +1296,33 @@ html, body {
 
 /* ===== SIDEBAR HOME LAYOUT ===== */
 .header-right { display: flex; align-items: center; gap: 10px; }
+
+@media (max-width: 600px) {
+  .app-header {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding: 10px 14px;
+  }
+  .header-left { gap: 10px; }
+  .logo-mark { width: 32px; height: 32px; font-size: 18px; }
+  .logo-text { font-size: 16px; }
+  .logo-sub { font-size: 10px; }
+  .header-right {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  #ai-usage-badge {
+    font-size: 11px !important;
+    padding: 3px 8px !important;
+    white-space: nowrap;
+  }
+  .header-badge { font-size: 11px; padding: 3px 8px; }
+  .btn-admin-icon { width: 30px; height: 30px; font-size: 14px; }
+}
 .btn-admin-icon {
   background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
   color: #fff; font-size: 16px; width: 36px; height: 36px;
