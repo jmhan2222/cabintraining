@@ -212,17 +212,24 @@ function createModelVoicePlayer(containerId, opts = {}) {
         playBtn.textContent = '⏸ 일시정지';
         return;
       }
-      // 캐시 완전 미스(극히 드문 경우): await로 URL 획득
-      // iOS에서는 이 경우 제스처 컨텍스트 소멸로 play() 실패 가능 — 다음 클릭에 정상 작동
-      console.warn('[모델음성] 캐시 미스 — await로 URL 획득 시도 (iOS에서 재생 실패 가능)');
+      // 캐시 완전 미스(홈 화면 추가 앱에서는 매 실행마다 자주 발생) —
+      // 클릭 즉시(await 전) 빈 Audio로 재생을 먼저 "시도"해 iOS 재생 권한을
+      // 선점해둔 다음, URL을 비동기로 확보해서 같은 엘리먼트에 재생한다.
+      console.warn('[모델음성] 캐시 미스 — unlock 선(先)적용 후 URL 비동기 조회');
+      const _unlocked = _createUnlockedAudio();
       const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
       if (!url) { setAvailable(false); return; }
-      _currentModelAudio = new Audio(url);
-      _currentModelAudio.setAttribute('playsinline', '');
+      try {
+        await _playUnlockedAudio(_unlocked, url);
+      } catch (e) {
+        console.warn('[모델음성] unlock 재생 실패, 안내 후 재시도 유도:', e.name);
+        showToast('재생 버튼을 다시 눌러주세요.', 2000);
+      }
+      _unlocked.setAttribute('playsinline', '');
+      _currentModelAudio = _unlocked;
       window._modelAudioKeepAlive = _currentModelAudio;
       _playerAudio = _currentModelAudio;
       attachHandlers();
-      _safePlay(_currentModelAudio);
       playBtn.textContent = '⏸ 일시정지';
     } catch (e) {
       console.error('[모델음성] 재생 핸들러 오류:', e);
@@ -595,6 +602,39 @@ function stopMicStream(stream) {
 async function resumeAudioContext() {
   if (state.audioContext?.state === 'suspended') {
     await state.audioContext.resume().catch(() => {});
+  }
+}
+
+// ─── iOS PWA(홈 화면 추가 앱) 오디오 재생 안정화 공용 헬퍼 ──────────────────
+// 문제: 홈 화면에서 실행한 앱은 열 때마다 메모리 캐시가 비어있어, 재생 버튼을
+//       누른 뒤 URL을 서버에서 비동기로 가져와야 하는 경우가 잦다. 이때
+//       "await 이후에" audio.play()를 호출하면, iOS가 이를 "사용자 클릭과
+//       무관하게 코드가 임의로 실행한 재생"으로 간주해 차단할 수 있다.
+// 해결: 사용자가 버튼을 누른 바로 그 순간(await 전, 동기적으로) 아직 src가
+//       없는 빈 Audio 엘리먼트로 play()를 한 번 "시도"해서 iOS에 이 엘리먼트를
+//       미리 등록해둔다. src가 없어 이 시도 자체는 실패하지만, 이후 같은
+//       엘리먼트에 src를 넣고 다시 play()를 호출하면(비동기 이후라도) 정상
+//       재생된다. → 새로운 오디오 재생 기능을 추가할 때도 아래 두 함수를
+//       그대로 재사용하면 이 문제가 재발하지 않는다.
+function _createUnlockedAudio() {
+  const audio = new Audio();
+  audio.setAttribute('playsinline', '');
+  audio.muted = false;
+  const p = audio.play();
+  if (p && p.catch) p.catch(() => {}); // src 없어 실패하는 게 정상 동작, 무시
+  return audio;
+}
+// 미리 unlock해둔 audio 엘리먼트에 실제 URL을 넣고 재생 (URL을 비동기로
+// 확보해야 하는 모든 재생 로직에서 이 두 함수를 짝으로 사용할 것)
+async function _playUnlockedAudio(audio, url) {
+  audio.src = url;
+  audio.load();
+  const p = audio.play();
+  if (p && p.catch) {
+    await p.catch(err => {
+      console.warn('[오디오 unlock 재생 실패]', err.name);
+      throw err;
+    });
   }
 }
 
@@ -2855,15 +2895,20 @@ async function playModelVoice() {
   }
   const s = state.currentScript;
   if (!s) return;
+  // 캐시 미스 시 await 전에 먼저 unlock (문안별 재생 플레이어와 동일한 안전 패턴)
+  const _unlocked = _createUnlockedAudio();
   const url = await _resolveModelVoiceUrl(s.id, state.selectedLang, _rvcGender);
   if (!url) { showToast('모델 음성 없음'); return; }
   if (_rvcModelAudio) { _rvcModelAudio.pause(); }
-  _rvcModelAudio = new Audio(url);
-  _rvcModelAudio.setAttribute('playsinline', '');
+  _rvcModelAudio = _unlocked;
+  try {
+    await _playUnlockedAudio(_rvcModelAudio, url);
+  } catch (e) {
+    console.warn('[모델음성 비교] unlock 재생 실패:', e.name);
+    showToast('재생 버튼을 다시 눌러주세요.', 2000);
+  }
   if (btn) btn.textContent = '⏸ 일시정지';
   _rvcAttachScrub(_rvcModelAudio, 'rvc-model-scrub', 'rvc-model-time', 'btn-play-model');
-  await resumeAudioContext();
-  _rvcModelAudio.play().catch(()=>{});
   console.log('[완료] 모델 음성 재생');
 }
 
