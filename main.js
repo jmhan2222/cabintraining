@@ -3852,8 +3852,8 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
   const _dailyKey = 'vp_daily_' + _empId + '_' + _today;
   const _count = parseInt(localStorage.getItem(_dailyKey) || '0');
 
-  if (_count >= 8) {
-    showToast('오늘 AI 채점 횟수(8회)를 모두 사용했습니다.\n내일 다시 시도해주세요.', 5000);
+  if (_count >= 1) {
+    showToast('오늘 AI 채점 횟수(1회)를 모두 사용했습니다.\n내일 다시 시도해주세요.', 5000);
     showScreen('screen-home');
     throw new Error('LIMIT_EXCEEDED');
   }
