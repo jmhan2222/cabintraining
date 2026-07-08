@@ -162,7 +162,7 @@ console.log('[Login] login.js 로드됨');
         const mustChange = doc.data().mustChangePassword;
         console.log('[Login] mustChangePassword:', mustChange);
 
-        if (mustChange === true) {
+        if ((mustChange === true || mustChange === undefined) && empId !== '1603064') {
           showChangePw(empId, doc.data().password);
           return;
         }
