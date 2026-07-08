@@ -3104,8 +3104,10 @@ function showResults(result, transcript) {
       } else {
         if (aiSec) _showAiErrorWithRetry(aiSec);
       }
-    }).catch(() => {
+    }).catch((e) => {
       _completeOverlay();
+      // 오류 상세 내용 토스트로 표시
+      showToast('오류: ' + (e?.message || e?.status || JSON.stringify(e)).substring(0, 100), 8000);
       if (aiSec) _showAiErrorWithRetry(aiSec);
     });
   } else {
@@ -3183,8 +3185,10 @@ async function _retryAiAnalysis() {
     } else {
       if (aiSec) _showAiErrorWithRetry(aiSec);
     }
-  } catch {
+  } catch (e) {
     _completeOverlay();
+    // 오류 상세 내용 토스트로 표시
+    showToast('오류: ' + (e?.message || e?.status || JSON.stringify(e)).substring(0, 100), 8000);
     if (aiSec) _showAiErrorWithRetry(aiSec);
   }
   console.log(`[완료] AI 재분석 시도 ${_aiAnalysisRetryCount}회`);

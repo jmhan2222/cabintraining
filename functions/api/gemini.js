@@ -41,7 +41,10 @@ export async function onRequestPost(context) {
 
   if (!geminiRes.ok) {
     return Response.json(
-      { error: data?.error?.message || `Gemini API 오류 (HTTP ${geminiRes.status})` },
+      { 
+        error: data?.error?.message || `Gemini API 오류 (HTTP ${geminiRes.status})`,
+        details: data?.error || data
+      },
       { status: geminiRes.status }
     );
   }
