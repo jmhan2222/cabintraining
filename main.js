@@ -162,6 +162,27 @@ function createModelVoicePlayer(containerId, opts = {}) {
           // readyState < 2 이면 재로드 후 재생 (백그라운드 복귀 시 stale 상태 대응)
           if (audio.readyState < 2) audio.load();
           await resumeAudioContext();
+
+          // iOS PWA AudioContext 강제 resume
+          try {
+            const AudioCtx = window.AudioContext || 
+              window.webkitAudioContext;
+            if (AudioCtx) {
+              if (!window._sharedAudioCtx) {
+                window._sharedAudioCtx = new AudioCtx();
+              }
+              if (window._sharedAudioCtx.state === 'suspended') {
+                await window._sharedAudioCtx.resume();
+              }
+            }
+          } catch(e) {
+            console.warn('[iOS AudioContext]', e);
+          }
+
+          // audio 엘리먼트도 muted 해제
+          audio.muted = false;
+          audio.volume = 1.0;
+
           await audio.play();
         } catch (err) {
           console.error('[모델음성] 재생 실패:', err.name, err.message);
