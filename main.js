@@ -1780,11 +1780,7 @@ async function stopRecording() {
     }
 
     state.audioBlob = new Blob(state.audioChunks, { type: mimeType });
-    // 임시 디버그 - iOS 확인용
-    const _sizeMB = (state.audioBlob.size/1024/1024).toFixed(2);
-    const _chunks = state.audioChunks.length;
-    const _type = mimeType;
-    showToast(`녹음완료: ${_sizeMB}MB | ${_chunks}청크 | ${_type}`, 5000);
+
     console.log('[녹음완료] Blob 크기:', 
       (state.audioBlob.size/1024/1024).toFixed(2) + 'MB');
     // ① 녹음 시간 3초 미만 차단
