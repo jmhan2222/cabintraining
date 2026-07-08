@@ -1200,6 +1200,32 @@ function buildCustomLang(text, cpStr, langCode) {
 
 // ===== HOME / SIDEBAR =====
 async function loadAndRenderHome() {
+  // 오늘 채점 횟수 업데이트
+  (function() {
+    const badge = document.getElementById('ai-usage-badge');
+    const usedEl = document.getElementById('ai-used-count');
+    const remainEl = document.getElementById('ai-remaining-count');
+    if (!badge || !usedEl || !remainEl) return;
+
+    const today = new Date().toDateString();
+    const empId = (() => {
+      try {
+        return JSON.parse(
+          localStorage.getItem('vp_s') || '{}'
+        ).empId || 'guest';
+      } catch(e) { return 'guest'; }
+    })();
+    const key = 'vp_daily3_' + empId + '_' + today;
+    const used = parseInt(localStorage.getItem(key) || '0');
+    const remaining = Math.max(0, 5 - used);
+
+    usedEl.textContent = used;
+    remainEl.textContent = remaining;
+    remainEl.style.color = remaining <= 1 ? '#FF3B30' : '#003479';
+    remainEl.style.fontWeight = '700';
+    badge.style.display = 'flex'; // inline-flex/flex 레이아웃을 위해 flex로 활성화
+  })();
+
   _renderSidebarLoading();
 
   let firestoreScripts = [];
@@ -3888,7 +3914,7 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
       return JSON.parse(localStorage.getItem('vp_s') || '{}').empId || 'guest';
     } catch(e) { return 'guest'; }
   })();
-  const _dailyKey = 'vp_daily2_' + _empId + '_' + _today;
+  const _dailyKey = 'vp_daily3_' + _empId + '_' + _today;
   const _count = parseInt(localStorage.getItem(_dailyKey) || '0');
 
   if (_count >= 5) {
