@@ -1223,7 +1223,16 @@ async function loadAndRenderHome() {
     remainEl.textContent = remaining;
     remainEl.style.color = remaining <= 1 ? '#FF3B30' : '#003479';
     remainEl.style.fontWeight = '700';
-    badge.style.display = 'flex'; // inline-flex/flex 레이아웃을 위해 flex로 활성화
+    badge.style.cssText = 
+      'display:flex!important;' +
+      'background:#F5F5F7;' +
+      'color:#6E6E73;' +
+      'border:1px solid #E5E5EA;' +
+      'border-radius:8px;' +
+      'padding:4px 10px;' +
+      'font-size:12px;' +
+      'align-items:center;' +
+      'gap:4px;';
   })();
 
   _renderSidebarLoading();
@@ -3918,9 +3927,39 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
   const _count = parseInt(localStorage.getItem(_dailyKey) || '0');
 
   if (_count >= 5) {
-    showToast('오늘 AI 채점 횟수(5회)를 모두 사용했습니다.\n내일 다시 시도해주세요.', 5000);
-    showScreen('screen-home');
-    throw new Error('LIMIT_EXCEEDED');
+    const _limitOverlay = document.createElement('div');
+    _limitOverlay.style.cssText = 
+      'position:fixed;inset:0;background:rgba(0,0,0,0.7);' +
+      'z-index:999999;display:flex;align-items:center;' +
+      'justify-content:center;';
+    _limitOverlay.innerHTML = `
+      <div style="width:100%;max-width:320px;background:#fff;
+        border-radius:16px;padding:28px 24px;margin:20px;
+        text-align:center;box-sizing:border-box;">
+        <div style="font-size:36px;margin-bottom:12px;">✈️</div>
+        <h3 style="font-size:17px;font-weight:700;
+          color:#003479;margin-bottom:12px;">
+          오늘 채점을 모두 완료했어요!</h3>
+        <p style="font-size:14px;color:#6E6E73;
+          line-height:1.6;margin-bottom:20px;">
+          하루 5회 AI 채점 한도를 사용하셨습니다.<br>
+          내일 자정이 지나면 다시 채점할 수 있어요.<br><br>
+          오늘은 <b>학습 모드</b>와 <b>드릴 모드</b>를<br>
+          활용해보세요! 😊</p>
+        <button id="limit-close-btn"
+          style="width:100%;padding:14px;
+          background:#FF6B00;color:white;border:none;
+          border-radius:10px;font-size:15px;
+          font-weight:700;cursor:pointer;">
+          확인</button>
+      </div>`;
+    document.body.appendChild(_limitOverlay);
+    document.getElementById('limit-close-btn')
+      .addEventListener('click', () => {
+        _limitOverlay.remove();
+        showScreen('screen-home');
+      });
+    return;
   }
   // 성공적인 결과 응답 시에만 차감하기 위해 여기서의 선증가는 제거합니다.
 
