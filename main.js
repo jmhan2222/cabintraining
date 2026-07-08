@@ -1080,7 +1080,20 @@ function _renderKoEnText(text) {
     return `<span class="script-var">[${inner}]</span>`;
   });
   const lines = text.split('\n');
-  let html = '';
+  let html = `
+  <div style="
+    font-size:12px;
+    color:#6E6E73;
+    text-align:right;
+    padding:6px 16px;
+    background:#F5F5F7;
+    border-radius:8px;
+    margin:8px 12px;
+  ">
+    🎯 오늘 AI 채점: <b>${_used}/5회</b>
+    · 남은 횟수: <b style="color:${_remaining <= 1 ? '#FF3B30' : '#003479'}">
+      ${_remaining}회</b>
+  </div>`;
   let tableRows = [];  // markdown pipe tables
   let taggedRows = []; // [TAG] content section lines
 
@@ -1255,6 +1268,17 @@ function _mapAnnouncementsToScripts(announcements) {
 function renderSidebar(scripts) {
   const tree = $('sidebar-tree');
   if (!tree) return;
+
+  // 오늘 채점 횟수 계산
+  const _today = new Date().toDateString();
+  const _empId = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('vp_s') || '{}').empId || 'guest';
+    } catch(e) { return 'guest'; }
+  })();
+  const _dailyKey = 'vp_daily3_' + _empId + '_' + _today;
+  const _used = parseInt(localStorage.getItem(_dailyKey) || '0');
+  const _remaining = Math.max(0, 5 - _used);
 
   if (!scripts.length) {
     tree.innerHTML = '<div style="padding:32px 16px;text-align:center;color:var(--gray-400);font-size:13px">방송문 데이터가 없습니다.<br>관리자 패널에서 JSON을 업로드해 주세요.</div>';
@@ -3888,7 +3912,7 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
       return JSON.parse(localStorage.getItem('vp_s') || '{}').empId || 'guest';
     } catch(e) { return 'guest'; }
   })();
-  const _dailyKey = 'vp_daily2_' + _empId + '_' + _today;
+  const _dailyKey = 'vp_daily3_' + _empId + '_' + _today;
   const _count = parseInt(localStorage.getItem(_dailyKey) || '0');
 
   if (_count >= 5) {
