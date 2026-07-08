@@ -159,35 +159,30 @@ function createModelVoicePlayer(containerId, opts = {}) {
       }
       const _safePlay = async (audio) => {
         try {
-          // readyState < 2 이면 재로드 후 재생 (백그라운드 복귀 시 stale 상태 대응)
+          // iOS PWA 감지
+          const isIOSPWA = 
+            window.navigator.standalone === true ||
+            window.matchMedia('(display-mode: standalone)').matches;
+
           if (audio.readyState < 2) audio.load();
-          await resumeAudioContext();
 
-          // iOS PWA AudioContext 강제 resume
-          try {
-            const AudioCtx = window.AudioContext || 
-              window.webkitAudioContext;
-            if (AudioCtx) {
-              if (!window._sharedAudioCtx) {
-                window._sharedAudioCtx = new AudioCtx();
-              }
-              if (window._sharedAudioCtx.state === 'suspended') {
-                await window._sharedAudioCtx.resume();
-              }
-            }
-          } catch(e) {
-            console.warn('[iOS AudioContext]', e);
+          if (isIOSPWA) {
+            // iOS PWA: async 없이 즉시 동기 play() 호출
+            audio.muted = false;
+            audio.volume = 1.0;
+            const p = audio.play();
+            if (p) p.catch(e => {
+              console.warn('[iOS PWA 재생 실패]', e.name);
+              showToast('재생 버튼을 다시 눌러주세요.', 2000);
+            });
+          } else {
+            await resumeAudioContext();
+            await audio.play();
           }
-
-          // audio 엘리먼트도 muted 해제
-          audio.muted = false;
-          audio.volume = 1.0;
-
-          await audio.play();
-        } catch (err) {
+        } catch(err) {
           console.error('[모델음성] 재생 실패:', err.name, err.message);
           showToast('모델 음성 재생에 실패했습니다. 다시 시도해 주세요.', 3000);
-          stopPlayer();
+          if (typeof stopPlayer === 'function') stopPlayer();
         }
       };
 
