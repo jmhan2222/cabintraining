@@ -788,7 +788,7 @@ function logout() {
 function enterApp() {
   initFirebase();
   renderHome();
-  showScreen('screen-home');
+  showScreen('screen-home'); updateAIUsageBadge();
   const empId = getStoredEmployeeId();
   if (empId) _startWatermarkGuard(empId);
   _initContentProtection();
@@ -1199,42 +1199,38 @@ function buildCustomLang(text, cpStr, langCode) {
 }
 
 // ===== HOME / SIDEBAR =====
-async function loadAndRenderHome() {
-  // 오늘 채점 횟수 업데이트
-  (function() {
-    const badge = document.getElementById('ai-usage-badge');
-    const usedEl = document.getElementById('ai-used-count');
-    const remainEl = document.getElementById('ai-remaining-count');
-    if (!badge || !usedEl || !remainEl) return;
+function updateAIUsageBadge() {
+  const badge = document.getElementById('ai-usage-badge');
+  const usedEl = document.getElementById('ai-used-count');
+  const remainEl = document.getElementById('ai-remaining-count');
+  if (!badge || !usedEl || !remainEl) return;
 
-    const today = new Date().toDateString();
-    const empId = (() => {
-      try {
-        return JSON.parse(
-          localStorage.getItem('vp_s') || '{}'
-        ).empId || 'guest';
-      } catch(e) { return 'guest'; }
-    })();
-    const key = 'vp_daily3_' + empId + '_' + today;
-    const used = parseInt(localStorage.getItem(key) || '0');
-    const remaining = Math.max(0, 5 - used);
-
-    usedEl.textContent = used;
-    remainEl.textContent = remaining;
-    remainEl.style.color = remaining <= 1 ? '#FF3B30' : '#003479';
-    remainEl.style.fontWeight = '700';
-    badge.style.cssText = 
-      'display:flex!important;' +
-      'background:#F5F5F7;' +
-      'color:#6E6E73;' +
-      'border:1px solid #E5E5EA;' +
-      'border-radius:8px;' +
-      'padding:4px 10px;' +
-      'font-size:12px;' +
-      'align-items:center;' +
-      'gap:4px;';
+  const today = new Date().toDateString();
+  const empId = (() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem('vp_s') || '{}'
+      ).empId || 'guest';
+    } catch(e) { return 'guest'; }
   })();
+  const key = 'vp_daily3_' + empId + '_' + today;
+  const used = parseInt(localStorage.getItem(key) || '0');
+  const remaining = Math.max(0, 5 - used);
 
+  usedEl.textContent = used;
+  remainEl.textContent = remaining;
+  remainEl.style.color = remaining <= 1 ? '#FF3B30' : '#003479';
+  remainEl.style.fontWeight = '700';
+  badge.style.cssText = 
+    'display:flex!important;background:#F5F5F7;' +
+    'color:#6E6E73;border:1px solid #E5E5EA;' +
+    'border-radius:8px;padding:4px 10px;' +
+    'font-size:12px;align-items:center;gap:4px;';
+}
+
+// ===== HOME / SIDEBAR =====
+async function loadAndRenderHome() {
+  updateAIUsageBadge();
   _renderSidebarLoading();
 
   let firestoreScripts = [];
@@ -3957,7 +3953,7 @@ async function callGeminiScoring(script, audioBlob, langCode, checkpoints) {
     document.getElementById('limit-close-btn')
       .addEventListener('click', () => {
         _limitOverlay.remove();
-        showScreen('screen-home');
+        showScreen('screen-home'); updateAIUsageBadge();
       });
     return;
   }
@@ -4337,6 +4333,7 @@ ${sharedJson}`;
     const m = raw.match(/\{[\s\S]*\}/);
     if (m) {
       localStorage.setItem(_dailyKey, _count + 1);
+      updateAIUsageBadge();
       console.log('[채점] 오늘 채점 횟수:', _count + 1, '/ 5회');
       return JSON.parse(m[0]);
     }
@@ -4373,6 +4370,7 @@ ${sharedJson}`;
     try {
       const resData = JSON.parse(m[0]);
       localStorage.setItem(_dailyKey, _count + 1);
+      updateAIUsageBadge();
       console.log('[채점] 오늘 채점 횟수:', _count + 1, '/ 5회');
       return resData;
     } catch {
@@ -5552,7 +5550,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  $('btn-back-prep').addEventListener('click', () => { clearInterval(state.prepTimerInterval); showScreen('screen-home'); });
+  $('btn-back-prep').addEventListener('click', () => { clearInterval(state.prepTimerInterval); showScreen('screen-home'); updateAIUsageBadge(); });
   $('btn-start-record').addEventListener('click', startRecording);
   $('btn-peek').addEventListener('click', () => $('script-peek-text').classList.toggle('hidden'));
   $('btn-stop-record').addEventListener('click', stopRecording);
@@ -5711,7 +5709,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-back-study').addEventListener('click', () => {
     if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio = null; }
     if (state.currentScript) showScreen('screen-prep');
-    else showScreen('screen-home');
+    else showScreen('screen-home'); updateAIUsageBadge();
   });
   // 학습 화면 성별 버튼
   ['m', 'f'].forEach(g => {
@@ -5813,7 +5811,7 @@ document.addEventListener('DOMContentLoaded', () => {
     _resetDrillRecordingState();
     if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio = null; }
     if (state.currentScript) showScreen('screen-prep');
-    else showScreen('screen-home');
+    else showScreen('screen-home'); updateAIUsageBadge();
   });
   $('btn-drill-play-my').addEventListener('click', async () => {
     if (!_drill.myAudioUrl) return;
@@ -5830,7 +5828,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-drill-next').addEventListener('click', _drillNext);
   $('btn-drill-done').addEventListener('click', () => {
     if (state.currentScript) startPrep(state.currentScript);
-    else showScreen('screen-home');
+    else showScreen('screen-home'); updateAIUsageBadge();
   });
 
   // ===== 결과 화면 모델 음성 비교 =====
@@ -5841,7 +5839,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ===== 관리자 패널 =====
   $('btn-open-admin').addEventListener('click', openAdminScreen);
-  $('btn-admin-back').addEventListener('click', () => { showScreen('screen-home'); loadAndRenderHome(); });
+  $('btn-admin-back').addEventListener('click', () => { showScreen('screen-home'); updateAIUsageBadge(); loadAndRenderHome(); });
   // 관리자 일괄 가이드 생성
   $('btn-admin-load-guide-status')?.addEventListener('click', _loadAdminGuideStatuses);
   $('btn-admin-bulk-guide')?.addEventListener('click', _runBulkGuideGeneration);
@@ -5947,7 +5945,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // 결과 화면 버튼
-  document.getElementById('btn-result-select')?.addEventListener('click', () => { stopModelComparison(); showScreen('screen-home'); });
+  document.getElementById('btn-result-select')?.addEventListener('click', () => { stopModelComparison(); showScreen('screen-home'); updateAIUsageBadge(); });
   document.getElementById('btn-result-retry-2')?.addEventListener('click', () => { stopModelComparison(); if (state.currentScript) startPrep(state.currentScript); });
   $('btn-retry')?.addEventListener('click', () => { stopModelComparison(); if (state.currentScript) startPrep(state.currentScript); });
 
