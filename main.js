@@ -148,61 +148,71 @@ function createModelVoicePlayer(containerId, opts = {}) {
   };
 
   const doPlay = async () => {
-    const s = state.currentScript;
-    if (!s) return;
-    // 토글: 이 플레이어가 재생 중이면 일시정지
-    if (_playerAudio && _playerAudio === _currentModelAudio && !_currentModelAudio.paused) {
-      _currentModelAudio.pause();
-      playBtn.textContent = '▶ 재생';
-      return;
-    }
-    const _safePlay = async (audio) => {
-      // readyState < 2 이면 재로드 후 재생 (백그라운드 복귀 시 stale 상태 대응)
-      if (audio.readyState < 2) audio.load();
-      await resumeAudioContext();
-      return audio.play().catch(err => {
-        console.error('[모델음성] 재생 실패:', err.name, err.message);
-      });
-    };
-
-    // _currentModelAudio 없으면 동기 캐시에서 즉시 생성 시도 (await 없음 → iOS 제스처 유지)
-    // initState()가 이미 _preload()로 생성했으면 이 분기는 건너뜀
-    if (!_currentModelAudio?.src) {
-      const syncUrl = _getCachedModelVoiceUrl(s.id, state.selectedLang);
-      if (syncUrl) {
-        _currentModelAudio = new Audio(syncUrl);
-        _currentModelAudio.setAttribute('playsinline', '');
-        window._modelAudioKeepAlive = _currentModelAudio;
+    try {
+      const s = state.currentScript;
+      if (!s) return;
+      // 토글: 이 플레이어가 재생 중이면 일시정지
+      if (_playerAudio && _playerAudio === _currentModelAudio && !_currentModelAudio.paused) {
+        _currentModelAudio.pause();
+        playBtn.textContent = '▶ 재생';
+        return;
       }
-    }
+      const _safePlay = async (audio) => {
+        try {
+          // readyState < 2 이면 재로드 후 재생 (백그라운드 복귀 시 stale 상태 대응)
+          if (audio.readyState < 2) audio.load();
+          await resumeAudioContext();
+          await audio.play();
+        } catch (err) {
+          console.error('[모델음성] 재생 실패:', err.name, err.message);
+          showToast('모델 음성 재생에 실패했습니다. 다시 시도해 주세요.', 3000);
+          stopPlayer();
+        }
+      };
 
-    // 일시정지 상태면 현재 위치에서 재개
-    if (_playerAudio && _playerAudio === _currentModelAudio && _currentModelAudio?.paused) {
-      _safePlay(_currentModelAudio);
-      playBtn.textContent = '⏸ 일시정지';
-      return;
-    }
-    // _currentModelAudio가 있으면 재사용 (initState/_preload 또는 위 동기 생성)
-    // — await가 없으므로 iOS 사용자 제스처 컨텍스트 완전 유지
-    if (_currentModelAudio?.src) {
+      // _currentModelAudio 없으면 동기 캐시에서 즉시 생성 시도 (await 없음 → iOS 제스처 유지)
+      // initState()가 이미 _preload()로 생성했으면 이 분기는 건너뜀
+      if (!_currentModelAudio?.src) {
+        const syncUrl = _getCachedModelVoiceUrl(s.id, state.selectedLang);
+        if (syncUrl) {
+          _currentModelAudio = new Audio(syncUrl);
+          _currentModelAudio.setAttribute('playsinline', '');
+          window._modelAudioKeepAlive = _currentModelAudio;
+        }
+      }
+
+      // 일시정지 상태면 현재 위치에서 재개
+      if (_playerAudio && _playerAudio === _currentModelAudio && _currentModelAudio?.paused) {
+        _safePlay(_currentModelAudio);
+        playBtn.textContent = '⏸ 일시정지';
+        return;
+      }
+      // _currentModelAudio가 있으면 재사용 (initState/_preload 또는 위 동기 생성)
+      // — await가 없으므로 iOS 사용자 제스처 컨텍스트 완전 유지
+      if (_currentModelAudio?.src) {
+        _playerAudio = _currentModelAudio;
+        attachHandlers();
+        _safePlay(_currentModelAudio);
+        playBtn.textContent = '⏸ 일시정지';
+        return;
+      }
+      // 캐시 완전 미스(극히 드문 경우): await로 URL 획득
+      // iOS에서는 이 경우 제스처 컨텍스트 소멸로 play() 실패 가능 — 다음 클릭에 정상 작동
+      console.warn('[모델음성] 캐시 미스 — await로 URL 획득 시도 (iOS에서 재생 실패 가능)');
+      const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
+      if (!url) { setAvailable(false); return; }
+      _currentModelAudio = new Audio(url);
+      _currentModelAudio.setAttribute('playsinline', '');
+      window._modelAudioKeepAlive = _currentModelAudio;
       _playerAudio = _currentModelAudio;
       attachHandlers();
       _safePlay(_currentModelAudio);
       playBtn.textContent = '⏸ 일시정지';
-      return;
+    } catch (e) {
+      console.error('[모델음성] 재생 핸들러 오류:', e);
+      showToast('오류가 발생했습니다.', 2000);
+      stopPlayer();
     }
-    // 캐시 완전 미스(극히 드문 경우): await로 URL 획득
-    // iOS에서는 이 경우 제스처 컨텍스트 소멸로 play() 실패 가능 — 다음 클릭에 정상 작동
-    console.warn('[모델음성] 캐시 미스 — await로 URL 획득 시도 (iOS에서 재생 실패 가능)');
-    const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
-    if (!url) { setAvailable(false); return; }
-    _currentModelAudio = new Audio(url);
-    _currentModelAudio.setAttribute('playsinline', '');
-    window._modelAudioKeepAlive = _currentModelAudio;
-    _playerAudio = _currentModelAudio;
-    attachHandlers();
-    _safePlay(_currentModelAudio);
-    playBtn.textContent = '⏸ 일시정지';
   };
 
   playBtn.addEventListener('click', doPlay);
