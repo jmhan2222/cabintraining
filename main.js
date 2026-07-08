@@ -148,10 +148,6 @@ function createModelVoicePlayer(containerId, opts = {}) {
   };
 
   const doPlay = async () => {
-    // iOS PWA 오디오 잠금 해제
-    if (state.modelAudio) {
-      state.modelAudio.load();
-    }
     try {
       const s = state.currentScript;
       if (!s) return;
@@ -161,15 +157,37 @@ function createModelVoicePlayer(containerId, opts = {}) {
         playBtn.textContent = '▶ 재생';
         return;
       }
-      const _safePlay = (audio) => {
-        audio.muted = false;
-        audio.volume = 1.0;
-        const p = audio.play();
-        if (p !== undefined) {
-          p.catch(e => {
-            console.warn('[모델음성]', e.name);
-            showToast('재생 버튼을 다시 한 번 눌러주세요.', 2000);
-          });
+      const _safePlay = async (audio) => {
+        try {
+          // readyState < 2 이면 재로드 후 재생 (백그라운드 복귀 시 stale 상태 대응)
+          if (audio.readyState < 2) audio.load();
+          await resumeAudioContext();
+
+          // iOS PWA AudioContext 강제 resume
+          try {
+            const AudioCtx = window.AudioContext || 
+              window.webkitAudioContext;
+            if (AudioCtx) {
+              if (!window._sharedAudioCtx) {
+                window._sharedAudioCtx = new AudioCtx();
+              }
+              if (window._sharedAudioCtx.state === 'suspended') {
+                await window._sharedAudioCtx.resume();
+              }
+            }
+          } catch(e) {
+            console.warn('[iOS AudioContext]', e);
+          }
+
+          // audio 엘리먼트도 muted 해제
+          audio.muted = false;
+          audio.volume = 1.0;
+
+          await audio.play();
+        } catch (err) {
+          console.error('[모델음성] 재생 실패:', err.name, err.message);
+          showToast('모델 음성 재생에 실패했습니다. 다시 시도해 주세요.', 3000);
+          stopPlayer();
         }
       };
 
@@ -180,7 +198,6 @@ function createModelVoicePlayer(containerId, opts = {}) {
         if (syncUrl) {
           _currentModelAudio = new Audio(syncUrl);
           _currentModelAudio.setAttribute('playsinline', '');
-      audio.setAttribute('webkit-playsinline', '');
           window._modelAudioKeepAlive = _currentModelAudio;
         }
       }
@@ -207,7 +224,6 @@ function createModelVoicePlayer(containerId, opts = {}) {
       if (!url) { setAvailable(false); return; }
       _currentModelAudio = new Audio(url);
       _currentModelAudio.setAttribute('playsinline', '');
-      audio.setAttribute('webkit-playsinline', '');
       window._modelAudioKeepAlive = _currentModelAudio;
       _playerAudio = _currentModelAudio;
       attachHandlers();
@@ -246,7 +262,6 @@ function createModelVoicePlayer(containerId, opts = {}) {
     if (!url || (_currentModelAudio && _currentModelAudio.src)) return;
     _currentModelAudio = new Audio(url);
     _currentModelAudio.setAttribute('playsinline', '');
-      audio.setAttribute('webkit-playsinline', '');
     window._modelAudioKeepAlive = _currentModelAudio;
   };
 
@@ -2723,7 +2738,6 @@ async function playModelVoice() {
   if (_rvcModelAudio) { _rvcModelAudio.pause(); }
   _rvcModelAudio = new Audio(url);
   _rvcModelAudio.setAttribute('playsinline', '');
-      audio.setAttribute('webkit-playsinline', '');
   if (btn) btn.textContent = '⏸ 일시정지';
   _rvcAttachScrub(_rvcModelAudio, 'rvc-model-scrub', 'rvc-model-time', 'btn-play-model');
   await resumeAudioContext();
@@ -2745,7 +2759,6 @@ async function playMyRecording() {
   if (!_lastRecordingUrl) { showToast('녹음 파일 없음'); return; }
   _rvcMyAudio = new Audio(_lastRecordingUrl);
   _rvcMyAudio.setAttribute('playsinline', '');
-      audio.setAttribute('webkit-playsinline', '');
   if (btn) btn.textContent = '⏸ 일시정지';
   _rvcAttachScrub(_rvcMyAudio, 'rvc-my-scrub', 'rvc-my-time', 'btn-play-my');
   _rvcMyAudio.onended = () => { if (btn) btn.textContent = '▶ 재생'; };
@@ -2790,7 +2803,6 @@ async function _cmpCycle() {
       await resumeAudioContext();
       const b = new Audio(_lastRecordingUrl);
       b.setAttribute('playsinline', '');
-      b.setAttribute('webkit-playsinline', '');
       _cmp.audio = b;
       b.play().catch(() => {});
       b.onended = () => {
@@ -5681,7 +5693,6 @@ document.addEventListener('DOMContentLoaded', () => {
     await resumeAudioContext();
     const a = new Audio(_drill.myAudioUrl);
     a.setAttribute('playsinline', '');
-      a.setAttribute('webkit-playsinline', '');
     a.play().catch(e => { console.error('[드릴] 내음성 재생 오류:', e); showToast('음성 재생에 실패했습니다.', 'error'); });
   });
   $('btn-drill-redo').addEventListener('click', () => {
