@@ -1909,10 +1909,7 @@ function setupSpeechRecognition(langCode) {
   recog.continuous = true;
   recog.interimResults = true;
 
-  let _sttFailCount = 0;
-  let _sttNotified = false;
   recog.onresult = e => {
-    _sttFailCount = 0; // 정상적으로 결과를 받으면 실패 카운트 초기화
     let interim = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript;
@@ -1920,29 +1917,20 @@ function setupSpeechRecognition(langCode) {
     }
     $('live-text').textContent = (state.transcript + interim).trim() || '말씀해 주세요...';
   };
+  // 화면에는 아무 영향 없이, 콘솔에만 조용히 로그를 남겨 다음 진단(chrome://inspect)에 활용
   recog.onerror = e => {
-    if (e.error !== 'no-speech' && e.error !== 'aborted') console.warn('STT:', e.error);
-    if (e.error === 'no-speech' || e.error === 'audio-capture' || e.error === 'not-allowed') _sttFailCount++;
+    if (e.error !== 'no-speech' && e.error !== 'aborted') console.warn('[STT] onerror:', e.error);
   };
   recog.onend = () => {
-    if (state.mediaRecorder?.state !== 'recording') return;
-    // 실시간 인식이 계속 실패(예: 안드로이드에서 마이크 세션 충돌)하면 무한 재시작
-    // 루프에 빠지지 않도록 일정 횟수 이상이면 중단한다. 녹음/AI 채점 자체는
-    // 이 실패와 무관하게 정상 진행되므로, 자막만 안 뜬다는 점을 한 번만 안내.
-    if (_sttFailCount >= 8) {
-      if (!_sttNotified) {
-        _sttNotified = true;
-        $('live-text').textContent = '⚠️ 이 기기에서는 실시간 자막이 지원되지 않아요. 녹음과 AI 채점은 정상 진행됩니다.';
-        console.warn('[STT] 반복 실패로 재시작 중단 (기기 마이크 세션 제약 가능성)');
-      }
-      return;
+    if (state.mediaRecorder?.state === 'recording') {
+      try { recog.start(); } catch(e) { console.warn('[STT] 재시작 실패:', e.name, e.message); }
     }
-    // 즉시 재시작 대신 약간의 지연을 둬 마이크 세션 경합을 완화
-    setTimeout(() => {
-      if (state.mediaRecorder?.state === 'recording') { try { recog.start(); } catch(e){} }
-    }, 250);
   };
-  try { recog.start(); } catch(e){}
+  try {
+    recog.start();
+  } catch(e) {
+    console.warn('[STT] 최초 시작 실패:', e.name, e.message);
+  }
   state.recognition = recog;
 }
 
