@@ -1902,6 +1902,7 @@ function autoCorrelationPitch(buf, sampleRate) {
 
 function setupSpeechRecognition(langCode) {
   const SR = /** @type {any} */ (window).SpeechRecognition || /** @type {any} */ (window).webkitSpeechRecognition;
+  console.log('[STT] setupSpeechRecognition 호출, langCode:', langCode, '| SR 지원:', !!SR);
   if (!SR) { $('live-text').textContent = '⚠️ Chrome 브라우저에서만 음성 인식이 지원됩니다.'; return; }
 
   const recog = new SR();
@@ -1909,25 +1910,28 @@ function setupSpeechRecognition(langCode) {
   recog.continuous = true;
   recog.interimResults = true;
 
+  recog.onstart = () => console.log('[STT] onstart 발생 — 인식 세션 정상 시작됨');
   recog.onresult = e => {
     let interim = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript;
       e.results[i].isFinal ? (state.transcript += t + ' ') : (interim = t);
     }
+    console.log('[STT] onresult 발생 — interim:', interim, '| final 누적길이:', state.transcript.length);
     $('live-text').textContent = (state.transcript + interim).trim() || '말씀해 주세요...';
   };
-  // 화면에는 아무 영향 없이, 콘솔에만 조용히 로그를 남겨 다음 진단(chrome://inspect)에 활용
   recog.onerror = e => {
-    if (e.error !== 'no-speech' && e.error !== 'aborted') console.warn('[STT] onerror:', e.error);
+    console.warn('[STT] onerror 발생 —', e.error); // no-speech 포함 전부 기록 (진단용)
   };
   recog.onend = () => {
+    console.log('[STT] onend 발생 | 녹음상태:', state.mediaRecorder?.state);
     if (state.mediaRecorder?.state === 'recording') {
       try { recog.start(); } catch(e) { console.warn('[STT] 재시작 실패:', e.name, e.message); }
     }
   };
   try {
     recog.start();
+    console.log('[STT] recog.start() 호출 성공 (동기적으로 에러 없음)');
   } catch(e) {
     console.warn('[STT] 최초 시작 실패:', e.name, e.message);
   }
