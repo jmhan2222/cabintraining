@@ -602,11 +602,21 @@ function stopMicStream(stream) {
   stream.getTracks().forEach(track => track.stop());
 }
 
+// AudioContext.resume()이 iOS(특히 PWA)에서 간혹 영원히 응답하지 않는
+// WebKit 버그가 보고되어 있음 — 최대 2초만 기다리고, 응답이 없으면 그냥
+// 진행한다. 이 함수를 안 쓰고 audioContext.resume()을 직접 호출하면
+// 화면이 무한정 멈출 수 있으므로, resume이 필요한 모든 곳에서 반드시 재사용할 것.
+function _resumeCtxWithTimeout(ctx, timeoutMs = 2000) {
+  if (!ctx || ctx.state !== 'suspended') return Promise.resolve();
+  return Promise.race([
+    ctx.resume().catch(() => {}),
+    new Promise(resolve => setTimeout(resolve, timeoutMs))
+  ]);
+}
+
 // 오디오 재생 전 공통 복원 — 모든 audio.play() 호출 직전에 호출
 async function resumeAudioContext() {
-  if (state.audioContext?.state === 'suspended') {
-    await state.audioContext.resume().catch(() => {});
-  }
+  await _resumeCtxWithTimeout(state.audioContext);
 }
 
 // ─── iOS PWA(홈 화면 추가 앱) 오디오 재생 안정화 공용 헬퍼 ──────────────────
@@ -1756,10 +1766,8 @@ async function startRecording() {
 
   const AudioCtx = /** @type {any} */ (window).AudioContext || /** @type {any} */ (window).webkitAudioContext;
   state.audioContext = new AudioCtx();
-  // iOS는 AudioContext를 suspended 상태로 생성할 수 있음 — 명시적 resume
-  if (state.audioContext.state === 'suspended') {
-    await state.audioContext.resume().catch(() => {});
-  }
+  // iOS는 AudioContext를 suspended 상태로 생성할 수 있음 — 명시적 resume (타임아웃 안전장치 포함)
+  await _resumeCtxWithTimeout(state.audioContext);
   state.analyser = state.audioContext.createAnalyser();
   state.analyser.fftSize = 4096;
   state.analyser.smoothingTimeConstant = 0.6;
@@ -2712,13 +2720,14 @@ async function _drillStartRec() {
     _drill.stream = stream;
     // 드릴 모드만 단독으로 사용해도 resumeAudioContext()가 동작하도록 공유 AudioContext 확보
     const ctx = _ensureAudioContext();
-    if (ctx.state === 'suspended') { await ctx.resume().catch(() => {}); }
+    await _resumeCtxWithTimeout(ctx);
     const _drillRecOpts = _getSupportedMimeType();
     console.log('[드릴녹음] mimeType:', _drillRecOpts.mimeType || '기본값');
     const mr = new MediaRecorder(stream, _drillRecOpts);
     _drill.mr = mr;
     mr.ondataavailable = e => { if (e.data.size > 0) _drill.chunks.push(e.data); };
     mr.onstop = async () => {
+      _drill.stopHandled = true; // 워치독 타이머에게 "정상 처리됨"을 알림
       // Blob 생성이 끝난 뒤에만 마이크를 해제한다 — 조기 해제 시 마지막 데이터가 유실됨
       _drill.myBlob = new Blob(_drill.chunks, { type: mr.mimeType || 'audio/mp4' });
       if (_drill.myAudioUrl) URL.revokeObjectURL(_drill.myAudioUrl);
@@ -2754,7 +2763,19 @@ function _drillStopRec() {
   const recBtn = $('btn-drill-record');
   if (recBtn) { recBtn.disabled = true; recBtn.textContent = '⏳ 처리 중...'; }
   _drill.recording = false;
+  _drill.stopHandled = false;
   _drill.mr.stop(); // 스트림 정리·오디오 세션 복원·화면 전환은 onstop에서 일괄 처리
+
+  // 워치독: onstop 이벤트가 어떤 이유로든(브라우저 버그 등) 6초 내에 안 불리면
+  // "처리 중..."에 무한정 멈춰있지 않도록 강제로 복구하고 재시도를 안내한다.
+  setTimeout(() => {
+    if (_drill.stopHandled) return; // 이미 정상 처리됨 — 아무것도 안 함
+    console.warn('[드릴모드] onstop 미발생 — 워치독으로 강제 복구');
+    stopMicStream(_drill.stream);
+    _drill.stream = null;
+    if (recBtn) { recBtn.disabled = false; recBtn.textContent = '🎤 따라읽기 시작'; recBtn.onclick = _drillStartRec; }
+    showToast('녹음 처리가 지연되었습니다. 다시 시도해 주세요.', 3000);
+  }, 6000);
 }
 
 function _drillNext() {
