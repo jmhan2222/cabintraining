@@ -915,7 +915,10 @@ function enterApp() {
   renderHome();
   showScreen('screen-home'); updateAIUsageBadge();
   const empId = getStoredEmployeeId();
-  if (empId) _startWatermarkGuard(empId);
+  if (empId) {
+    _startWatermarkGuard(empId);
+    _recordAccessLog(empId); // 세션 복원(재접속) 시에도 접속 기록 — 하루 1회만 저장되도록 함수 내부에서 중복 방지됨
+  }
   _initContentProtection();
 }
 
