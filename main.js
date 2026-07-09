@@ -3275,8 +3275,7 @@ function showResults(result, transcript) {
   const lang    = state.currentScript.langs[state.selectedLang];
   const isAdmin = isEditUnlocked();
 
-  // 음성 비교 카드 블러 (소프트 페이월)
-  $('result-voice-card')?.classList.add('blur-section');
+  // (정식 배포: 소프트 페이월 블러 제거 — 바로 결과 확인 가능하도록)
 
   // 내 녹음 없으면 scrub 영역 메시지
   if (!_lastRecordingBlob) {
@@ -4654,7 +4653,7 @@ function renderAiResult(ai, isAdmin) {
       ? `<div class="ai-card-fb-row ai-card-fb-improve"><span class="ai-card-fb-icon">📌</span><div><strong>개선 포인트</strong><br>${escHtml(flCat.feedback.trim())}</div></div>` : '';
     const fbTip = flCat.practiceTip
       ? `<div class="ai-card-fb-row ai-card-fb-tip"><span class="ai-card-fb-icon">🎯</span><div><strong>다음 연습 목표</strong><br>${escHtml(flCat.practiceTip)}</div></div>` : '';
-    const blurredRows = (fbImprove || fbTip) ? `<div class="blur-section paywall-fluency-blur">${fbImprove}${fbTip}</div>` : '';
+    const blurredRows = (fbImprove || fbTip) ? `${fbImprove}${fbTip}` : '';
     fluencyCardHtml = `<div class="ai-cat-card ${bgCls}">
       <div class="ai-cat-card-header">
         <span class="ai-cat-card-icon">${m.icon}</span>
@@ -4707,22 +4706,13 @@ function renderAiResult(ai, isAdmin) {
     ${matchRateHtml}
     ${gradeHeaderHtml}
     ${fluencyCardHtml}
-    <div class="blur-wrapper">
-      <div class="blur-section">
-        ${goodPointsHtml}
-        ${blurredCatCardsHtml}
-        ${missedHtml}
-        ${nextFocusHtml}
-      </div>
-      <div class="paywall-overlay">
-        <h3>🔒 상세 분석 결과</h3>
-        <p>발음 오류, 억양, 분위기/목소리<br>개선 포인트와 모델 음성 비교까지<br>전체 분석을 확인할 수 있어요.</p>
-        <button class="paywall-btn" onclick="window.open(SURVEY_URL,'_blank')">✈️ 자가 학습할게요!</button>
-      </div>
-    </div>
+    ${goodPointsHtml}
+    ${blurredCatCardsHtml}
+    ${missedHtml}
+    ${nextFocusHtml}
     ${encourageHtml}
   `;
-  console.log('[완료] 소프트 페이월');
+  console.log('[완료] AI 상세 분석 렌더링');
 }
 
 // ===== ADMIN =====
