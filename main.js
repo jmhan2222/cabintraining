@@ -262,13 +262,32 @@ function createModelVoicePlayer(containerId, opts = {}) {
     });
   });
 
-  // URL 확보 즉시 Audio 객체 미리 생성
+  // URL 확보 즉시 Audio 객체 미리 생성 + 실제 재생 가능(canplay) 상태까지 대기
   // → doPlay() 클릭 시 await 없이 _currentModelAudio.src 경로로 직행 (iOS 제스처 유지)
+  // → 버튼을 "URL 준비됨"이 아니라 "실제 재생 가능"할 때 활성화해, 네트워크
+  //   버퍼링이 안 끝난 상태에서 재생을 시도하다 iOS에 막히는 상황을 방지
   const _preload = (url) => {
-    if (!url || (_currentModelAudio && _currentModelAudio.src)) return;
-    _currentModelAudio = new Audio(url);
-    _currentModelAudio.setAttribute('playsinline', '');
-    window._modelAudioKeepAlive = _currentModelAudio;
+    if (!url || (_currentModelAudio && _currentModelAudio.src)) return Promise.resolve();
+    return new Promise(resolve => {
+      const audio = new Audio();
+      audio.setAttribute('playsinline', '');
+      audio.preload = 'auto';
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        _currentModelAudio = audio;
+        window._modelAudioKeepAlive = audio;
+        resolve();
+      };
+      audio.addEventListener('canplaythrough', finish, { once: true });
+      audio.addEventListener('loadeddata', finish, { once: true });
+      audio.addEventListener('error', finish, { once: true }); // 실패해도 진행(기존 폴백 경로가 처리)
+      // 네트워크 지연 대비 상한 — 3초 내 로드 안 되면 그냥 진행 (다음 클릭 시 재시도됨)
+      setTimeout(finish, 3000);
+      audio.src = url;
+      audio.load();
+    });
   };
 
   // 가용성 초기 확인 (기존 _currentModelAudio 있으면 현재 상태 즉시 반영)
@@ -289,14 +308,14 @@ function createModelVoicePlayer(containerId, opts = {}) {
     const local  = loadModelVoice(s.id, state.selectedLang);
     const cached = _getCachedModelVoiceUrl(s.id, state.selectedLang);
     if (local || cached) {
-      _preload(local || cached); // 즉시 Audio 미리 생성
-      setAvailable(true);
+      _preload(local || cached).then(() => setAvailable(true)); // 실제 재생 가능 확인 후 버튼 활성화
       return;
     }
     // 비동기: Firestore에서 URL 확보 후 Audio 미리 생성
-    _resolveModelVoiceUrl(s.id, state.selectedLang).then(url => {
-      _preload(url);
-      setAvailable(!!url);
+    _resolveModelVoiceUrl(s.id, state.selectedLang).then(async url => {
+      if (!url) { setAvailable(false); return; }
+      await _preload(url);
+      setAvailable(true);
     });
   };
   initState();
@@ -1890,7 +1909,10 @@ function setupSpeechRecognition(langCode) {
   recog.continuous = true;
   recog.interimResults = true;
 
+  let _sttFailCount = 0;
+  let _sttNotified = false;
   recog.onresult = e => {
+    _sttFailCount = 0; // 정상적으로 결과를 받으면 실패 카운트 초기화
     let interim = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript;
@@ -1898,8 +1920,28 @@ function setupSpeechRecognition(langCode) {
     }
     $('live-text').textContent = (state.transcript + interim).trim() || '말씀해 주세요...';
   };
-  recog.onerror = e => { if (e.error !== 'no-speech' && e.error !== 'aborted') console.warn('STT:', e.error); };
-  recog.onend = () => { if (state.mediaRecorder?.state === 'recording') { try { recog.start(); } catch(e){} } };
+  recog.onerror = e => {
+    if (e.error !== 'no-speech' && e.error !== 'aborted') console.warn('STT:', e.error);
+    if (e.error === 'no-speech' || e.error === 'audio-capture' || e.error === 'not-allowed') _sttFailCount++;
+  };
+  recog.onend = () => {
+    if (state.mediaRecorder?.state !== 'recording') return;
+    // 실시간 인식이 계속 실패(예: 안드로이드에서 마이크 세션 충돌)하면 무한 재시작
+    // 루프에 빠지지 않도록 일정 횟수 이상이면 중단한다. 녹음/AI 채점 자체는
+    // 이 실패와 무관하게 정상 진행되므로, 자막만 안 뜬다는 점을 한 번만 안내.
+    if (_sttFailCount >= 8) {
+      if (!_sttNotified) {
+        _sttNotified = true;
+        $('live-text').textContent = '⚠️ 이 기기에서는 실시간 자막이 지원되지 않아요. 녹음과 AI 채점은 정상 진행됩니다.';
+        console.warn('[STT] 반복 실패로 재시작 중단 (기기 마이크 세션 제약 가능성)');
+      }
+      return;
+    }
+    // 즉시 재시작 대신 약간의 지연을 둬 마이크 세션 경합을 완화
+    setTimeout(() => {
+      if (state.mediaRecorder?.state === 'recording') { try { recog.start(); } catch(e){} }
+    }, 250);
+  };
   try { recog.start(); } catch(e){}
   state.recognition = recog;
 }
