@@ -219,18 +219,22 @@ function createModelVoicePlayer(containerId, opts = {}) {
       const _unlocked = _createUnlockedAudio();
       const url = await _resolveModelVoiceUrl(s.id, state.selectedLang);
       if (!url) { setAvailable(false); return; }
+      let _playOk = true;
       try {
         await _playUnlockedAudio(_unlocked, url);
       } catch (e) {
-        console.warn('[모델음성] unlock 재생 실패, 안내 후 재시도 유도:', e.name);
-        showToast('재생 버튼을 다시 눌러주세요.', 2000);
+        _playOk = false;
+        console.warn('[모델음성] unlock 재생 실패, 재시도 유도:', e.name);
+        showToast('재생 버튼을 다시 눌러주세요.', 2500);
       }
       _unlocked.setAttribute('playsinline', '');
       _currentModelAudio = _unlocked;
       window._modelAudioKeepAlive = _currentModelAudio;
       _playerAudio = _currentModelAudio;
       attachHandlers();
-      playBtn.textContent = '⏸ 일시정지';
+      // 실패 시 "▶ 재생"으로 유지해 사용자가 재시도해야 함을 명확히 인지하게 함
+      // (다음 클릭은 "일시정지 상태에서 재개" 분기를 타므로 정상적으로 재생 재시도됨)
+      playBtn.textContent = _playOk ? '⏸ 일시정지' : '▶ 재생';
     } catch (e) {
       console.error('[모델음성] 재생 핸들러 오류:', e);
       showToast('오류가 발생했습니다.', 2000);
@@ -616,17 +620,43 @@ async function resumeAudioContext() {
 //       엘리먼트에 src를 넣고 다시 play()를 호출하면(비동기 이후라도) 정상
 //       재생된다. → 새로운 오디오 재생 기능을 추가할 때도 아래 두 함수를
 //       그대로 재사용하면 이 문제가 재발하지 않는다.
+// 녹음 가능한 MediaRecorder mimeType 탐지 — 전역 함수로 선언해 모든 녹음 관련
+// 기능(연습하기/드릴모드 등)이 하나의 정의를 공유하게 함. 함수 내부에 지역으로
+// 중복 선언하면, 다른 녹음 기능에서 같은 이름으로 호출 시 스코프 밖이라
+// ReferenceError가 나므로 반드시 이 전역 함수 하나만 사용할 것.
+function _getSupportedMimeType() {
+  const types = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4;codecs=aac',
+    'audio/mp4',
+    'audio/aac',
+    ''
+  ];
+  for (const type of types) {
+    if (!type || MediaRecorder.isTypeSupported(type)) {
+      return type ? { mimeType: type } : {};
+    }
+  }
+  return {};
+}
+
+// 오디오 재생 권한을 선점(unlock)하기 위한 최소 크기 무음 WAV (44바이트 헤더 + 짧은 무음).
+// 빈 Audio()로 play()를 시도하면 브라우저에 따라 "재생 시도"로 인정 안 되는 경우가 있어
+// 실제 재생 가능한 무음 오디오를 넣어 더 폭넓은 브라우저에서 안정적으로 unlock되게 함.
+const _SILENT_AUDIO_SRC = 'data:audio/wav;base64,UklGRuwAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YcgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
 function _createUnlockedAudio() {
-  const audio = new Audio();
+  const audio = new Audio(_SILENT_AUDIO_SRC);
   audio.setAttribute('playsinline', '');
   audio.muted = false;
   const p = audio.play();
-  if (p && p.catch) p.catch(() => {}); // src 없어 실패하는 게 정상 동작, 무시
+  if (p && p.catch) p.catch(() => {}); // unlock 목적의 무음 재생, 실패해도 무시
   return audio;
 }
 // 미리 unlock해둔 audio 엘리먼트에 실제 URL을 넣고 재생 (URL을 비동기로
 // 확보해야 하는 모든 재생 로직에서 이 두 함수를 짝으로 사용할 것)
 async function _playUnlockedAudio(audio, url) {
+  audio.pause();
   audio.src = url;
   audio.load();
   const p = audio.play();
@@ -1736,22 +1766,6 @@ async function startRecording() {
   state.sourceNode = state.audioContext.createMediaStreamSource(state.stream);
   state.sourceNode.connect(state.analyser);
 
-  const _getSupportedMimeType = () => {
-    const types = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/mp4;codecs=aac',
-      'audio/mp4',
-      'audio/aac',
-      ''
-    ];
-    for (const type of types) {
-      if (!type || MediaRecorder.isTypeSupported(type)) {
-        return type ? { mimeType: type } : {};
-      }
-    }
-    return {};
-  };
   const _recOpts = _getSupportedMimeType();
   // 음성 채점용 비트레이트를 64kbps로 제한 (음질은 음성 인식/분석에 충분, 파일 용량은 크게 감소)
   // → 파일이 작을수록 Gemini 전송/분석 시간이 줄어 동시접속 시 타임아웃 확률이 낮아짐
@@ -2906,13 +2920,15 @@ async function playModelVoice() {
   if (!url) { showToast('모델 음성 없음'); return; }
   if (_rvcModelAudio) { _rvcModelAudio.pause(); }
   _rvcModelAudio = _unlocked;
+  let _playOk = true;
   try {
     await _playUnlockedAudio(_rvcModelAudio, url);
   } catch (e) {
+    _playOk = false;
     console.warn('[모델음성 비교] unlock 재생 실패:', e.name);
-    showToast('재생 버튼을 다시 눌러주세요.', 2000);
+    showToast('재생 버튼을 다시 눌러주세요.', 2500);
   }
-  if (btn) btn.textContent = '⏸ 일시정지';
+  if (btn) btn.textContent = _playOk ? '⏸ 일시정지' : '▶ 재생';
   _rvcAttachScrub(_rvcModelAudio, 'rvc-model-scrub', 'rvc-model-time', 'btn-play-model');
   console.log('[완료] 모델 음성 재생');
 }
