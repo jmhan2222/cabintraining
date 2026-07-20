@@ -11,10 +11,10 @@ const FIREBASE_CONFIG = {
   appId: "1:991357763010:web:ec0a5d7ee55752b5a1aa5b"
 };
 
-let _db = null;
-let _storage = null;
+var _db = null;
+var _storage = null;
 let _geminiModel = null;
-let auth = null;
+var auth = null;
 const _mvUrlCache = {}; // { "scriptId_lang": url }
 let _guideUpdateNeededIds = new Set(); // guideUpdateNeeded: true 인 방송문 IDs
 
@@ -822,25 +822,60 @@ async function _checkAllowedEmployee(empId) {
 }
 
 async function _recordAccessLog(empId) {
-  if (!_db) return;
+  console.log('[접속로그] _recordAccessLog 호출됨, empId:', empId, '| _db 존재:', !!_db);
+  if (!_db) { console.warn('[접속로그] _db가 없어서 기록 중단'); return; }
   try {
     const dateStr = _kstDateStr();
     const logId = `${empId}_${dateStr}`;
+    console.log('[접속로그] 기록 시도, logId:', logId);
     const ref = _db.collection('accessLogs').doc(logId);
     const snap = await ref.get();
-    if (snap.exists) return; // 당일 이미 기록됨
+    if (snap.exists) { console.log('[접속로그] 오늘 이미 기록됨, 스킵'); return; }
     await ref.set({
       employeeId: empId,
       date: dateStr,
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       device: navigator.userAgent,
     });
+    console.log('[접속로그] accessLogs 기록 성공:', logId);
     // allowedUsers에 마지막 접속 시각 반영 (관리자 사용자 목록에서 조회용)
     await _db.collection('allowedUsers').doc(empId).set(
       { lastAccessAt: firebase.firestore.FieldValue.serverTimestamp() },
       { merge: true }
     );
-  } catch (e) { console.warn('[접속로그] 기록 실패:', e.message); }
+    console.log('[접속로그] allowedUsers.lastAccessAt 갱신 성공');
+  } catch (e) { console.error('[접속로그] 기록 실패:', e.code || '', e.message); }
+}
+
+// 로그인 여부와 무관하게 "기기당 고유 ID"를 부여 (최초 실행 시 1회 생성 후 계속 재사용)
+function _getOrCreateDeviceId() {
+  const KEY = 'vp_device_id';
+  let id = localStorage.getItem(KEY);
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2));
+    localStorage.setItem(KEY, id);
+  }
+  return id;
+}
+
+// 로그인 성공 여부와 무관하게 "앱이 실행됐다"는 사실 자체를 하루 1회 기록
+// (로그인 화면만 보고 나간 사람까지 포함해서 "오늘 총 실행 인원"을 집계하기 위함)
+// 기존 accessLogs(로그인 기반)와는 완전히 별개의 컬렉션을 사용해 서로 영향 없음
+async function _recordAppLaunch() {
+  if (!_db && !initFirebase()) return; // 로그인 전이라 Firebase가 아직 초기화 안 됐을 수 있음
+  try {
+    const key = getStoredEmployeeId() || _getOrCreateDeviceId();
+    const dateStr = _kstDateStr();
+    const ref = _db.collection('appLaunches').doc(`${key}_${dateStr}`);
+    const snap = await ref.get();
+    if (snap.exists) return; // 당일 이미 기록됨
+    await ref.set({
+      key,
+      isLoggedIn: !!getStoredEmployeeId(),
+      date: dateStr,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (e) { console.warn('[앱실행기록] 기록 실패:', e.message); }
 }
 
 async function attemptLogin() {
@@ -915,10 +950,13 @@ function enterApp() {
   renderHome();
   showScreen('screen-home'); updateAIUsageBadge();
   const empId = getStoredEmployeeId();
-  if (empId) {
-    _startWatermarkGuard(empId);
-    _recordAccessLog(empId); // 세션 복원(재접속) 시에도 접속 기록 — 하루 1회만 저장되도록 함수 내부에서 중복 방지됨
-  }
+  if (empId) _startWatermarkGuard(empId);
+  // 접속 기록: 실제 로그인(login.js)은 사번을 'vp_s' 세션에만 저장하므로,
+  // 구버전 키(cvp_employee_id)가 비어있으면 vp_s에서 읽는다. (이 불일치로
+  // 지금까지 접속 기록이 전혀 남지 않았음)
+  const _sessEmpId = _getEmpId();
+  const _logEmpId = empId || (_sessEmpId !== 'guest' ? _sessEmpId : null);
+  if (_logEmpId) _recordAccessLog(_logEmpId); // 하루 1회만 저장 (함수 내부 중복 방지)
   _initContentProtection();
 }
 
@@ -4726,8 +4764,26 @@ function openAdminScreen() {
     _refreshAdminVersionList();
     _setupAdminMvSection();
     _loadAdminUserList();
+    _loadTodayLaunchCount();
     showScreen('screen-admin');
   });
+}
+
+// 오늘 하루 앱 실행 인원(로그인 여부 무관, 누적) 조회
+async function _loadTodayLaunchCount() {
+  const el = $('admin-today-launch-count');
+  if (!el || !_db) return;
+  el.textContent = '조회 중...';
+  try {
+    const dateStr = _kstDateStr();
+    const snap = await _db.collection('appLaunches').where('date', '==', dateStr).get();
+    const total = snap.size;
+    const loggedIn = snap.docs.filter(d => d.data().isLoggedIn).length;
+    el.textContent = `오늘 앱 실행: 총 ${total}명 (그중 로그인 완료 ${loggedIn}명)`;
+  } catch (e) {
+    el.textContent = '조회 실패';
+    console.warn('[오늘실행인원] 조회 실패:', e.message);
+  }
 }
 
 // ===== ADMIN MODEL VOICE MANAGEMENT =====
@@ -5689,6 +5745,8 @@ async function _openGuideModal() {
 
 // ===== EVENTS =====
 document.addEventListener('DOMContentLoaded', () => {
+  _recordAppLaunch(); // 로그인 여부와 무관하게 "앱 실행" 자체를 하루 1회 기록
+
   // vp_s 세션 체크 후 즉시 앱 복구
   const s = localStorage.getItem('vp_s');
   if (s) {
