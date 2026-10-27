@@ -1438,28 +1438,68 @@ async function loadAndRenderHome() {
 
   let firestoreScripts = [];
   const cached = (() => { try { return JSON.parse(localStorage.getItem('cabinvoice_scripts_cache')||'null'); } catch { return null; } })();
-  if (cached && cached.announcements && (Date.now()-cached.ts < 3600000)) {
+  
+  // 1. 캐시가 있으면 즉시 렌더링 (빠른 초기 로딩)
+  if (cached && cached.announcements) {
     firestoreScripts = _mapAnnouncementsToScripts(cached.announcements);
     if ($('rev-badge')) $('rev-badge').textContent = cached.rev || 'OPIc 방식';
-    console.log('[초기로딩] 소스: localStorage cache, 방송문 수:', cached.announcements.length);
-  } else if (initFirebase()) {
+    _allScripts = [...firestoreScripts, ...loadCustomScripts()];
+    renderSidebar(_allScripts);
+    console.log('[초기로딩] 소스: localStorage cache, 버전:', cached.rev);
+  }
+
+  // 2. 백그라운드에서 서버 최신 버전 확인 및 변경 감지
+  if (initFirebase()) {
     try {
       const latest = await firestoreLoadLatest();
       if (latest && latest.announcements) {
-        firestoreScripts = _mapAnnouncementsToScripts(latest.announcements);
-        localStorage.setItem('cabinvoice_scripts_cache', JSON.stringify({
-          rev: latest.revVersion, announcements: latest.announcements, ts: Date.now()
-        }));
-        if ($('rev-badge')) $('rev-badge').textContent = latest.revVersion || 'OPIc 방식';
-        console.log('[초기로딩] 소스: cabinManual/latest, 방송문 수:', latest.announcements.length);
+        const isNewVersion = cached && cached.rev && cached.rev !== latest.revVersion;
+        
+        if (!cached || isNewVersion || (Date.now() - cached.ts >= 3600000)) {
+          console.log('[버전확인] 서버 버전:', latest.revVersion, '캐시 버전:', cached?.rev);
+
+          if (isNewVersion) {
+            // 버전 변경 감지 시 배너 노출
+            const banner = $('version-update-banner');
+            const bannerText = $('version-update-text');
+            const applyBtn = $('btn-apply-update');
+            if (banner && bannerText && applyBtn) {
+              bannerText.textContent = `새로운 개정 방송문(${latest.revVersion})이 배포되었습니다.`;
+              banner.classList.remove('hidden');
+              applyBtn.onclick = () => {
+                localStorage.setItem('cabinvoice_scripts_cache', JSON.stringify({
+                  rev: latest.revVersion, announcements: latest.announcements, ts: Date.now()
+                }));
+                banner.classList.add('hidden');
+                _allScripts = [..._mapAnnouncementsToScripts(latest.announcements), ...loadCustomScripts()];
+                renderSidebar(_allScripts);
+                if ($('rev-badge')) $('rev-badge').textContent = latest.revVersion;
+                showToast(`개정 방송문(${latest.revVersion})이 적용되었습니다. ✨`);
+              };
+            }
+          } else {
+            // 최초 진입이거나 캐시 만료 시 자동 반영
+            firestoreScripts = _mapAnnouncementsToScripts(latest.announcements);
+            localStorage.setItem('cabinvoice_scripts_cache', JSON.stringify({
+              rev: latest.revVersion, announcements: latest.announcements, ts: Date.now()
+            }));
+            if ($('rev-badge')) $('rev-badge').textContent = latest.revVersion || 'OPIc 방식';
+            _allScripts = [...firestoreScripts, ...loadCustomScripts()];
+            renderSidebar(_allScripts);
+          }
+        }
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[버전확인실패]', e);
+    }
   }
 
-  const customScripts = loadCustomScripts();
-  _allScripts = [...firestoreScripts, ...customScripts];
+  if (!cached || !cached.announcements) {
+    const customScripts = loadCustomScripts();
+    _allScripts = [...firestoreScripts, ...customScripts];
+    renderSidebar(_allScripts);
+  }
 
-  renderSidebar(_allScripts);
   if (_db) _fetchGuideUpdateFlags().then(() => renderSidebar(_allScripts)).catch(() => {});
 }
 

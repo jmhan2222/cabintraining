@@ -2750,3 +2750,61 @@ body.cvp-protected * {
 @media print {
   body.cvp-protected { display: none !important; }
 }
+
+/* ===== 버전 업데이트 알림 배너 ===== */
+.version-update-banner {
+  background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%);
+  border-bottom: 1px solid #FED7AA;
+  color: #C2410C;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  animation: slideDownBanner 0.3s ease;
+  z-index: 50;
+  flex-shrink: 0;
+}
+.version-update-banner.hidden {
+  display: none !important;
+}
+.version-update-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.version-update-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+#version-update-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.btn-version-update {
+  background: #EA580C;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(234, 88, 12, 0.2);
+  transition: all 0.15s ease;
+}
+.btn-version-update:hover {
+  background: #C2410C;
+  transform: translateY(-1px);
+}
+@keyframes slideDownBanner {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
