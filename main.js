@@ -4958,10 +4958,22 @@ function openAdminScreen() {
     _refreshAdminVersionList();
     _setupAdminMvSection();
     _ensureVoiceStatus(true).then(_renderAdminVoiceStatus);
-    _loadAdminUserList();
+    _loadAdminUserList().then(() => {
+      _checkAndAutoSyncAccessLogs();
+    });
     _loadTodayLaunchCount();
     showScreen('screen-admin');
   });
+}
+
+// 과거 접속 기록이 allowedUsers에 아직 소급 반영되지 않았으면 백그라운드 1회 자동 동기화
+async function _checkAndAutoSyncAccessLogs() {
+  if (!_db || !_adminAllowedUsers.length) return;
+  const hasUnsynced = _adminAllowedUsers.some(u => u.lastAccessAt && !u.totalLoginDays);
+  if (hasUnsynced) {
+    console.log('[접속로그] 과거 접속 데이터 소급 동기화 자동 시작...');
+    await _syncPastAccessLogsToAllowedUsers();
+  }
 }
 
 // 오늘 하루 앱 실행 인원(로그인 여부 무관, 누적) 조회
@@ -5645,6 +5657,68 @@ function _downloadAdminUserListCsv() {
   a.download = `allowedUsers_stats_${_kstDateStr()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// 과거 accessLogs 원본 기록을 읽어 allowedUsers의 접속일수(totalLoginDays / loginDays_YYYY)로 소급 동기화
+async function _syncPastAccessLogsToAllowedUsers() {
+  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+  const btn = $('btn-admin-user-sync-logs');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 동기화 중...'; }
+  try {
+    const snap = await _db.collection('accessLogs').get();
+    if (snap.empty) {
+      showToast('accessLogs 데이터가 없습니다.', 2500);
+      return;
+    }
+
+    // empId -> { years: { 2026: Set(...) }, totalDates: Set(...) }
+    const userStats = {};
+    snap.docs.forEach(d => {
+      const data = d.data();
+      const empId = data.employeeId;
+      const date = data.date || '';
+      if (!empId || !date) return;
+      const year = date.slice(0, 4);
+      if (!userStats[empId]) {
+        userStats[empId] = { years: {}, totalDates: new Set() };
+      }
+      if (!userStats[empId].years[year]) {
+        userStats[empId].years[year] = new Set();
+      }
+      userStats[empId].years[year].add(date);
+      userStats[empId].totalDates.add(date);
+    });
+
+    const entries = Object.entries(userStats);
+    const BATCH_LIMIT = 400;
+    let updatedCount = 0;
+
+    for (let i = 0; i < entries.length; i += BATCH_LIMIT) {
+      const batch = _db.batch();
+      const chunk = entries.slice(i, i + BATCH_LIMIT);
+      chunk.forEach(([empId, stat]) => {
+        const ref = _db.collection('allowedUsers').doc(empId);
+        const payload = {
+          totalLoginDays: stat.totalDates.size,
+        };
+        Object.entries(stat.years).forEach(([yr, dateSet]) => {
+          payload[`loginDays_${yr}`] = dateSet.size;
+        });
+        batch.set(ref, payload, { merge: true });
+        updatedCount++;
+      });
+      await batch.commit();
+    }
+
+    showToast(`✅ ${updatedCount}명 과거 접속일수 소급 동기화 완료!`, 3500);
+    await _loadAdminUserList();
+    await _loadAdminAccessLogs();
+  } catch (e) {
+    showToast(`동기화 실패: ${e.message}`, 3500);
+    console.error('[접속로그 소급 동기화]', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 접속일수 소급 동기화'; }
+  }
 }
 
 // ===== ADMIN: 접속 로그 조회 =====
@@ -6516,6 +6590,7 @@ document.addEventListener('DOMContentLoaded', () => {
     _renderAdminUserList();
   });
   $('btn-admin-user-delete-all')?.addEventListener('click', _deleteAllAdminUsers);
+  $('btn-admin-user-sync-logs')?.addEventListener('click', _syncPastAccessLogsToAllowedUsers);
   $('btn-admin-user-download')?.addEventListener('click', _downloadAdminUserListCsv);
   $('btn-admin-log-load')?.addEventListener('click', _loadAdminAccessLogs);
   $('btn-admin-log-csv')?.addEventListener('click', _downloadAdminLogCsv);
