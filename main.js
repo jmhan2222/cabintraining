@@ -86,6 +86,56 @@ function _extractScriptNum(script) {
   return null;
 }
 
+// ===== MODEL VOICE STATUS (개정 대비 음성 연결 해제 상태) =====
+// Firestore scripts/_voiceStatus = { pending, unlinkedAt, linkedAt, revVersion, by }
+// pending=true : 방송문 개정으로 기존 모델 음성 연결을 해제하고 새 녹음을 기다리는 상태
+//   → 플레이어에 '모델 음성 준비 중' 표시, 기기에 직접 올린(localStorage) 음성도 무시
+// 새 음성 배포 후 '로컬 모델 음성 스캔'이 1개 이상 매핑되면 자동으로 pending=false
+const _VOICE_STATUS_DOC = '_voiceStatus';
+let _voiceStatus = null;          // 마지막으로 읽은 상태 데이터
+let _voiceStatusLoaded = false;   // 1회 이상 조회 완료 여부
+let _voiceStatusPromise = null;   // 중복 조회 방지
+
+function _ensureVoiceStatus(force = false) {
+  if (!_db) return Promise.resolve(null);
+  if (!force && _voiceStatusPromise) return _voiceStatusPromise;
+  _voiceStatusPromise = (async () => {
+    try {
+      const doc = await _db.collection('scripts').doc(_VOICE_STATUS_DOC).get();
+      _voiceStatus = doc.exists ? doc.data() : null;
+    } catch (e) {
+      console.warn('[음성상태] 조회 실패:', e?.message);
+    }
+    _voiceStatusLoaded = true;
+    return _voiceStatus;
+  })();
+  return _voiceStatusPromise;
+}
+function _isVoicePending() { return !!(_voiceStatus && _voiceStatus.pending); }
+
+// 교범 방송문(사용자 정의 방송문 제외)인지
+function _isManualScriptId(scriptId) {
+  return _allScripts.some(s => s.id === scriptId && !s._custom);
+}
+
+// 기기 로컬 업로드 음성 조회 — 음성 준비 중이면 교범 방송문에 한해 무시
+// 상태 조회 전에는 null 반환 → 비동기 경로(_resolveModelVoiceUrl)가 상태 확인 후 다시 판단
+function _loadLocalModelVoiceOverride(scriptId, lang) {
+  if (_isManualScriptId(scriptId)) {
+    if (!_voiceStatusLoaded || _isVoicePending()) return null;
+  }
+  return loadModelVoice(scriptId, lang);
+}
+
+// 화면에 남아 있는 모델 음성/URL 캐시 비우기 (개정본 적용, 연결 해제 직후)
+function _clearModelVoiceRuntimeCache() {
+  Object.keys(_mvUrlCache).forEach(k => delete _mvUrlCache[k]);
+  if (_currentModelAudio) {
+    try { _currentModelAudio.pause(); } catch {}
+    _currentModelAudio = null;
+  }
+}
+
 // ===== COMMON MODEL VOICE PLAYER =====
 // containerId: 렌더링할 컨테이너 DOM ID
 // opts.onAvailable(bool): 음성 가용 여부 콜백 (드릴 버튼 활성화 등)
@@ -115,8 +165,11 @@ function createModelVoicePlayer(containerId, opts = {}) {
   const setAvailable = (ok) => {
     playBtn.disabled = !ok;
     scrub.disabled = !ok;
-    if (!ok) { playBtn.textContent = '모델 음성 미등록'; scrub.value = 0; timeEl.textContent = '0:00 / 0:00'; }
-    else if (playBtn.textContent === '모델 음성 미등록') playBtn.textContent = '▶ 재생';
+    if (!ok) {
+      playBtn.textContent = _isVoicePending() ? '🎙 모델 음성 준비 중' : '모델 음성 미등록';
+      scrub.value = 0; timeEl.textContent = '0:00 / 0:00';
+    }
+    else if (playBtn.textContent.includes('모델 음성')) playBtn.textContent = '▶ 재생';
     if (opts.onAvailable) opts.onAvailable(ok);
   };
 
@@ -305,7 +358,7 @@ function createModelVoicePlayer(containerId, opts = {}) {
     }
     const s = state.currentScript;
     if (!s) { setAvailable(false); return; }
-    const local  = loadModelVoice(s.id, state.selectedLang);
+    const local  = _loadLocalModelVoiceOverride(s.id, state.selectedLang);
     const cached = _getCachedModelVoiceUrl(s.id, state.selectedLang);
     if (local || cached) {
       _preload(local || cached).then(() => setAvailable(true)); // 실제 재생 가능 확인 후 버튼 활성화
@@ -363,7 +416,20 @@ async function _doScanLocalModelVoices() {
     }
   }
 
+  // 1개 이상 매핑되면 '음성 준비 중' 상태 해제
+  let newStatus = null;
+  if (matched > 0) {
+    newStatus = {
+      pending: false,
+      linkedAt: firebase.firestore.Timestamp.now(),
+      linkedCount: matched,
+      by: auth?.currentUser?.email || null,
+    };
+    batch.set(_db.collection('scripts').doc(_VOICE_STATUS_DOC), newStatus, { merge: true });
+  }
+
   await batch.commit();
+  if (newStatus) _voiceStatus = { ...(_voiceStatus || {}), ...newStatus };
   Object.keys(_mvUrlCache).forEach(k => delete _mvUrlCache[k]);
   return matched;
 }
@@ -372,8 +438,11 @@ async function _doScanLocalModelVoices() {
 // 우선순위: 1) localStorage base64  2) 메모리 캐시  3) Firestore modelFiles → 로컬 URL
 // gender: 'M'(남) | 'F'(여) — 기본값은 현재 선택 성별
 async function _resolveModelVoiceUrl(scriptId, lang, gender = _currentGender) {
-  // 1. 직접 업로드된 base64 (localStorage, gender 무관)
-  const local = loadModelVoice(scriptId, lang);
+  // 0. 음성 준비 중 상태 확인 (1회 조회 후 재사용)
+  await _ensureVoiceStatus();
+
+  // 1. 직접 업로드된 base64 (localStorage, gender 무관) — 음성 준비 중이면 교범 방송문은 무시
+  const local = _loadLocalModelVoiceOverride(scriptId, lang);
   if (local) return local;
 
   // 2. 메모리 캐시 (gender 포함 키)
@@ -442,7 +511,7 @@ async function _resolveModelVoiceUrl(scriptId, lang, gender = _currentGender) {
 }
 
 function _getCachedModelVoiceUrl(scriptId, lang, gender = _currentGender) {
-  return loadModelVoice(scriptId, lang) || _mvUrlCache[`${scriptId}_${lang}_${gender}`] || null;
+  return _loadLocalModelVoiceOverride(scriptId, lang) || _mvUrlCache[`${scriptId}_${lang}_${gender}`] || null;
 }
 
 // ===== GEMINI (Cloudflare Pages Function 프록시 경유) =====
@@ -1450,6 +1519,7 @@ async function loadAndRenderHome() {
 
   // 2. 백그라운드에서 서버 최신 버전 확인 및 변경 감지
   if (initFirebase()) {
+    _ensureVoiceStatus(); // 음성 준비 중 여부 미리 조회 (비차단)
     try {
       const latest = await firestoreLoadLatest();
       if (latest && latest.announcements) {
@@ -1471,6 +1541,9 @@ async function loadAndRenderHome() {
                   rev: latest.revVersion, announcements: latest.announcements, ts: Date.now()
                 }));
                 banner.classList.add('hidden');
+                // 이전 개정본 기준으로 불러둔 모델 음성 정리 후 상태 재조회
+                _clearModelVoiceRuntimeCache();
+                _ensureVoiceStatus(true);
                 _allScripts = [..._mapAnnouncementsToScripts(latest.announcements), ...loadCustomScripts()];
                 renderSidebar(_allScripts);
                 if ($('rev-badge')) $('rev-badge').textContent = latest.revVersion;
@@ -4803,6 +4876,7 @@ function openAdminScreen() {
     _refreshAdminVersion();
     _refreshAdminVersionList();
     _setupAdminMvSection();
+    _ensureVoiceStatus(true).then(_renderAdminVoiceStatus);
     _loadAdminUserList();
     _loadTodayLaunchCount();
     showScreen('screen-admin');
@@ -4855,6 +4929,7 @@ function _setupAdminMvSection() {
 
 // 로컬 모델 음성 자동 스캔 → Firestore scripts/{id}.modelFiles 저장
 async function _scanLocalModelVoices() {
+  if (!_confirmScanWhilePending()) return;
   await new Promise(resolve => setTimeout(resolve, 500));
   console.log('[스캔] 현재 사용자:', auth?.currentUser?.email);
   const btn = $('btn-admin-scan-mv');
@@ -4863,6 +4938,7 @@ async function _scanLocalModelVoices() {
     const matched = await _doScanLocalModelVoices();
     showToast(`✅ ${matched}개 방송문 매핑 완료`);
     console.log(`[스캔] ${matched}개 방송문 modelFiles 저장 완료`);
+    _renderAdminVoiceStatus();
   } catch (e) {
     showToast(`스캔 실패: ${e.message}`);
     console.error('[스캔] 오류:', e);
@@ -4872,6 +4948,7 @@ async function _scanLocalModelVoices() {
 }
 
 async function _resetAndRescanModelVoices() {
+  if (!_confirmScanWhilePending()) return;
   if (!confirm('scripts 컬렉션의 modelFiles 필드를 전부 삭제하고 재스캔합니다.\n계속하시겠습니까?')) return;
 
   const btn = $('btn-admin-reset-scan-mv');
@@ -4886,6 +4963,7 @@ async function _resetAndRescanModelVoices() {
     if (snap.docs.length > 0) {
       const batch = _db.batch();
       snap.docs.forEach(doc => {
+        if (doc.id === _VOICE_STATUS_DOC) return;
         batch.update(doc.ref, { modelFiles: firebase.firestore.FieldValue.delete() });
       });
       await batch.commit();
@@ -4895,12 +4973,95 @@ async function _resetAndRescanModelVoices() {
     if (btn) btn.textContent = '⏳ 재스캔 중...';
     const matched = await _doScanLocalModelVoices();
     showToast(`✅ ${matched}개 방송문 재매핑 완료`);
+    _renderAdminVoiceStatus();
   } catch (e) {
     showToast(`초기화/재스캔 실패: ${e.message}`);
     console.error('[초기화]', e);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🗑️ 전체 초기화 후 재스캔'; }
     if (scanBtn) scanBtn.disabled = false;
+  }
+}
+
+// '음성 준비 중' 상태에서 스캔하면 아직 폴더에 남아 있는 옛 음성이 다시 연결될 수 있어 확인
+function _confirmScanWhilePending() {
+  if (!_isVoicePending()) return true;
+  return confirm(
+    '현재 "모델 음성 준비 중" 상태입니다.\n\n' +
+    '새로 녹음한 음성을 update-voices.cmd로 교체·배포한 뒤에만 스캔하세요.\n' +
+    '(배포 전에 스캔하면 이전 개정본 음성이 다시 연결됩니다)\n\n' +
+    '새 음성 배포를 마쳤습니까?'
+  );
+}
+
+// 개정 방송문 배포 시: 모든 방송문의 모델 음성 연결 해제 → '모델 음성 준비 중' 표시
+async function _unlinkModelVoices() {
+  if (!_db) initFirebase();
+  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+
+  const rev = (() => {
+    try { return JSON.parse(localStorage.getItem('cabinvoice_scripts_cache') || 'null')?.rev || null; }
+    catch { return null; }
+  })();
+  if (!confirm(
+    '모든 방송문의 모델 음성 연결을 해제합니다.\n\n' +
+    '• 사용자 화면에는 "모델 음성 준비 중"이 표시됩니다.\n' +
+    '• 음성 파일은 삭제되지 않습니다 (연결만 해제).\n' +
+    '• 새 음성 배포 후 "로컬 모델 음성 스캔"을 누르면 다시 연결됩니다.\n\n' +
+    `현재 방송문 버전: ${rev || '알 수 없음'}\n계속하시겠습니까?`
+  )) return;
+
+  const btn = $('btn-admin-unlink-mv');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 해제 중...'; }
+  try {
+    const snap = await _db.collection('scripts').get();
+    const batch = _db.batch();
+    let count = 0;
+    snap.docs.forEach(doc => {
+      if (doc.id === _VOICE_STATUS_DOC) return;
+      if (doc.data().modelFiles) {
+        batch.update(doc.ref, { modelFiles: firebase.firestore.FieldValue.delete() });
+        count++;
+      }
+    });
+    const status = {
+      pending: true,
+      unlinkedAt: firebase.firestore.Timestamp.now(),
+      unlinkedCount: count,
+      revVersion: rev,
+      by: auth?.currentUser?.email || null,
+    };
+    batch.set(_db.collection('scripts').doc(_VOICE_STATUS_DOC), status, { merge: true });
+    await batch.commit();
+
+    _voiceStatus = { ...(_voiceStatus || {}), ...status };
+    _voiceStatusLoaded = true;
+    _clearModelVoiceRuntimeCache();
+    showToast(`⛔ ${count}개 방송문 음성 연결 해제 — "모델 음성 준비 중" 표시`, 3500);
+    _renderAdminVoiceStatus();
+  } catch (e) {
+    showToast(`연결 해제 실패: ${e.message}`, 3500);
+    console.error('[음성 연결 해제]', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⛔ 음성 연결 해제 (개정 대비)'; }
+  }
+}
+
+// 관리자 화면: 현재 모델 음성 상태 표시
+function _renderAdminVoiceStatus() {
+  const el = $('admin-mv-status');
+  if (!el) return;
+  const fmtTs = ts => ts?.seconds ? new Date(ts.seconds * 1000).toLocaleString('ko') : '';
+  const s = _voiceStatus;
+  if (s && s.pending) {
+    el.innerHTML = `🟡 <strong>모델 음성 준비 중</strong> — ${fmtTs(s.unlinkedAt)} 해제` +
+      (s.revVersion ? ` (방송문 ${escHtml(String(s.revVersion))})` : '') +
+      `<br><span style="color:var(--gray-500)">새 음성 배포 후 "로컬 모델 음성 스캔"을 누르면 연결됩니다.</span>`;
+    el.style.background = '#fef9c3';
+  } else {
+    el.innerHTML = `🟢 <strong>모델 음성 연결됨</strong>` +
+      (s?.linkedAt ? ` — ${fmtTs(s.linkedAt)} 스캔 (${s.linkedCount || 0}개 방송문)` : '');
+    el.style.background = '#dcfce7';
   }
 }
 
@@ -6120,6 +6281,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if ($('btn-admin-scan-mv')) $('btn-admin-scan-mv').addEventListener('click', _scanLocalModelVoices);
   if ($('btn-admin-reset-scan-mv')) $('btn-admin-reset-scan-mv').addEventListener('click', _resetAndRescanModelVoices);
+  if ($('btn-admin-unlink-mv')) $('btn-admin-unlink-mv').addEventListener('click', _unlinkModelVoices);
   if ($('btn-save-firebase-cfg')) $('btn-save-firebase-cfg').addEventListener('click', () => {
     const ok = initFirebase();
     const el = $('admin-firebase-status');

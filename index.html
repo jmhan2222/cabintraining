@@ -629,11 +629,13 @@
       <section class="admin-section">
         <div class="admin-section-title">🎙 모델 음성 관리</div>
         <div style="color:var(--gray-500);font-size:13px;margin-bottom:10px">방송문을 선택하고 언어별 모델 음성을 업로드하거나, 로컬 폴더를 자동 스캔하세요.</div>
+        <div id="admin-mv-status" style="font-size:13px;padding:8px 12px;border-radius:var(--radius-sm);margin-bottom:10px;background:var(--gray-100, #f3f4f6)">상태 확인 중...</div>
         <div class="admin-row-btns" style="margin-bottom:10px">
           <button class="btn-primary" id="btn-admin-scan-mv" style="background:#6366f1">📂 로컬 모델 음성 스캔</button>
           <button class="btn-primary" id="btn-admin-reset-scan-mv" style="background:#dc2626">🗑️ 전체 초기화 후 재스캔</button>
+          <button class="btn-primary" id="btn-admin-unlink-mv" style="background:#b45309">⛔ 음성 연결 해제 (개정 대비)</button>
         </div>
-        <div style="color:var(--gray-400);font-size:12px;margin-bottom:10px">cabinvoice pro/ 폴더 → Firestore 자동 매핑 | 초기화: 기존 modelFiles 전체 삭제 후 재스캔</div>
+        <div style="color:var(--gray-400);font-size:12px;margin-bottom:10px">cabinvoice pro/ 폴더 → Firestore 자동 매핑 | 초기화: 기존 modelFiles 전체 삭제 후 재스캔 | 연결 해제: 개정 방송문 배포 직후 사용 → 사용자 화면에 "모델 음성 준비 중" 표시 (절차: README.md)</div>
         <div class="admin-row-btns">
           <select id="admin-mv-script" class="admin-input" style="flex:1;max-width:360px">
             <option value="">-- 방송문 선택 --</option>

@@ -3,6 +3,10 @@ cabinvoice pro/**/*.wav
 cabinvoice pro/**/*.m4a
 !cabinvoice pro/manifest.json
 
+# 모델 음성 교체 도구(update-voices.cmd) 작업 폴더 — 배포 대상 아님
+_new_voices/
+_voice_backup/
+
 # 빌드/배포 산출물
 project.zip
 
