@@ -994,6 +994,98 @@ async function _recordAiEvaluation() {
   }
 }
 
+// 화면 노출 체류 학습 시간 누적 (초 단위)
+async function _recordStudyTime(durationSec) {
+  if (!durationSec || durationSec < 1) return;
+  const empId = _getCurrentEmpId();
+  if (!empId || !_db) return;
+  try {
+    const dateStr = _kstDateStr();
+    const yearStr = dateStr.slice(0, 4);
+    const monthStr = dateStr.slice(0, 7).replace('-', '_');
+    const sec = Math.round(durationSec);
+
+    const updatePayload = {
+      totalStudySeconds: firebase.firestore.FieldValue.increment(sec),
+      lastStudyAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    updatePayload[`studySec_${yearStr}`] = firebase.firestore.FieldValue.increment(sec);
+    updatePayload[`studySec_${monthStr}`] = firebase.firestore.FieldValue.increment(sec);
+
+    await _db.collection('allowedUsers').doc(empId).set(updatePayload, { merge: true });
+    console.log(`[체류학습] 사번 ${empId} 화면 체류 학습시간 +${sec}초 누적 완료`);
+  } catch (e) {
+    console.warn('[체류학습] 누적 실패:', e.message);
+  }
+}
+
+// 체류 학습 시간 및 낭독 시간을 종합 포맷팅
+function _formatPracticeTimeDisplay(studySec, practiceSec) {
+  const study = studySec || 0;
+  const practice = practiceSec || 0;
+  if (study <= 0 && practice <= 0) return '0분';
+
+  if (study > 0) {
+    const studyStr = _formatSeconds(study);
+    if (practice > 0) {
+      return `${studyStr} (낭독 ${Math.round(practice / 60)}분)`;
+    }
+    return studyStr;
+  }
+  return `낭독 ${_formatSeconds(practice)}`;
+}
+
+// 화면 노출 체류 학습 시간 실시간 측정기 (스마트 활성 시간 추적)
+// 1) 화면이 켜져 있고 보고 있을 때만 측정
+// 2) 5분 이상 무동작(방치) 시 자리비움으로 판단하여 측정 일시정지 (유령 시간 차단)
+// 3) 60초마다 Firestore에 자동 동기화
+let _studyTrackerInitialized = false;
+let _pendingStudySec = 0;
+let _lastUserInteractionTime = Date.now();
+
+function _initStudyTimeTracker() {
+  if (_studyTrackerInitialized) return;
+  _studyTrackerInitialized = true;
+
+  const onUserActivity = () => { _lastUserInteractionTime = Date.now(); };
+  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+    window.addEventListener(evt, onUserActivity, { passive: true });
+  });
+
+  // 10초마다 활성 상태 점검
+  setInterval(() => {
+    const empId = _getCurrentEmpId();
+    if (!empId) return; // 미로그인 상태는 측정하지 않음
+
+    const isVisible = !document.hidden;
+    const isRecentlyActive = (Date.now() - _lastUserInteractionTime) < 5 * 60 * 1000; // 5분 이내 활동
+
+    if (isVisible && isRecentlyActive) {
+      _pendingStudySec += 10;
+      // 60초 쌓이면 서버로 전송
+      if (_pendingStudySec >= 60) {
+        const toSend = _pendingStudySec;
+        _pendingStudySec = 0;
+        _recordStudyTime(toSend);
+      }
+    }
+  }, 10000);
+
+  // 창 닫거나 백그라운드 전환 시 남은 초 즉시 플러시
+  const flushPending = () => {
+    if (_pendingStudySec >= 5) {
+      const toSend = _pendingStudySec;
+      _pendingStudySec = 0;
+      _recordStudyTime(toSend);
+    }
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) flushPending();
+    else _lastUserInteractionTime = Date.now();
+  });
+  window.addEventListener('beforeunload', flushPending);
+}
+
 // 로그인 여부와 무관하게 "기기당 고유 ID"를 부여 (최초 실행 시 1회 생성 후 계속 재사용)
 function _getOrCreateDeviceId() {
   const KEY = 'vp_device_id';
@@ -1105,6 +1197,7 @@ function enterApp() {
   const _logEmpId = empId || (_sessEmpId !== 'guest' ? _sessEmpId : null);
   if (_logEmpId) _recordAccessLog(_logEmpId); // 하루 1회만 저장 (함수 내부 중복 방지)
   _initContentProtection();
+  _initStudyTimeTracker(); // 스마트 화면 체류 학습시간 자동 측정 시작
 }
 
 // ===== 보안 안내 팝업 =====
@@ -5356,15 +5449,15 @@ function _renderAdminUserList() {
       const inactive = _isAdminUserInactive(u);
 
       const loginDays = u[`loginDays_${thisYear}`] || u.totalLoginDays || 0;
-      const practiceTimeStr = _formatSeconds(u.totalPracticeSeconds || 0);
       const evalThisMonth = u[thisMonthKey] || 0;
       const totalEval = u.totalEvalCount || 0;
+      const studyDisplay = _formatPracticeTimeDisplay(u.totalStudySeconds, u.totalPracticeSeconds);
 
       return `<div class="admin-user-item" style="flex-wrap:wrap;gap:6px;align-items:center;">
         <span class="admin-user-item-id" style="min-width:70px;">${escHtml(u.id)}</span>
         ${u.name ? `<span class="admin-user-item-name" style="min-width:60px;">${escHtml(u.name)}</span>` : ''}
         <span class="admin-user-item-date" style="font-size:12px;color:var(--gray-500);">
-          접속: <strong>${loginDays}일</strong>(올해) · 연습: <strong>${practiceTimeStr}</strong> · AI평가: <strong>${evalThisMonth}회</strong>(당월)/${totalEval}회(총) · 최근: ${escHtml(lastDate)}
+          접속: <strong>${loginDays}일</strong> · 학습: <strong>${studyDisplay}</strong> · AI평가: <strong>${evalThisMonth}회</strong>(당월)/${totalEval}회(총) · 최근: ${escHtml(lastDate)}
         </span>
         ${inactive ? `<span class="admin-user-item-badge">⚠️ 장기 미접속</span>` : ''}
         <div style="margin-left:auto;display:flex;gap:4px;">
@@ -5751,12 +5844,12 @@ async function _loadAdminAccessLogs() {
           periodDays: yDays,
           lastDate,
           yearlyLoginDays: yDays,
+          totalStudySeconds: u.totalStudySeconds || 0,
           totalPracticeSeconds: u.totalPracticeSeconds || 0,
-          practiceStr: _formatSeconds(u.totalPracticeSeconds || 0),
           evalThisMonth: u[thisMonthKey] || 0,
           totalEvalCount: u.totalEvalCount || 0,
         };
-      }).sort((a, b) => b.yearlyLoginDays - a.yearlyLoginDays);
+      }).sort((a, b) => b.periodDays - a.periodDays);
 
       $('admin-log-summary').textContent = `총 활성 사용자: ${_adminLogRows.length}명 (${thisYear}년 연간 누적)`;
       listEl.innerHTML = _adminLogRows.length
@@ -5764,7 +5857,7 @@ async function _loadAdminAccessLogs() {
             <span class="admin-user-item-id" style="min-width:70px;">${escHtml(r.employeeId)}</span>
             ${r.name ? `<span class="admin-user-item-name" style="min-width:60px;">${escHtml(r.name)}</span>` : ''}
             <span class="admin-user-item-date" style="font-size:12px;color:var(--gray-500);">
-              올해 접속: <strong>${r.yearlyLoginDays}일</strong> · 연습: <strong>${r.practiceStr}</strong> · AI평가: <strong>${r.evalThisMonth}회</strong>(당월)/${r.totalEvalCount}회(총) · 최근: ${escHtml(r.lastDate)}
+              접속: <strong>${r.periodDays}일</strong> · 학습: <strong>${_formatPracticeTimeDisplay(r.totalStudySeconds, r.totalPracticeSeconds)}</strong> · AI평가: <strong>${r.evalThisMonth}회</strong>(당월)/${r.totalEvalCount}회(총) · 최근: ${escHtml(r.lastDate)}
             </span>
           </div>`).join('')
         : `<div style="padding:10px;font-size:13px;color:var(--gray-400)">${thisYear}년 접속 기록이 없습니다.</div>`;
@@ -5811,13 +5904,13 @@ async function _loadAdminAccessLogs() {
           periodDays: stat.count,
           lastDate: stat.lastDate,
           yearlyLoginDays: u[`loginDays_${thisYear}`] || u.totalLoginDays || stat.count,
+          totalStudySeconds: u.totalStudySeconds || 0,
           totalPracticeSeconds: u.totalPracticeSeconds || 0,
-          practiceStr: _formatSeconds(u.totalPracticeSeconds || 0),
           evalThisMonth: u[thisMonthKey] || 0,
           totalEvalCount: u.totalEvalCount || 0,
         };
       })
-      .sort((a, b) => b.lastDate.localeCompare(a.lastDate));
+      .sort((a, b) => (b.periodDays - a.periodDays) || b.lastDate.localeCompare(a.lastDate));
 
     const periodLabel = period === 'today' ? '오늘' : `최근 ${period}일`;
     $('admin-log-summary').textContent = `총 활성 사용자: ${_adminLogRows.length}명 (${periodLabel})`;
@@ -5826,7 +5919,7 @@ async function _loadAdminAccessLogs() {
           <span class="admin-user-item-id" style="min-width:70px;">${escHtml(r.employeeId)}</span>
           ${r.name ? `<span class="admin-user-item-name" style="min-width:60px;">${escHtml(r.name)}</span>` : ''}
           <span class="admin-user-item-date" style="font-size:12px;color:var(--gray-500);">
-            기간내: <strong>${r.periodDays}일</strong> (올해: ${r.yearlyLoginDays}일) · 연습: <strong>${r.practiceStr}</strong> · AI평가: <strong>${r.evalThisMonth}회</strong>(당월)/${r.totalEvalCount}회(총) · 최근: ${escHtml(r.lastDate)}
+            접속: <strong>${r.periodDays}일</strong> · 학습: <strong>${_formatPracticeTimeDisplay(r.totalStudySeconds, r.totalPracticeSeconds)}</strong> · AI평가: <strong>${r.evalThisMonth}회</strong>(당월)/${r.totalEvalCount}회(총) · 최근: ${escHtml(r.lastDate)}
           </span>
         </div>`).join('')
       : '<div style="padding:10px;font-size:13px;color:var(--gray-400)">해당 기간의 접속 기록이 없습니다.</div>';
@@ -5838,10 +5931,12 @@ async function _loadAdminAccessLogs() {
 function _downloadAdminLogCsv() {
   if (!_adminLogRows.length) { showToast('먼저 조회해주세요.', 2000); return; }
   const period = $('admin-log-period').value;
-  const header = '사번,이름,조회기간내 접속일수,올해 접속일수,총 연습시간(초),총 연습시간(표시),이번달 AI평가횟수,총 AI평가횟수,마지막 접속일\n';
-  const rows = _adminLogRows.map(r =>
-    `${r.employeeId},${r.name},${r.periodDays},${r.yearlyLoginDays},${r.totalPracticeSeconds},${r.practiceStr},${r.evalThisMonth},${r.totalEvalCount},${r.lastDate}`
-  ).join('\n');
+  const header = '사번,이름,조회기간 접속일수,올해 접속일수,학습체류시간(초),학습체류시간,낭독녹음시간(초),낭독녹음시간,이번달 AI평가횟수,총 AI평가횟수,마지막 접속일\n';
+  const rows = _adminLogRows.map(r => {
+    const studyStr = _formatSeconds(r.totalStudySeconds || 0);
+    const practiceStr = _formatSeconds(r.totalPracticeSeconds || 0);
+    return `${r.employeeId},${r.name},${r.periodDays},${r.yearlyLoginDays},${r.totalStudySeconds || 0},"${studyStr}",${r.totalPracticeSeconds || 0},"${practiceStr}",${r.evalThisMonth},${r.totalEvalCount},${r.lastDate}`;
+  }).join('\n');
   const csv = '﻿' + header + rows;
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
