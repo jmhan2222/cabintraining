@@ -895,6 +895,8 @@ async function _recordAccessLog(empId) {
   if (!_db) { console.warn('[접속로그] _db가 없어서 기록 중단'); return; }
   try {
     const dateStr = _kstDateStr();
+    const yearStr = dateStr.slice(0, 4);
+    const monthStr = dateStr.slice(0, 7).replace('-', '_');
     const logId = `${empId}_${dateStr}`;
     console.log('[접속로그] 기록 시도, logId:', logId);
     const ref = _db.collection('accessLogs').doc(logId);
@@ -907,13 +909,89 @@ async function _recordAccessLog(empId) {
       device: navigator.userAgent,
     });
     console.log('[접속로그] accessLogs 기록 성공:', logId);
-    // allowedUsers에 마지막 접속 시각 반영 (관리자 사용자 목록에서 조회용)
-    await _db.collection('allowedUsers').doc(empId).set(
-      { lastAccessAt: firebase.firestore.FieldValue.serverTimestamp() },
-      { merge: true }
-    );
-    console.log('[접속로그] allowedUsers.lastAccessAt 갱신 성공');
+    // allowedUsers에 마지막 접속 시각 및 접속 일수(연간/월간/총) 누적
+    const updatePayload = {
+      lastAccessAt: firebase.firestore.FieldValue.serverTimestamp(),
+      totalLoginDays: firebase.firestore.FieldValue.increment(1),
+    };
+    updatePayload[`loginDays_${yearStr}`] = firebase.firestore.FieldValue.increment(1);
+    updatePayload[`loginDays_${monthStr}`] = firebase.firestore.FieldValue.increment(1);
+    await _db.collection('allowedUsers').doc(empId).set(updatePayload, { merge: true });
+    console.log('[접속로그] allowedUsers 접속 통계 갱신 성공');
   } catch (e) { console.error('[접속로그] 기록 실패:', e.code || '', e.message); }
+}
+
+// 현재 로그인한 사번 가져오기 유틸
+function _getCurrentEmpId() {
+  try {
+    const s = localStorage.getItem('vp_s');
+    if (s) {
+      const parsed = JSON.parse(s);
+      if (parsed.empId) return String(parsed.empId).padStart(7, '0');
+    }
+  } catch {}
+  const raw = getStoredEmployeeId();
+  return raw ? String(raw).padStart(7, '0') : null;
+}
+
+// 초 단위 시간을 "X시간 Y분 Z초" 문자열로 포맷
+function _formatSeconds(sec) {
+  if (!sec || sec <= 0) return '0분';
+  const s = Math.round(sec);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const remS = s % 60;
+  if (h > 0) return `${h}시간 ${m}분`;
+  if (m > 0) return `${m}분 ${remS}초`;
+  return `${remS}초`;
+}
+
+// 낭독 / 드릴 연습 시간 누적 (초 단위)
+async function _recordPracticeTime(durationSec) {
+  if (!durationSec || durationSec < 1) return;
+  const empId = _getCurrentEmpId();
+  if (!empId || !_db) return;
+  try {
+    const dateStr = _kstDateStr();
+    const yearStr = dateStr.slice(0, 4);
+    const monthStr = dateStr.slice(0, 7).replace('-', '_');
+    const sec = Math.round(durationSec);
+
+    const updatePayload = {
+      totalPracticeSeconds: firebase.firestore.FieldValue.increment(sec),
+      lastPracticeAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    updatePayload[`practiceSec_${yearStr}`] = firebase.firestore.FieldValue.increment(sec);
+    updatePayload[`practiceSec_${monthStr}`] = firebase.firestore.FieldValue.increment(sec);
+
+    await _db.collection('allowedUsers').doc(empId).set(updatePayload, { merge: true });
+    console.log(`[연습기록] 사번 ${empId} 연습시간 +${sec}초 누적 완료`);
+  } catch (e) {
+    console.warn('[연습기록] 누적 실패:', e.message);
+  }
+}
+
+// AI 평가 완료 횟수 누적
+async function _recordAiEvaluation() {
+  const empId = _getCurrentEmpId();
+  if (!empId || !_db) return;
+  try {
+    const dateStr = _kstDateStr();
+    const yearStr = dateStr.slice(0, 4);
+    const monthStr = dateStr.slice(0, 7).replace('-', '_');
+
+    const updatePayload = {
+      totalEvalCount: firebase.firestore.FieldValue.increment(1),
+      lastEvalAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    updatePayload[`evalCount_${yearStr}`] = firebase.firestore.FieldValue.increment(1);
+    updatePayload[`evalCount_${monthStr}`] = firebase.firestore.FieldValue.increment(1);
+
+    await _db.collection('allowedUsers').doc(empId).set(updatePayload, { merge: true });
+    console.log(`[평가기록] 사번 ${empId} AI 평가 횟수 +1 누적 완료`);
+  } catch (e) {
+    console.warn('[평가기록] 누적 실패:', e.message);
+  }
 }
 
 // 로그인 여부와 무관하게 "기기당 고유 ID"를 부여 (최초 실행 시 1회 생성 후 계속 재사용)
@@ -2148,6 +2226,7 @@ async function stopRecording() {
     if (_lastRecordingBlob.size > 500 * 1024) {
       showToast('음성 파일이 큽니다. 분석에 시간이 걸릴 수 있어요.', 3500);
     }
+    _recordPracticeTime(duration); // 낭독 연습 시간 누적
     analyzeAndShow(duration);
   };
 
@@ -3460,6 +3539,7 @@ function showResults(result, transcript) {
     callGeminiScoring(lang.text, state.audioBlob, state.selectedLang, lang.checkpoints).then(aiResult => {
       _completeOverlay();
       if (aiResult) {
+        _recordAiEvaluation(); // AI 평가 완료 횟수 누적
         renderAiResult(aiResult, isAdmin);
         if (aiResult.transcript) renderTranscriptCompare(aiResult.transcript, lang);
       } else {
@@ -3541,6 +3621,7 @@ async function _retryAiAnalysis() {
     const aiResult = await callGeminiScoring(lang.text, _lastRecordingBlob, state.selectedLang, lang.checkpoints);
     _completeOverlay();
     if (aiResult) {
+      _recordAiEvaluation(); // AI 평가 완료 횟수 누적
       renderAiResult(aiResult, isAdmin);
       if (aiResult.transcript) renderTranscriptCompare(aiResult.transcript, lang);
     } else {
@@ -5203,7 +5284,16 @@ async function _loadAdminUserList() {
     const snap = await _db.collection('allowedUsers').get();
     _adminAllowedUsers = snap.docs.map(d => {
       const data = d.data();
-      return { id: d.id, name: data.name || '', createdAt: data.createdAt, lastAccessAt: data.lastAccessAt || null };
+      return {
+        id: d.id,
+        name: data.name || '',
+        createdAt: data.createdAt,
+        lastAccessAt: data.lastAccessAt || null,
+        totalLoginDays: data.totalLoginDays || 0,
+        totalPracticeSeconds: data.totalPracticeSeconds || 0,
+        totalEvalCount: data.totalEvalCount || 0,
+        ...data
+      };
     });
   } catch (e) {
     listEl.innerHTML = `<div style="padding:10px;font-size:13px;color:var(--color-fail)">조회 실패: ${escHtml(e.message)}</div>`;
@@ -5241,6 +5331,9 @@ function _renderAdminUserList() {
   if (!listEl) return;
   $('admin-user-count').textContent = _adminAllowedUsers.length;
 
+  const thisYear = _kstDateStr().slice(0, 4);
+  const thisMonthKey = 'evalCount_' + _kstDateStr().slice(0, 7).replace('-', '_');
+
   const list = _sortedFilteredAdminUsers();
   if (!list.length) {
     listEl.innerHTML = `<div style="padding:10px;font-size:13px;color:var(--gray-400)">${_adminAllowedUsers.length ? '검색 결과가 없습니다.' : '등록된 사번이 없습니다.'}</div>`;
@@ -5249,20 +5342,55 @@ function _renderAdminUserList() {
       const regDate  = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('ko-KR') : '-';
       const lastDate = u.lastAccessAt?.toDate ? u.lastAccessAt.toDate().toLocaleDateString('ko-KR') : '미접속';
       const inactive = _isAdminUserInactive(u);
-      return `<div class="admin-user-item">
-        <span class="admin-user-item-id">${escHtml(u.id)}</span>
-        ${u.name ? `<span class="admin-user-item-name">${escHtml(u.name)}</span>` : ''}
-        <span class="admin-user-item-date">등록일: ${escHtml(regDate)} · 마지막 접속: ${escHtml(lastDate)}</span>
+
+      const loginDays = u[`loginDays_${thisYear}`] || u.totalLoginDays || 0;
+      const practiceTimeStr = _formatSeconds(u.totalPracticeSeconds || 0);
+      const evalThisMonth = u[thisMonthKey] || 0;
+      const totalEval = u.totalEvalCount || 0;
+
+      return `<div class="admin-user-item" style="flex-wrap:wrap;gap:6px;align-items:center;">
+        <span class="admin-user-item-id" style="min-width:70px;">${escHtml(u.id)}</span>
+        ${u.name ? `<span class="admin-user-item-name" style="min-width:60px;">${escHtml(u.name)}</span>` : ''}
+        <span class="admin-user-item-date" style="font-size:12px;color:var(--gray-500);">
+          접속: <strong>${loginDays}일</strong>(올해) · 연습: <strong>${practiceTimeStr}</strong> · AI평가: <strong>${evalThisMonth}회</strong>(당월)/${totalEval}회(총) · 최근: ${escHtml(lastDate)}
+        </span>
         ${inactive ? `<span class="admin-user-item-badge">⚠️ 장기 미접속</span>` : ''}
-        <button class="btn-icon sm admin-user-del-btn" data-id="${escHtml(u.id)}" data-name="${escHtml(u.name)}">✕ 삭제</button>
+        <div style="margin-left:auto;display:flex;gap:4px;">
+          <button class="btn-icon sm admin-user-reset-pw-btn" data-id="${escHtml(u.id)}" data-name="${escHtml(u.name)}" style="color:#003479;border-color:#003479;" title="초기 비밀번호(Jeju+사번앞4자리)로 초기화">🔑 PW 초기화</button>
+          <button class="btn-icon sm admin-user-del-btn" data-id="${escHtml(u.id)}" data-name="${escHtml(u.name)}">✕ 삭제</button>
+        </div>
       </div>`;
     }).join('');
+
+    listEl.querySelectorAll('.admin-user-reset-pw-btn').forEach(btn => {
+      btn.addEventListener('click', () => _resetUserPassword(btn.dataset.id, btn.dataset.name));
+    });
     listEl.querySelectorAll('.admin-user-del-btn').forEach(btn => {
       btn.addEventListener('click', () => _deleteAdminUser(btn.dataset.id, btn.dataset.name));
     });
   }
 
   _renderAdminUserSummary();
+}
+
+// 개별 사용자 비밀번호 초기화 (초기값: Jeju + 사번 앞 4자리)
+async function _resetUserPassword(empId, name) {
+  const defaultPw = 'Jeju' + String(empId).slice(0, 4);
+  const label = name ? `${name}(사번: ${empId})` : `사번 ${empId}`;
+  if (!confirm(`${label}의 비밀번호를 초기화하시겠습니까?\n\n• 초기 비밀번호: ${defaultPw}\n• 다음 로그인 시 본인 비밀번호 변경 화면이 표출됩니다.`)) return;
+
+  if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+  try {
+    await _db.collection('allowedUsers').doc(empId).set({
+      password: defaultPw,
+      mustChangePassword: empId !== '1603064',
+      active: true
+    }, { merge: true });
+    alert(`✅ ${label}의 비밀번호가 초기화되었습니다.\n\n초기 비밀번호: ${defaultPw}`);
+    _loadAdminUserList();
+  } catch (e) {
+    showToast(`비밀번호 초기화 실패: ${e.message}`, 3000);
+  }
 }
 
 function _renderAdminUserSummary() {
@@ -5281,20 +5409,29 @@ function _renderAdminUserSummary() {
 async function _addAdminUser() {
   const input = $('admin-user-add-input');
   const nameInput = $('admin-user-name-input');
-  const empId = input.value.trim();
+  const rawId = input.value.trim();
   const name = nameInput ? nameInput.value.trim() : '';
-  if (!empId) return;
-  if (!/^\d+$/.test(empId)) { showToast('사번은 숫자만 입력해주세요.', 2000); return; }
+  if (!rawId) return;
+  if (!/^\d+$/.test(rawId)) { showToast('사번은 숫자만 입력해주세요.', 2000); return; }
   if (!_db) { showToast('Firebase 연결이 필요합니다.', 3000); return; }
+
+  const empId = String(rawId).padStart(7, '0');
+  const defaultPw = 'Jeju' + empId.slice(0, 4);
+
   try {
     await _db.collection('allowedUsers').doc(empId).set({
       employeeId: empId,
+      empId,
       name,
+      password: defaultPw,
+      active: true,
+      mustChangePassword: empId !== '1603064',
+      isAdmin: empId === '1603064',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    }, { merge: true });
     input.value = '';
     if (nameInput) nameInput.value = '';
-    showToast('추가되었습니다 ✓');
+    showToast(`추가되었습니다 ✓ (초기 비밀번호: ${defaultPw})`, 3000);
     _loadAdminUserList();
   } catch (e) {
     showToast(`추가 실패: ${e.message}`, 3000);
@@ -5353,11 +5490,12 @@ function _parseBulkCsvData(text, autoPw) {
     const parts = line.split(',').map(p => p.trim());
     const rawId = parts[0] || '';
     if (!rawId || !/^\d+$/.test(rawId)) continue;
-    const empId = rawId;
+    const empId = String(rawId).padStart(7, '0');
     const name = parts[1] || '';
     let password = parts[2] || '';
     if (!password || autoPw) {
-      password = empId.slice(-4) + 'jeju';
+      // 규칙: Jeju + 사번 앞 4자리 (예: 1603064 → Jeju1603)
+      password = 'Jeju' + empId.slice(0, 4);
     }
     result.push({ empId, name, password });
   }
@@ -5482,18 +5620,29 @@ async function bulkRegisterEmployees(data) {
 
 function _downloadAdminUserListCsv() {
   if (!_adminAllowedUsers.length) { showToast('등록된 사번이 없습니다.', 2000); return; }
-  const header = '사번,이름,등록일,마지막 접속일\n';
+  const thisYear = _kstDateStr().slice(0, 4);
+  const thisMonthKey = 'evalCount_' + _kstDateStr().slice(0, 7).replace('-', '_');
+
+  const header = '사번,이름,올해 접속일수,총 접속일수,총 연습시간(초),총 연습시간(표시),이번달 AI평가횟수,총 AI평가횟수,등록일,마지막 접속일\n';
   const rows = _adminAllowedUsers.map(u => {
     const regDate  = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString('ko-KR') : '';
     const lastDate = u.lastAccessAt?.toDate ? u.lastAccessAt.toDate().toLocaleDateString('ko-KR') : '';
-    return `${u.id},${u.name || ''},${regDate},${lastDate}`;
+    const loginDaysYear = u[`loginDays_${thisYear}`] || 0;
+    const totalLoginDays = u.totalLoginDays || 0;
+    const practiceSec = u.totalPracticeSeconds || 0;
+    const practiceStr = _formatSeconds(practiceSec);
+    const evalMonth = u[thisMonthKey] || 0;
+    const totalEval = u.totalEvalCount || 0;
+
+    return `${u.id},${u.name || ''},${loginDaysYear},${totalLoginDays},${practiceSec},${practiceStr},${evalMonth},${totalEval},${regDate},${lastDate}`;
   }).join('\n');
+
   const csv = '﻿' + header + rows;
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `allowedUsers_${_kstDateStr()}.csv`;
+  a.download = `allowedUsers_stats_${_kstDateStr()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -5517,25 +5666,56 @@ async function _loadAdminAccessLogs() {
     }
     const snap = await query.get();
 
-    const lastSeen = {};
+    // allowedUsers 맵 빌드 (사번 -> 사용자 데이터)
+    const userMap = {};
+    _adminAllowedUsers.forEach(u => { userMap[u.id] = u; });
+
+    // 사번별 기간 내 접속 일수 및 마지막 접속일 집계
+    const userStatsInPeriod = {}; // empId -> { count, lastDate }
     snap.docs.forEach(d => {
       const data = d.data();
       const empId = data.employeeId;
       const date = data.date || '';
       if (!empId) return;
-      if (!lastSeen[empId] || date > lastSeen[empId]) lastSeen[empId] = date;
+      if (!userStatsInPeriod[empId]) {
+        userStatsInPeriod[empId] = { count: 0, lastDate: date };
+      }
+      userStatsInPeriod[empId].count++;
+      if (date > userStatsInPeriod[empId].lastDate) {
+        userStatsInPeriod[empId].lastDate = date;
+      }
     });
-    _adminLogRows = Object.entries(lastSeen)
-      .map(([employeeId, lastDate]) => ({ employeeId, lastDate }))
+
+    const thisYear = _kstDateStr().slice(0, 4);
+    const thisMonthKey = 'evalCount_' + _kstDateStr().slice(0, 7).replace('-', '_');
+
+    _adminLogRows = Object.entries(userStatsInPeriod)
+      .map(([employeeId, stat]) => {
+        const u = userMap[employeeId] || {};
+        return {
+          employeeId,
+          name: u.name || '',
+          periodDays: stat.count,
+          lastDate: stat.lastDate,
+          yearlyLoginDays: u[`loginDays_${thisYear}`] || u.totalLoginDays || stat.count,
+          totalPracticeSeconds: u.totalPracticeSeconds || 0,
+          practiceStr: _formatSeconds(u.totalPracticeSeconds || 0),
+          evalThisMonth: u[thisMonthKey] || 0,
+          totalEvalCount: u.totalEvalCount || 0,
+        };
+      })
       .sort((a, b) => b.lastDate.localeCompare(a.lastDate));
 
-    $('admin-log-summary').textContent = `총 활성 사용자: ${_adminLogRows.length}명`;
+    $('admin-log-summary').textContent = `총 활성 사용자: ${_adminLogRows.length}명 (기간 내)`;
     listEl.innerHTML = _adminLogRows.length
-      ? _adminLogRows.map(r => `<div class="admin-user-item">
-          <span class="admin-user-item-id">${escHtml(r.employeeId)}</span>
-          <span class="admin-user-item-date">마지막 접속: ${escHtml(r.lastDate)}</span>
+      ? _adminLogRows.map(r => `<div class="admin-user-item" style="flex-wrap:wrap;gap:6px;align-items:center;">
+          <span class="admin-user-item-id" style="min-width:70px;">${escHtml(r.employeeId)}</span>
+          ${r.name ? `<span class="admin-user-item-name" style="min-width:60px;">${escHtml(r.name)}</span>` : ''}
+          <span class="admin-user-item-date" style="font-size:12px;color:var(--gray-500);">
+            기간내: <strong>${r.periodDays}일</strong> (올해: ${r.yearlyLoginDays}일) · 연습: <strong>${r.practiceStr}</strong> · AI평가: <strong>${r.evalThisMonth}회</strong>(당월)/${r.totalEvalCount}회(총) · 최근: ${escHtml(r.lastDate)}
+          </span>
         </div>`).join('')
-      : '<div style="padding:10px;font-size:13px;color:var(--gray-400)">접속 기록이 없습니다.</div>';
+      : '<div style="padding:10px;font-size:13px;color:var(--gray-400)">해당 기간의 접속 기록이 없습니다.</div>';
   } catch (e) {
     listEl.innerHTML = `<div style="padding:10px;font-size:13px;color:var(--color-fail)">조회 실패: ${escHtml(e.message)}</div>`;
   }
@@ -5543,14 +5723,16 @@ async function _loadAdminAccessLogs() {
 
 function _downloadAdminLogCsv() {
   if (!_adminLogRows.length) { showToast('먼저 조회해주세요.', 2000); return; }
-  const header = '사번,마지막 접속일\n';
-  const rows = _adminLogRows.map(r => `${r.employeeId},${r.lastDate}`).join('\n');
+  const header = '사번,이름,조회기간내 접속일수,올해 접속일수,총 연습시간(초),총 연습시간(표시),이번달 AI평가횟수,총 AI평가횟수,마지막 접속일\n';
+  const rows = _adminLogRows.map(r =>
+    `${r.employeeId},${r.name},${r.periodDays},${r.yearlyLoginDays},${r.totalPracticeSeconds},${r.practiceStr},${r.evalThisMonth},${r.totalEvalCount},${r.lastDate}`
+  ).join('\n');
   const csv = '﻿' + header + rows;
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `accessLogs_${_kstDateStr()}.csv`;
+  a.download = `accessLogs_stats_${_kstDateStr()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
