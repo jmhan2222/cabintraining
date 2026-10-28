@@ -5729,7 +5729,49 @@ async function _loadAdminAccessLogs() {
   const period = $('admin-log-period').value;
   const listEl = $('admin-log-list');
   listEl.innerHTML = '<div style="padding:10px;font-size:13px;color:var(--gray-400)">로딩 중...</div>';
+
+  const thisYear = _kstDateStr().slice(0, 4);
+  const thisMonthKey = 'evalCount_' + _kstDateStr().slice(0, 7).replace('-', '_');
+
   try {
+    // 1. [올해 전체] 조회: 대량 로그 쿼리 없이 allowedUsers의 연간 누적 데이터를 0.1초 만에 즉시 표출 (비용 0원)
+    if (period === 'year') {
+      const activeUsers = _adminAllowedUsers.filter(u => {
+        const yDays = u[`loginDays_${thisYear}`] || u.totalLoginDays || 0;
+        const last = u.lastAccessAt?.toDate ? _kstDateStr(u.lastAccessAt.toDate()) : '';
+        return yDays > 0 || last.startsWith(thisYear);
+      });
+
+      _adminLogRows = activeUsers.map(u => {
+        const yDays = u[`loginDays_${thisYear}`] || u.totalLoginDays || 0;
+        const lastDate = u.lastAccessAt?.toDate ? u.lastAccessAt.toDate().toLocaleDateString('ko-KR') : '미접속';
+        return {
+          employeeId: u.id,
+          name: u.name || '',
+          periodDays: yDays,
+          lastDate,
+          yearlyLoginDays: yDays,
+          totalPracticeSeconds: u.totalPracticeSeconds || 0,
+          practiceStr: _formatSeconds(u.totalPracticeSeconds || 0),
+          evalThisMonth: u[thisMonthKey] || 0,
+          totalEvalCount: u.totalEvalCount || 0,
+        };
+      }).sort((a, b) => b.yearlyLoginDays - a.yearlyLoginDays);
+
+      $('admin-log-summary').textContent = `총 활성 사용자: ${_adminLogRows.length}명 (${thisYear}년 연간 누적)`;
+      listEl.innerHTML = _adminLogRows.length
+        ? _adminLogRows.map(r => `<div class="admin-user-item" style="flex-wrap:wrap;gap:6px;align-items:center;">
+            <span class="admin-user-item-id" style="min-width:70px;">${escHtml(r.employeeId)}</span>
+            ${r.name ? `<span class="admin-user-item-name" style="min-width:60px;">${escHtml(r.name)}</span>` : ''}
+            <span class="admin-user-item-date" style="font-size:12px;color:var(--gray-500);">
+              올해 접속: <strong>${r.yearlyLoginDays}일</strong> · 연습: <strong>${r.practiceStr}</strong> · AI평가: <strong>${r.evalThisMonth}회</strong>(당월)/${r.totalEvalCount}회(총) · 최근: ${escHtml(r.lastDate)}
+            </span>
+          </div>`).join('')
+        : `<div style="padding:10px;font-size:13px;color:var(--gray-400)">${thisYear}년 접속 기록이 없습니다.</div>`;
+      return;
+    }
+
+    // 2. [기간별 상세 로그] 쿼리: 오늘 / 7일 / 30일 / 90일 / 365일
     let query = _db.collection('accessLogs');
     if (period === 'today') {
       query = query.where('date', '==', _kstDateStr());
@@ -5760,9 +5802,6 @@ async function _loadAdminAccessLogs() {
       }
     });
 
-    const thisYear = _kstDateStr().slice(0, 4);
-    const thisMonthKey = 'evalCount_' + _kstDateStr().slice(0, 7).replace('-', '_');
-
     _adminLogRows = Object.entries(userStatsInPeriod)
       .map(([employeeId, stat]) => {
         const u = userMap[employeeId] || {};
@@ -5780,7 +5819,8 @@ async function _loadAdminAccessLogs() {
       })
       .sort((a, b) => b.lastDate.localeCompare(a.lastDate));
 
-    $('admin-log-summary').textContent = `총 활성 사용자: ${_adminLogRows.length}명 (기간 내)`;
+    const periodLabel = period === 'today' ? '오늘' : `최근 ${period}일`;
+    $('admin-log-summary').textContent = `총 활성 사용자: ${_adminLogRows.length}명 (${periodLabel})`;
     listEl.innerHTML = _adminLogRows.length
       ? _adminLogRows.map(r => `<div class="admin-user-item" style="flex-wrap:wrap;gap:6px;align-items:center;">
           <span class="admin-user-item-id" style="min-width:70px;">${escHtml(r.employeeId)}</span>
@@ -5797,6 +5837,7 @@ async function _loadAdminAccessLogs() {
 
 function _downloadAdminLogCsv() {
   if (!_adminLogRows.length) { showToast('먼저 조회해주세요.', 2000); return; }
+  const period = $('admin-log-period').value;
   const header = '사번,이름,조회기간내 접속일수,올해 접속일수,총 연습시간(초),총 연습시간(표시),이번달 AI평가횟수,총 AI평가횟수,마지막 접속일\n';
   const rows = _adminLogRows.map(r =>
     `${r.employeeId},${r.name},${r.periodDays},${r.yearlyLoginDays},${r.totalPracticeSeconds},${r.practiceStr},${r.evalThisMonth},${r.totalEvalCount},${r.lastDate}`
@@ -5806,7 +5847,8 @@ function _downloadAdminLogCsv() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `accessLogs_stats_${_kstDateStr()}.csv`;
+  const filePeriodName = period === 'year' ? 'annual_2026' : `${period}_days`;
+  a.download = `accessLogs_${filePeriodName}_${_kstDateStr()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
