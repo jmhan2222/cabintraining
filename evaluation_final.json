@@ -1,13 +1,13 @@
 {
-  "revVersion": "Rev.23_261014",
+  "revVersion": "Rev.23_261029",
   "announcements": [
     {
       "section": "2.1.1",
-      "ko": "손님 여러분, 우리 비행기는 [목적지]까지 가는 제주항공 [편명]입니다.\n휴대한 짐은 앞 좌석 밑 또는 선반에 보관해 주세요.\n수하물 파손과 부상 방지를 위해 개인 수하물은 선반에 직접 넣어 주시기\n바라며, 교통약자 등 수하물 보관에 도움이 필요하신 분은 승무원에게\n말씀해주시기 바랍니다.\n\n[수하물 과다 반입] 오늘 [기내 수하물이 많아 / 만석으로] 선반 공간이 부족할 것으로 예상됩니다. 캐리어를 제외한 작은 짐이나 깨지기 쉬운 물건은 앞 좌석 밑에 보관해 주시고,\n\n(또한,) 모든 전자기기는 비행기 모드로 사용하거나 전원을 꺼주세요.\n\n[(필요 시)군사공항] 아울러, [공항명]은 군사 공항으로 외부 촬영이 전면 금지돼 있으며, 군사시설 보안 유지를 위하여 창문 덮개 닫힘 상태를 유지하시기 바랍니다.",
+      "ko": "손님 여러분, 우리 비행기는 [목적지]까지 가는 제주항공 [편명]입니다.\n수하물 파손과 부상 방지를 위해 휴대한 짐은 좌석 밑 또는 선반에\n직접 넣어 주시기 바랍니다.\n\n[수하물 과다 반입] 오늘 [기내 수하물이 많아 / 만석으로] 선반 공간이 부족할 것으로 예상됩니다. 캐리어를 제외한 작은 짐이나 깨지기 쉬운 물건은 앞 좌석 밑에 보관해 주시고,\n\n(또한,) 모든 전자기기는 비행기 모드로 사용하거나 전원을 꺼주세요.\n\n[(필요 시)군사공항] 아울러, [공항명]은 군사 공항으로 외부 촬영이 전면 금지돼 있으며, 군사시설 보안 유지를 위하여 창문 덮개 닫힘 상태를 유지하시기 바랍니다.",
       "quarters_ja_ca": [
         "Q1"
       ],
-      "ja": "みなさま、とうきは チェジュこうくう [편명]びん [목적지] ゆきでございます。\n\n[General] おてにもつは まえの ざせきの した、または しゅうのうだなを ごりようください。\n\n[수하물 과다 반입] ほんじつは [きないの おてにもつが おおいため / まんせきとなっており] しゅうのうだなの スペースぶそくが よそうされます。ちいさな おてにもつ、または こわれやすい おてにもつは まえの ざせきの したに おいれください。\n\nまた、すべての でんしききは きないモードに せっていするか、でんげんを おきりください。",
+      "ja": "미나사마、토-키와 제주코-쿠- [편명]빈 [목적지] 유키데고자이마스\nみなさま、とうきは チェジュこうくう [편명]びん [목적지] ゆきでございます。\n오테니모츠노 하손야 케가오 후세구타메、오테니모츠와 오캬쿠사마 고지신데 자세키노 시타마타와 슈-노-다나에 오이레이타다키마스요- 오네가이이타시마스\nおてにもつの はそんや けがを ふせぐため、おてにもつは おきゃくさま ごじしんで ざせきの したまたは しゅうのうだなへ おいれいただきますよう おねがいいたします。\n\n[General] 오테니모츠와 마에노 자세키노 시타、마타와 슈-노-다나오 고리요-쿠다사이\n[General] おてにもつは まえの ざせきの した、または しゅうのうだなを ごりようください。\n\n[수하물 과다 반입] 혼지츠와 [키나이노 오테니모츠가 오-이타메 / 만세키토낫떼오리] 슈-노-다나노 스페-스부소쿠가 요소-사레마스。치이사나 오테니모츠、마타와 코와레야스이 오테니모츠와 마에노 자세키노 시타니 오이레쿠다사이\n[수하물 과다 반입] ほんじつは [きないの おてにもつが おおいため / まんせきとなっており] しゅうのうだなの スぺースぶそくが よそうされます。ちいさな おてにもつ、または こわれやすい おてにもつは まえの ざせきの したに おいれください。\n\n마타、스베떼노 덴시키키와 키나이모-도니 셋떼-스루카、덴겡오 오키리쿠다사이\nまた、すべての でんしききは きないモードに せっていするか、でんげんを おきりください。",
       "chapterName": "On Ground",
       "checkpoints": [
         "[목적지]",
@@ -22,12 +22,12 @@
         "ja",
         "ca"
       ],
-      "en": "Dear Passengers, this is Jeju Air flight [편명] bound for [목적지].\nPlease stow your baggage in the overhead bins or\nunder the seat in front of you.\nFor your safety and to prevent damage,\nplease stow your carry-on baggage in the overhead bins yourself.\nIf you need assistance, including passengers with disabilities,\nplease inform our cabin crew.\n\n[수하물 과다 반입] Due to today's full cabin, storage space is limited. Please keep small size baggage or fragile items under the seat in front of you.\n\nAlso, please ensure that all electronic devices are set to airplane mode or switched off.\n\n[(필요 시)군사공항] Lastly, please be aware that taking photographs in this airport is strictly forbidden. Please keep your window shade closed.",
+      "en": "Dear Passengers, this is Jeju Air flight [편명] bound for [목적지].\nFor your safety and to prevent damage to baggage,\nplease stow your carry-on baggage under the seat in front of you or\nin the overhead bins yourself.\n\n[수하물 과다 반입] Due to today’s full cabin, storage space is limited. Please keep small size baggage or fragile items under the seat in front of you.\n\nAlso, please ensure that all electronic devices are set to airplane mode or switched off.\n\n[(필요 시)군사공항] Lastly, please be aware that taking photographs in this airport is strictly forbidden. Please keep your window shade closed.",
       "title": "항공기 출발 준비",
       "quarters_ko_en": [
         "Q1"
       ],
-      "ca": "各位旅客，你们好！欢迎乘坐济州航空公司[편명]次航班前往[목적지]。\n\n[General] 请将您的行李放在前排座椅下，或上面的行李架内。\n\n[수하물 과다 반입] 另外，因为今天满客，预计行李架空间不足。除了行李箱以外，小件或易碎物品，请放在前排座椅下面。\n\n请把电子设备调成为飞行模式或关机。"
+      "ca": "各位旅客，你们好！欢迎乘坐济州航空公司[편명]次航班前往[목적지]。\n为防止行李损坏及受伤，请您自行将随身行李放在座位下方或行李架内。\n\n[General] 请将您的行李放在前排座椅下，或上面的行李架内。\n\n[수하물 과다 반입] (另外，因为今天满客，预计行李架空间不足。) 除了行李箱以外，小件或易碎物品，请放在前排座椅下面。\n\n请把电子设备调成为飞行模式或关机。\n\n[(필요 시)군사공항] 因为[공항명]是军事机场，所有机场区域内禁止拍照。请把遮光板保持关闭状态。"
     },
     {
       "en": "Dear Passengers,\n\nPower banks, electronic cigarettes, and lighters must not be placed in the overhead bins.\n\nPlease carry power banks with you or keep them in the seat pocket with proper short-circuit protection.\n\nIn addition, charging power banks or electronic cigarettes is not permitted on board.\n\nIf you notice any device getting stuck in the seat, swelling, or overheating, please inform the cabin crew immediately.",
@@ -310,10 +310,11 @@
       "evalLang": [
         "ko",
         "en",
-        "ja"
+        "ja",
+        "ca"
       ],
       "section": "3.7",
-      "en": "Dear passengers, \ncabin lights will now be turned off.\nPlease use the reading light in the panel above you.\nLavatories are located at the front and rear of the aircraft.\nAlso, for your safety, please keep your seatbelt fastened at all times while seated.\nThe use and charging of portable power banks are strictly prohibited on board.\nPlease keep them with you at all times.\nIf your power bank overheats or begins to swell, please press the crew call button overhead to inform the cabin crew immediately.\n\n[금연 안내] Also, smoking and use of electronic cigarettes are not permitted during the entire flight. You could be fined if you violate aviation security laws.",
+      "en": "Dear passengers, \ncabin lights will now be turned off.\nPlease use the reading light in the panel above you.\nLavatories are located at the front and rear of the aircraft.\nAlso, for your safety, please keep your seatbelt fastened at all times while seated.\nThe use and charging of power banks are strictly prohibited on board. Please keep them with you at all times.\nIf your power bank overheats or begins to swell, please press the crew call button overhead to inform the cabin crew immediately.\n\n[금연 안내] Also, smoking and use of electronic cigarettes are not permitted during the entire flight. You could be fined if you violate aviation security laws.",
       "ko": "손님 여러분, \n편안한 휴식을 위해 기내 조명을 어둡게 조절하겠습니다.\n조명이 필요한 분은 머리 위 독서등을 사용해 주시고,\n화장실은 앞쪽과 뒤쪽에 있으니 참고하시기 바랍니다.\n또한, 자리에 앉아 계실 때는 항상 좌석벨트를 착용해주시고,\n기내에서는 보조배터리의 사용 및 충전이 불가하며,\n반드시 직접 소지해주세요. 뜨거워지거나, 부풀어 오를 경우에는\n머리 위 승무원 호출 버튼을 눌러 승무원에게 즉시 알려주시기 바랍니다.\n\n[금연 안내] 기내에서는 전자담배를 포함한 흡연이 금지돼 있으며, 흡연 시 항공보안법에 따라 처벌대상이 될 수 있습니다.",
       "checkpoints": [
         "조명 어둡게",
@@ -323,14 +324,15 @@
       "quarters_ko_en": [
         "Q3"
       ],
-      "ja": "미나사마、키나이노 쇼-메-오 쿠라쿠 쵸-세츠사세테 이타다키마스。라이토가 히츠요-나 오캬쿠사마와 우에노 라이토봇탄오 고리요-쿠다사이。오테아라이와 젠포-토 코-호-니 고자이마스\nみなさま、きないの しょうめいを くらく ちょうせつさせて いただきます。ライトが ひつような おきゃくさまは うえの ライトボタンを ごりようください。おてあらいは ぜんぽうと こうほうに ございます。\n\n[금연]\n타바코와 덴시타바코오 후쿠메、키나이데와 스베테 킨엔토낫테오리마스。키츠엔노 사이、코-쿠-호안호-니요리、쇼바츠 사레루코토가 아리마스노데\nタバコは でんしタバコを ふくめ、きないでは すべて きんえんとなっております。きつえんの さい、こうくうほあんほうにより、しょばつ されることが ありますので。",
+      "ja": "미나사마、키나이노 쇼-메이오 쿠라쿠 쵸-세츠사세테 이타다키마스。라이토가 히츠요-나 오캬쿠사마와 우에노 라이토보탄오 고리요-쿠다사이。오테아라이와 젠포-또 코-호-니 고자이마스\nみなさま、きないの しょうめいを くらく ちょうせつさせて いただきます。ライトが ひつような おきゃくさまは うえの ライトボタンを ごりようください。おてあらいは ぜんぽうと こうほうに ございます。\n마타、오자세키니 오츠키노 사이와、츠네니 시-토베루토오 오시메쿠다사이。모바이루밧테리-와、키나이데노 고시요- 오요비 쥬-덴와 킨시사레테오리마스。카나라즈 오캬쿠사마 고지신데 오모치쿠다사이。모바이루밧테리-가 아츠쿠낫타리、후쿠란다리시타 바아이와、죠-무인니 스구니 오시라세쿠다사이\nまた、おざせきに おつきの さいは、つねに しーとべるとを おしめください。モバイルバッテリーは、きないでの ごしよう および じゅうでんは きんしされております。かならず おきゃくさま ごじしんで おもちください。モバイルバッテリーが あつくなったり、ふくらんだりした ばあいは、じょうむいんに すぐに おしらせください。\n\n[금연 안내]\n타바코와 덴시타바코오 후쿠메、키나이데와 스베떼 킨엔토낫떼오리마스。키츠엔노 사이、코-쿠-호안호-니요리、쇼바츠 사레루코토가 아리마스노데 미나사마노 고쿄-료쿠오 오네가이이타시마스\nタバコは でんしタバコを ふくめ、きないでは すべて きんえんとなっております。きつえんの さい、こうくうほあんほうにより、しょばつ されることが ありますので みなさまの ごきょうりょくを おねがいいたします。",
       "title": "Light Off/금연 안내",
       "chapterName": "En-Route",
       "chapter": 3,
       "id": "3-7",
       "quarters_ja_ca": [
         "Q2"
-      ]
+      ],
+      "ca": "各位旅客，客舱灯光将会调暗。\n在头顶上设有阅读灯，需要的旅客可以使用。\n洗手间前面有一个，后面有两个。\n同时，请大家在座位上全程系好安全带。\n严禁使用充电宝或给充电宝充电，请务必随身携带。如果充电宝发热或鼓包，请立即告诉乘务员。\n\n[금연 안내]\n客舱全区域内禁止吸烟，包括电子烟。如果违反将受到法律制裁，请大家配合。"
     },
     {
       "quarters_ko_en": [
@@ -384,7 +386,7 @@
       ],
       "ko": "손님 여러분, 잠시 후 [공항]에 착륙하겠습니다.\n\n[Normal] 좌석벨트를 매 주시고, 등받이와 테이블, 팔걸이는 제자리로 정리해 주시기 바라며, 창문 덮개는 완전히 열어 주시기 바랍니다.\n\n[중국 군사공항] 좌석벨트를 매 주시고 등받이와 테이블, 팔걸이는 제자리로 정리해 주시기 바랍니다.\n안전을 위해 짐 보관 상태를 다시 한 번 확인해주시고,\n지금부터 화장실 사용이 불가함을 알려드립니다.\n\n[B737-8] 또한, 전자기기 거치대는 원위치로 접어주시고, 충전케이블은 제거해 주시기 바랍니다.\n\n[국내 군사공항] 아울러, [공항]은 군사공항으로 외부 촬영이 금지돼 있습니다.\n\n[중국 군사공항] 아울러, [공항]은 중화인민공화국 군사시설보안법에 따라 군사시설 보안 유지를 위하여 외부 촬영이 전면 금지돼 있습니다. 지금부터 모든 창문 덮개를 닫아 주시기 바랍니다. 창문 덮개를 개방하는 등 위반행위 적발 시 처벌대상이 될 수 있으며, 항공기에서 내릴 때까지 창문 덮개 닫힘 상태를 계속 유지하시기 바랍니다.",
       "chapter": 3,
-      "ca": "各位旅客，我们即将到达[공항]。\n\n请系好安全带，调直椅背，收起小桌板，放下扶手，把遮光板打开。\n\n而且，请再次确认您的随身行李存放状态。为了安全，请不要使用洗手间。",
+      "ca": "各位旅客，我们即将到达[공항]。\n\n[Normal] 请系好安全带，调直椅背，收起小桌板，放下扶手，把遮光板打开。\n\n[중국 군사공항] 请系好安全带，调直椅背，收起小桌板，放下扶手。\n\n而且，请再次确认您的随身行李存放状态。为了安全，请不要使用洗手间。\n\n[B737-8] 同时，请将电子设备支架收回原位，并去除充电电缆。\n\n[국내 군사공항] [공항명]是军事机场，所有机场区域内禁止拍照。\n\n[중국 군사공항] 另外，[공항]为军事机场。根据中华人民共和国军事设施保护法为了保持设施保安全面禁止窗外摄影。根据有关规定请立即关闭遮光板。如果被揭发打开遮光板，拍摄等的违法行为，将可能被追究法律责任，必须保持遮光板的关闭状态。",
       "evalLang": [
         "ko",
         "en",
@@ -406,7 +408,7 @@
       "en": "Dear passengers, we will be landing soon.\n\n[Normal] Please fasten your seatbelt and return your seatback, tray table, arm rest to the original position and keep your window shade open.\n\n[중국 군사공항] Please fasten your seatbelt and return your seatback, tray table, arm rest to the original position.\n\nAlso please ensure that your carry-on baggage is properly stowed.\n\nFor safety reasons, the lavatories are now closed.\n\n[B737-8] Lastly, please arrange the electronic device holder and remove the charging cable.\n\n[국내 군사공항] Lastly, please be aware that taking photographs in this airport is strictly forbidden by military law.\n\n[중국 군사공항] Lastly, please be aware that taking photographs in this airport is strictly forbidden. Please close all window shades now and keep them closed until you deplane. Non-compliance may result in penalties."
     },
     {
-      "ca": "尊敬的各位旅客，欢迎您来到[목적지]。\n\n为了您的安全，安全带指示灯熄灭之前，请不要离开座位。\n\n而且，安全带指示灯熄灭后，打开行李架时，请注意里面的东西掉落。\n\n祝您旅途愉快，并期待与您再次见面。谢谢。",
+      "ca": "尊敬的各位旅客，欢迎您来到[목적지]。\n\n为了您的安全，安全带指示灯熄灭之前，请不要离开座位。\n\n安全带指示灯熄灭后，打开行李架时，请注意里面的东西掉落。\n\n请在下飞机后使用充电宝，如有发热、鼓包等异常情况，请立即告诉乘务员。\n\n[국내 군사공항] 而且，为了保持军事设施保安，请把遮光板全部关好。\n\n祝您旅途愉快，并期待与您再次见面。谢谢。",
       "evalLang": [
         "ko",
         "en",
@@ -418,7 +420,7 @@
       "quarters_ja_ca": [
         "Q2"
       ],
-      "en": "Dear passengers, welcome to [목적지]!\nFor your safety, please remain seated with your seatbelt fastened\nuntil the fasten seatbelt sign is turned off.\nPlease be careful when opening the overhead bins\nas items may fall out.\nAlso, please use your portable power banks after disembarking the aircraft.\nIf your power bank overheats or begins to swell, please inform the cabin crew immediately.\n\n[국내 군사공항] Lastly for security reasons, please close the window shade.\n\nThank you for flying with Jeju Air and we hope to see you again soon.",
+      "en": "Dear passengers, welcome to [목적지]!\nFor your safety, please remain seated with your seatbelt fastened\nuntil the fasten seatbelt sign is turned off.\nPlease be careful when opening the overhead bins as items may fall out.\nAlso, please use your power banks after disembarking the aircraft. If your power bank overheats or begins to swell, please inform the cabin crew immediately.\n\n[국내 군사공항] Lastly for security reasons, please close the window shade.\n\nThank you for flying with Jeju Air and we hope to see you again soon.",
       "id": "4-1-1",
       "chapterName": "After Landing",
       "quarters_ko_en": [
@@ -431,7 +433,7 @@
         "선반 개방 주의"
       ],
       "title": "Farewell: Normal",
-      "ja": "미나사마、[목적지]에 요-코소!\nみなさま、[목적지]へ ようこそ！\n\n안젠노타메 시-토베루토 챠쿠요-노사인가 키에루마데 오자세키니테 스왓떼 오마치쿠다사이\nあんぜんのため シートベルト ちゃくようのサインが きえるまで おざせきにて すわって おまちください。\n\n마타、슈-노-다나오 아케루사이와 나카노 모노가 오치나이요- 고츄-이쿠다사이\nまた、しゅうのうだなを あけるさいは なかの ものが おちないよう ごちゅういください。\n\n[국내 군사공항]\n나오、군지시세츠노 호안 이지노타메、마도노 히요케오 오시메 쿠다사이\nなお、ぐんじしせつの ほあん いじのため、まどの ひよけを おしめ ください。\n\n아리가토-고자이마시타\nありがとうございました。",
+      "ja": "미나사마、[목적지]에 요-코소!\nみなさま、[목적지]へ ようこそ！\n\n안젠노타메 시-토베루토 챠쿠요-노사인가 키에루마데 오자세키니테 스왓떼 오마치쿠다사이\nあんぜんのため シートベルト ちゃくようのサインが きえるまで おざせきにて すわって おまちください。\n\n슈-노-다나오 아케루사이와 나까노 모노가 오치나이요- 고츄-이쿠다사이\nしゅうのうだなを あけるさいは なかの ものが おちないよう ごちゅういください。\n\n마타、모바이루밧테리-와 코-쿠-키오 오리테카라 고시요-쿠다사이\nまた、モバイルバッテリーは こうくうきを おりてから ごしようください。\n\n모바이루밧테리-가 아츠쿠낫타리、후쿠란다리시타 바아이와、죠-무인니 스구니 오시라세쿠다사이\nモバイルバッテリーが あつくなったり、ふくらんだりした ばあいは、じょうむいんに すぐに おしらせください。\n\n[국내 군사공항]\n나오、군지시세츠노 호-안 이지노타메、마도노 히요케오 오시메 쿠다사이\nなお、ぐんじしせつの ほあん いじのため、まどの ひよけを おしめ ください。\n\n아리가토-고자이마시타\nありがとうございました。",
       "ko": "손님 여러분,\n[목적지]에 오신 것을 환영합니다. (*'유네스코 지정 세계 자연 유산 도시' 제주)\n안전을 위해 머리 위 좌석벨트 표시등이 꺼질 때까지\n자리에 앉아 잠시만 더 기다려 주세요.\n비행기가 완전히 멈춘 후 선반을 개방할 때에는\n안에 있는 물건이 떨어지지 않도록 주의하시기 바랍니다.\n또한, 보조배터리는 항공기에서 내리신 후, 사용하시기 바라며,\n발열, 팽창 등 이상 증상이 있는 경우 승무원에게 즉시 알려주세요.\n\n[국내 군사공항] 아울러 군사시설 보안 유지를 위하여 지금부터 창문 덮개를 닫아 주시기 바랍니다.\n\n고맙습니다."
     },
     {

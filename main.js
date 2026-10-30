@@ -1700,26 +1700,30 @@ async function loadAndRenderHome() {
           console.log('[버전확인] 서버 버전:', latest.revVersion, '캐시 버전:', cached?.rev);
 
           if (isNewVersion) {
-            // 버전 변경 감지 시 배너 노출
+            console.log('[버전감지] 새 개정본 자동 적용:', latest.revVersion);
+            // 최신 개정본으로 로컬 캐시 즉시 자동 동기화
+            localStorage.setItem('cabinvoice_scripts_cache', JSON.stringify({
+              rev: latest.revVersion, announcements: latest.announcements, ts: Date.now()
+            }));
+            _clearModelVoiceRuntimeCache();
+            _ensureVoiceStatus(true);
+            _allScripts = [..._mapAnnouncementsToScripts(latest.announcements), ...loadCustomScripts()];
+            renderSidebar(_allScripts);
+            if ($('rev-badge')) $('rev-badge').textContent = latest.revVersion;
+            if (_selectedScriptId) selectScript(_selectedScriptId);
+            showToast(`새로운 개정 방송문(${latest.revVersion})이 적용되었습니다. ✨`);
+
+            // 배너도 업데이트 완료 상태로 안내
             const banner = $('version-update-banner');
             const bannerText = $('version-update-text');
             const applyBtn = $('btn-apply-update');
-            if (banner && bannerText && applyBtn) {
-              bannerText.textContent = `새로운 개정 방송문(${latest.revVersion})이 배포되었습니다.`;
+            if (banner && bannerText) {
+              bannerText.textContent = `개정 방송문(${latest.revVersion}) 최신본이 적용되었습니다.`;
+              if (applyBtn) {
+                applyBtn.textContent = '확인';
+                applyBtn.onclick = () => banner.classList.add('hidden');
+              }
               banner.classList.remove('hidden');
-              applyBtn.onclick = () => {
-                localStorage.setItem('cabinvoice_scripts_cache', JSON.stringify({
-                  rev: latest.revVersion, announcements: latest.announcements, ts: Date.now()
-                }));
-                banner.classList.add('hidden');
-                // 이전 개정본 기준으로 불러둔 모델 음성 정리 후 상태 재조회
-                _clearModelVoiceRuntimeCache();
-                _ensureVoiceStatus(true);
-                _allScripts = [..._mapAnnouncementsToScripts(latest.announcements), ...loadCustomScripts()];
-                renderSidebar(_allScripts);
-                if ($('rev-badge')) $('rev-badge').textContent = latest.revVersion;
-                showToast(`개정 방송문(${latest.revVersion})이 적용되었습니다. ✨`);
-              };
             }
           } else {
             // 최초 진입이거나 캐시 만료 시 자동 반영
@@ -1766,8 +1770,10 @@ function _mapAnnouncementsToScripts(announcements) {
     langs: {
       ...(a.ko ? { ko: buildCustomLang(a.ko, (a.checkpoints||[]).join(','), 'ko') } : {}),
       ...(a.en ? { en: buildCustomLang(a.en, '', 'en') } : {}),
+      ...(a.ja ? { ja: buildCustomLang(a.ja, '', 'ja') } : {}),
+      ...(a.ca ? { ca: buildCustomLang(a.ca, '', 'ca') } : {}),
     }
-  })).filter(s => s.langs.ko || s.langs.en);
+  })).filter(s => s.langs.ko || s.langs.en || s.langs.ja || s.langs.ca);
 }
 
 function renderSidebar(scripts) {
