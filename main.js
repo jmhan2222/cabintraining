@@ -1770,10 +1770,8 @@ function _mapAnnouncementsToScripts(announcements) {
     langs: {
       ...(a.ko ? { ko: buildCustomLang(a.ko, (a.checkpoints||[]).join(','), 'ko') } : {}),
       ...(a.en ? { en: buildCustomLang(a.en, '', 'en') } : {}),
-      ...(a.ja ? { ja: buildCustomLang(a.ja, '', 'ja') } : {}),
-      ...(a.ca ? { ca: buildCustomLang(a.ca, '', 'ca') } : {}),
     }
-  })).filter(s => s.langs.ko || s.langs.en || s.langs.ja || s.langs.ca);
+  })).filter(s => s.langs.ko || s.langs.en);
 }
 
 function renderSidebar(scripts) {
