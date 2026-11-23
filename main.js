@@ -3007,7 +3007,7 @@ function _sgToggleEdit(section) {
 // ===== DRILL MODE =====
 // _prepSetMvState 제거됨 — 공통 플레이어(createModelVoicePlayer)가 상태 관리
 let _currentModelAudio = null;
-let _drill = { sentences: [], idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
+let _drill = { sentences: [], idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false, segStart: 0, pauseAt: 0 };
 
 // 드릴 모드 녹음 상태 완전 초기화 — 문장 전환, 드릴 진입/종료, 뒤로가기에서 공통 호출
 // 진행 중이던 MediaRecorder/MediaStream을 확실히 정리해 스트림 누수를 막는다
@@ -3041,7 +3041,9 @@ async function startDrillMode() {
   const sentences = splitSentences(lang.text).filter(s => s.length > 2);
   if (!sentences.length) { showToast('방송문이 없습니다'); return; }
   _resetDrillRecordingState(); // 이전 드릴 세션의 녹음이 남아있다면 완전 정리
-  _drill = { sentences, idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false };
+  _drill = { sentences, idx: 0, myBlob: null, myAudioUrl: null, modelAudio: null, mr: null, stream: null, chunks: [], recording: false, segStart: 0, pauseAt: 0 };
+  // 드릴은 항상 모델음성 0:00부터 시작
+  if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = 0; }
   showScreen('screen-drill');
   _drillRender();
 }
@@ -3058,12 +3060,16 @@ function _drillRender() {
   // [2] 같은 방송문 내 문장 전환 시 audio 객체 유지 — URL 동일하므로 재사용
   // (새 URL이면 doPlay 첫 호출 시 createModelVoicePlayer 내부에서 자동 교체됨)
   if (_currentModelAudio) { _currentModelAudio.pause(); }
+  // 이 문장의 모델음성 시작 위치 기억 (비교 재생·다시 연습 때 여기로 돌아옴)
+  _drill.segStart = _currentModelAudio ? (_currentModelAudio.currentTime || 0) : 0;
   createModelVoicePlayer('drill-model-player');
   console.log(`[드릴모드] 문장 ${idx + 1}/${sentences.length} 시작`);
 }
 
 async function _drillStartRec() {
   // 동기 작업 먼저 (await 없으므로 제스처 컨텍스트 유지)
+  // 녹음 직전 모델음성 위치 = 이 문장의 끝 (다음 문장은 여기서 이어서 재생)
+  _drill.pauseAt = _currentModelAudio ? (_currentModelAudio.currentTime || 0) : _drill.segStart;
   if (_currentModelAudio) { _currentModelAudio.pause(); }
   const mvpPlay = $('drill-model-player-play');
   if (mvpPlay) { mvpPlay.textContent = '▶ 재생'; }
@@ -3101,8 +3107,8 @@ async function _drillStartRec() {
       _drill.stream = null;
       await _releaseAudioSession(); // iOS 오디오 세션 전환 대기 후 복원
 
-      // [1] 비교 화면은 0:00부터 새로 듣기 — currentTime만 초기화, 객체·src 유지
-      if (_currentModelAudio) { _currentModelAudio.currentTime = 0; }
+      // [1] 비교 화면은 이 문장 시작 위치부터 듣기 — currentTime만 설정, 객체·src 유지
+      if (_currentModelAudio) { _currentModelAudio.currentTime = _drill.segStart; }
       $('drill-actions').classList.add('hidden');
       $('drill-compare').classList.remove('hidden');
       createModelVoicePlayer('drill-compare-player', { noGender: true });
@@ -3145,6 +3151,8 @@ function _drillStopRec() {
 function _drillNext() {
   if (_drill.myAudioUrl) { URL.revokeObjectURL(_drill.myAudioUrl); _drill.myAudioUrl = null; }
   _drill.myBlob = null;
+  // 다음 문장은 녹음 직전 멈췄던 위치부터 이어서 재생
+  if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = _drill.pauseAt; }
   _drill.idx++;
   if (_drill.idx >= _drill.sentences.length) {
     $('drill-actions').classList.add('hidden');
@@ -6649,6 +6657,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-drill-redo').addEventListener('click', () => {
     if (_drill.myAudioUrl) { URL.revokeObjectURL(_drill.myAudioUrl); _drill.myAudioUrl = null; }
     _drill.myBlob = null;
+    // 다시 연습: 이 문장 시작 위치로 되돌림
+    if (_currentModelAudio) { _currentModelAudio.pause(); _currentModelAudio.currentTime = _drill.segStart; }
     _drillRender();
   });
   $('btn-drill-next').addEventListener('click', _drillNext);
