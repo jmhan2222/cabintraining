@@ -3050,6 +3050,8 @@ function _resetDrillRecordingState() {
   _drill.mr = null;
   _drill.chunks = [];
   _drill.recording = false;
+  // 내 음성 재생 중이면 정지 (문장 전환·다시 연습·뒤로가기·새 녹음 시작)
+  if (_drill.myAudio) { _drill.myAudio.pause(); _drill.myAudio = null; }
 
   const recBtn = $('btn-drill-record');
   if (recBtn) {
@@ -3139,6 +3141,8 @@ async function _drillStartRec() {
       $('drill-actions').classList.add('hidden');
       $('drill-compare').classList.remove('hidden');
       createModelVoicePlayer('drill-compare-player', { noGender: true });
+      // 모델 재생 버튼을 누르면 내 음성은 정지 (겹침 방지)
+      $('drill-compare-player-play')?.addEventListener('click', () => { if (_drill.myAudio) _drill.myAudio.pause(); });
       console.log(`[드릴모드] 문장 ${_drill.idx + 1} 녹음 완료`);
     };
     mr.start();
@@ -6676,9 +6680,21 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('btn-drill-play-my').addEventListener('click', async () => {
     if (!_drill.myAudioUrl) return;
+    // 모델음성이 재생 중이면 일시정지 (위치 유지, 버튼 표시도 '재생'으로)
+    if (_currentModelAudio && !_currentModelAudio.paused) {
+      _currentModelAudio.pause();
+      const _cmpBtn = $('drill-compare-player-play');
+      if (_cmpBtn) _cmpBtn.textContent = '▶ 재생';
+    }
+    // 내 음성은 하나만 재생: 이미 있으면 처음부터 다시 (여러 번 눌러도 겹치지 않음)
+    if (!_drill.myAudio) {
+      _drill.myAudio = new Audio(_drill.myAudioUrl);
+      _drill.myAudio.setAttribute('playsinline', '');
+    }
+    const a = _drill.myAudio;
+    a.pause();
+    a.currentTime = 0;
     await resumeAudioContext();
-    const a = new Audio(_drill.myAudioUrl);
-    a.setAttribute('playsinline', '');
     a.play().catch(e => { console.error('[드릴] 내음성 재생 오류:', e); showToast('음성 재생에 실패했습니다.', 'error'); });
   });
   $('btn-drill-redo').addEventListener('click', () => {
