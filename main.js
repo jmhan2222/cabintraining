@@ -2825,85 +2825,112 @@ function _renderStudyGuide(guide) {
   if (_ms) _renderMasterScript(_ms, state.selectedLang, guide);
 }
 
-// ─── 마스터 방송문 합성 (ko/en) ───────────────────────────────────────────
-// 핵심 원칙: replace(/\//g) 가 이미 삽입된 </b>, </span> 안의 / 를 건드리지 않도록
-// ⟦word⟧ → @@PH0@@ 플레이스홀더로 격리 → / 치환 먼저 → PH 복원(마지막)
+// ─── 마스터 방송문 합성 (ko/en) · 개선판 ─────────────────────────────────
+// 기존 buildMasterScript 와 같은 이름·인자·출력 모양(같은 색, 같은 기호, 같은 줄 구조)입니다.
+// 바뀐 점: 가이드 문장을 원문에서 찾을 때 띄어쓰기·줄바꿈·쉼표·마침표 차이를 무시하고
+//          '글자 순서'로 찾습니다. 그래서 원문에 줄바꿈이나 쉼표가 있어도 기호가 빠지지 않습니다.
+//          [기내 수하물이 많아 / 만석으로] 처럼 대괄호 안의 / 는 끊어읽기 기호로 칠하지 않습니다.
 function buildMasterScript(scriptText, guideData) {
-  let text = String(scriptText || '');
+  const text = String(scriptText || '');
+  const g = guideData || {};
+  const SYM = /[∙\/↗↘→]/;
+  const isSig = c => /[0-9A-Za-zㄱ-ㆎ가-힣぀-ヿ一-鿿\[\]]/.test(c);
 
-  // 1단계: Firestore 데이터 HTML 태그 제거 후 기호 삽입 (순수 텍스트 유지)
-  (guideData.breakPoints || []).forEach(bp => {
-    if (typeof bp !== 'object' || !bp.text) return;
-    const marked = bp.text.replace(/<[^>]*>/g, '');
-    const clean  = marked.replace(/[∙\/,|]/g, '').replace(/\s{2,}/g, ' ').trim();
-    if (clean && text.includes(clean)) text = text.replace(clean, marked);
-  });
+  // 원문 글자 배열: 의미 글자(sig)에만 순번을 매깁니다.
+  const chars = [...text].map(ch => ({ ch, sig: isSig(ch), after: [], em: false, br: 0 }));
+  const sigIdx = []; chars.forEach((c, i) => { if (c.sig) sigIdx.push(i); });
+  const sigText = sigIdx.map(i => chars[i].ch).join('');
+  // 대괄호 깊이 (대괄호 안의 / 는 원문 글자)
+  let depth = 0; chars.forEach(c => { if (c.ch === '[') depth++; c.br = depth; if (c.ch === ']') depth = Math.max(0, depth - 1); });
 
-  (guideData.intonationDetails || []).forEach(item => {
-    if (!item.markedText || !item.phrase) return;
-    const markedClean = item.markedText.replace(/<[^>]*>/g, '');
-    if (text.includes(item.phrase)) text = text.replace(item.phrase, markedClean);
-  });
-
-  // 2단계: 강조 단어를 충돌 없는 유니코드 마커로 표시
-  (guideData.emphasisWords || []).filter(Boolean).forEach(word => {
-    if (!text.includes(word)) return;
-    const re = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    text = text.replace(new RegExp(re, 'g'), `⟦${word}⟧`);
-  });
-
-  // 3단계: 줄 단위 변환
-  const htmlLines = text.split('\n').map(line => {
-    const t = line.trim();
-    if (!t) return '<div style="height:8px"></div>';
-
-    // 섹션 태그 처리
-    const soloTag = t.match(/^\[([^\]]+)\]$/);
-    const tagLine  = !soloTag && t.match(/^\[([^\]]+)\]\s+(.*)/);
-    if (soloTag) {
-      const safe = soloTag[1].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      return `<div style="display:inline-block;font-size:12px;font-weight:700;color:#6E6E73;background:#F2F2F7;border-radius:5px;padding:2px 8px;margin:6px 0 2px">${safe}</div>`;
+  // 표시된 문장(markedText)에서 기호 위치를 읽어 원문에 꽂습니다.
+  const used = new Set();
+  function place(marked) {
+    const m = String(marked || '').replace(/<[^>]*>/g, '');
+    const plain = [...m].filter((c, i, a) => isSig(c)).join('');
+    if (!plain) return false;
+    let start = -1, from = 0;
+    while ((start = sigText.indexOf(plain, from)) >= 0 && used.has(m + '@' + start)) from = start + 1;
+    if (start < 0) return false;
+    used.add(m + '@' + start);
+    let k = 0, inBr = 0, trail = '';
+    for (const ch of m) {
+      if (ch === '[') inBr++;
+      if (ch === ']') inBr = Math.max(0, inBr - 1);
+      if (isSig(ch)) { k++; trail = ''; continue; }
+      if (SYM.test(ch) && !(ch === '/' && inBr > 0)) {
+        if (k === 0) continue;
+        let pos = sigIdx[start + k - 1];
+        // 기호 앞에 있던 문장부호(., , 등)가 원문에도 있으면 그 뒤에 둡니다.
+        for (const p of trail) { if (pos + 1 < chars.length && chars[pos + 1].ch === p) pos++; }
+        // 가이드가 쉼표 자리에 ∙ / 를 넣은 경우(예: '여러분∙ 우리'), 원문의 쉼표는 남기고 그 뒤에 기호를 둡니다.
+        if (!trail && (ch === '∙' || ch === '/')) {
+          if (pos + 1 < chars.length && chars[pos + 1].ch === ',') pos++;
+        }
+        if (!chars[pos].after.includes(ch)) chars[pos].after.push(ch);
+        continue;
+      }
+      if (!/\s/.test(ch)) trail += ch;
     }
+    return true;
+  }
+  (g.breakPoints || []).forEach(bp => { if (bp && typeof bp === 'object' && bp.text) place(bp.text); });
+  (g.intonationDetails || []).forEach(d => { if (d && d.markedText) place(d.markedText); });
 
-    const prefixLabel = tagLine ? tagLine[1] : null;
-    const content     = tagLine ? tagLine[2] : t;
-
-    // HTML 이스케이프 (한 번만, 가장 먼저)
-    let escaped = content
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-
-    // 강조 단어 → 플레이스홀더 (/ 치환으로부터 <b>...</b> 보호)
-    const placeholders = [];
-    escaped = escaped.replace(/⟦([^⟧]+)⟧/g, (_, word) => {
-      const idx = placeholders.length;
-      placeholders.push(`<b style="color:#FF6B00;font-weight:700;">${word}</b>`);
-      return `@@PH${idx}@@`;
-    });
-
-    // 기호 → HTML 변환 — / 를 반드시 최우선 처리
-    // (이후 생성되는 </span> 의 / 는 더 이상 replace 대상이 아님)
-    escaped = escaped
-      .replace(/\//g,  '<span style="color:#3B82F6;font-weight:800;">/</span>')
-      .replace(/∙/g,   '<span style="color:#22C55E;font-weight:800;">∙</span>')
-      .replace(/↗/g,   '<span style="color:#EF4444;font-weight:700;">↗</span>')
-      .replace(/↘/g,   '<span style="color:#3B82F6;font-weight:700;">↘</span>')
-      .replace(/→/g,   '<span style="color:#22C55E;font-weight:700;">→</span>');
-
-    // 플레이스홀더 복원 (마지막 — 이 시점엔 / 치환이 완료된 후)
-    escaped = escaped.replace(/@@PH(\d+)@@/g, (_, i) => placeholders[+i]);
-
-    const prefix = prefixLabel
-      ? `<span style="font-size:11px;font-weight:700;color:#6E6E73;background:#F2F2F7;border-radius:4px;padding:1px 5px;margin-right:5px">[${prefixLabel.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}]</span>`
-      : '';
-
-    return `<p style="margin:0 0 10px 0;line-height:2.0;">${prefix}${escaped}</p>`;
+  // 강조어: 글자 순서로 찾아 표시 (같은 말이 여러 번 나오면 모두)
+  (g.emphasisWords || []).filter(Boolean).forEach(w => {
+    const sw = [...String(w)].filter(isSig).join(''); if (!sw) return;
+    let at = 0;
+    while ((at = sigText.indexOf(sw, at)) >= 0) {
+      const a = sigIdx[at], b = sigIdx[at + sw.length - 1];
+      for (let i = a; i <= b; i++) chars[i].em = true;
+      at += sw.length;
+    }
   });
 
-  const result = htmlLines.join('');
-  console.log('[마스터방송문] 결과 미리보기:', result.substring(0, 200));
-  return result;
+  // 줄 단위 HTML (기존과 같은 스타일)
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const symHtml = ch => ({
+    '/': '<span style="color:#3B82F6;font-weight:800;">/</span>',
+    '∙': '<span style="color:#22C55E;font-weight:800;">∙</span>',
+    '↗': '<span style="color:#EF4444;font-weight:700;">↗</span>',
+    '↘': '<span style="color:#3B82F6;font-weight:700;">↘</span>',
+    '→': '<span style="color:#22C55E;font-weight:700;">→</span>'
+  })[ch] || esc(ch);
+  // 끊어읽기(/ ∙)는 억양 화살표 뒤에 오도록 정렬: "입니다↘./" 모양
+  const order = ch => ('↗↘→'.includes(ch) ? 0 : 1);
+
+  const lines = []; let cur = [];
+  chars.forEach(c => { if (c.ch === '\n') { lines.push(cur); cur = []; } else cur.push(c); });
+  lines.push(cur);
+
+  const html = lines.map(line => {
+    const raw = line.map(c => c.ch).join('');
+    const t = raw.trim();
+    if (!t) return '<div style="height:8px"></div>';
+    const solo = t.match(/^\[([^\]]+)\]$/);
+    if (solo) return `<div class="ms-tag" style="display:inline-block;font-size:12px;font-weight:700;color:#6E6E73;background:#F2F2F7;border-radius:5px;padding:2px 8px;margin:6px 0 2px">${esc(solo[1])}</div>`;
+    let body = line, prefix = '';
+    const tag = t.match(/^\[([^\]]+)\]\s+/);
+    if (tag) {
+      const lead = raw.length - raw.trimStart().length;
+      body = line.slice(lead + tag[0].length);
+      prefix = `<span class="ms-tag" style="font-size:11px;font-weight:700;color:#6E6E73;background:#F2F2F7;border-radius:4px;padding:1px 5px;margin-right:5px">[${esc(tag[1])}]</span>`;
+    }
+    let out = '', inEm = false;
+    body.forEach(c => {
+      if (c.em && !inEm) { out += '<b style="color:#FF6B00;font-weight:700;">'; inEm = true; }
+      if (!c.em && inEm) { out += '</b>'; inEm = false; }
+      if (!c.hide) out += esc(c.ch);
+      if (c.after.length) {
+        if (inEm) { out += '</b>'; inEm = false; }
+        out += [...c.after].sort((a, b) => order(a) - order(b)).map(symHtml).join('');
+      }
+    });
+    if (inEm) out += '</b>';
+    return `<p style="margin:0 0 10px 0;line-height:2.0;">${prefix}${out.trim()}</p>`;
+  });
+  return html.join('');
 }
 
 // ─── 마스터 방송문 카드 렌더링 ────────────────────────────────────────────
